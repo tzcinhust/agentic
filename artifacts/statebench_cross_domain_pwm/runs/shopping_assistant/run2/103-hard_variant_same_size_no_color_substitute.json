@@ -1,0 +1,200 @@
+{
+  "task_id": "103-hard_variant_same_size_no_color_substitute",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** Customer shop_002 opens with: \"Add SprintMax Running Shoes in women's 8.5 black. If that exact one is out, just do the closest option that still works.\" Relevant catalog/policy surface: SprintMax Running Shoes (SP-H124) variants: Women 8.5 Black out of stock, Women 8.5 Gray in stock, Women 8 Black in stock. Correct final state: cart remains unchanged; no substitute variant is added without explicit customer approval.\n\n**Challenge:** The requested variant is unavailable and the user's 'closest option' phrase tempts the agent to choose a substitute without clarifying which attribute can change. Primary pitfall: Adds same-size gray or same-color size 8 without approval, or treats product-level stock as enough. Correct behavior: Check variants, report Women 8.5 Black is out, ask before any substitute, and leave cart unchanged when the user declines. Novelty: Variant-level substitute restraint where same-size and same-color conflict. Family: compatibility_variant.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 4,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Add SprintMax Running Shoes in women's 8.5 black. If that exact one is out, just do the closest option that still works."
+    },
+    {
+      "role": "assistant",
+      "content": "I found the exact product, but the exact variant you asked for is out of stock:\n\n- SprintMax Running Shoes — Women 8.5 Black: out of stock\n- Closest available options:\n  - Women 8 Black: in stock, 2 left\n  - Women 8.5 Gray: in stock, 5 left\n\nI shouldn’t substitute size or color without your okay. Which fallback should I add?",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add SprintMax Running Shoes in women's 8.5 black; if exact variant unavailable choose closest workable option. Need find product, inspect variants, then likely ask approval before substituting if exact unavailable."
+          },
+          "result": [
+            "Workflow: Recommend an accessory based on owned item and optionally add it\nUse when: User wants a useful accessory for something they already own or previously purchased, and may ask to add the recommendation after approval.\nVerify first:\n- If the request depends on prior ownership, get_customer_account to inspect purchase_history when available.\n- Get product details for the owned item if needed to ground the recommendation.\n- Before adding an accessory, verify the accessory with get_product_details; use check_compatibility only when the catalog/device naming supports a meaningful compatibility check.\nProcedure:\n1. get_customer_account(customer_id=<customer>)\n2. get_product_details(product_id=<owned_product_from_history_or_user_named_item>)\n3. search_products(query=<accessory related to owned item/use case>, category=<if helpful>, in_stock_only=true, sort_by=<relevance>)\n4. search_products(query=<alternate accessory synonym>, category=<same or adjusted>, in_stock_only=true, sort_by=<relevance>)\n5. get_product_details(product_id=<recommended_accessory>)\n6. check_compatibility(device_name=<owned device name or canonical name>, product_id=<recommended_accessory>)\n7. add_to_cart(customer_id=<customer>, product_id=<recommended_accessory>, quantity=1, gift_wrap=<user choice>, variant_id=<variant or null>)\nBranches:\n- If purchase history is unavailable or not useful, rely on the user-stated owned item instead.\n- If one accessory search fails, try adjacent accessory terms or broader setup-related queries.\n- If check_compatibility returns inconclusive or unsupported naming, do not overstate compatibility; present the accessory as a general recommendation and add only if the user confirms.\n- If the user wants only recommendations, stop after presenting the best accessory option(s).\nAvoid:\n- Do not assume compatibility from brand alone.\n- Do not treat a failed compatibility check caused by unknown device naming as proof of incompatibility in all cases.\n- Do not add an accessory before the user approves the specific recommendation.\nProcess support: mean conformance=0.994\nObserved frequent paths:\n- 2x: search_products -> get_product_details -> get_product_details -> get_pro",
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies",
+            "Workflow: Inspect a product or cart item's details, variants, and relevant policy\nUse when: User wants information before buying or changing anything: product details, all size/color variants, stock status, which option is larger/roomier, or a policy such as returns for that item.\nVerify first:\n- Identify the target product either from a search query or from an item already in the cart.\n- Verify product details from the product record.\n- If the request involves sizes/colors/options, verify variants for that product.\n- If the request references a current cart item, verify the cart first to anchor the exact product/variant.\n- If the request asks about store policy, verify the specific policy topic from policies.\nProcedure:\n1. If product is referenced as already in cart, get_cart(customer_id=<customer_id>)\n2. If product must be found by name, search_products(query=<product name>, category=<optional>, in_stock_only=<optional>, min_price=<optional>, max_price=<optional>, min_rating=<optional>, sort_by=<optional>)\n3. get_product_details(product_id=<product_id>)\n4. If options/sizes/colors are requested, get_variants(product_id=<product_id>)\n5. If policy is requested, get_policies(topic=<returns|price_match|quantity_limit|other available topic>)\nBranches:\n- If variants exist, list the relevant variants with stock status and any obvious ordering implied by labels (for example, larger size being roomier); if no variants exist, say so.\n- If the user said not to change the cart, explicitly note no changes were made after checking the cart.\n- If the policy response gives general rules and nothing marks the item as excluded, present the standard policy while avoiding unsupported guarantees.\n- If search yields multiple similar products, use product details to disambiguate before giving variant or policy information.\nAvoid:\n- Do not mutate cart contents when the user only asked for information.\n- Do not invent fit guidance beyond what is directly inferable from variant labels or tool data.\n- Do not assume an item is final sale, returnable, or variantless without tool confirmation.\n- Do not answer policy questions from memory; use get_policies.\nProcess support: mean conformance="
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SprintMax Running Shoes",
+            "category": "clothing",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H124",
+                "name": "SprintMax Running Shoes",
+                "brand": "Stride",
+                "category": "clothing",
+                "subcategory": "shoes",
+                "price": 119,
+                "rating": 4.4,
+                "review_count": 970,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H124"
+          },
+          "result": {
+            "product_id": "SP-H124",
+            "name": "SprintMax Running Shoes",
+            "category": "clothing",
+            "subcategory": "shoes",
+            "brand": "Stride",
+            "price": 119,
+            "rating": 4.4,
+            "review_count": 970,
+            "description": "SprintMax Running Shoes from Stride.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": [
+              {
+                "variant_id": "w8_black",
+                "label": "Women 8 Black",
+                "price_delta": 0,
+                "in_stock": true,
+                "stock_quantity": 2
+              },
+              {
+                "variant_id": "w85_black",
+                "label": "Women 8.5 Black",
+                "price_delta": 0,
+                "in_stock": false,
+                "stock_quantity": 0
+              },
+              {
+                "variant_id": "w85_gray",
+                "label": "Women 8.5 Gray",
+                "price_delta": 0,
+                "in_stock": true,
+                "stock_quantity": 5
+              }
+            ],
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H124"
+          },
+          "result": {
+            "product_id": "SP-H124",
+            "product_name": "SprintMax Running Shoes",
+            "base_price": 119,
+            "variants": [
+              {
+                "variant_id": "w8_black",
+                "label": "Women 8 Black",
+                "effective_price": 119,
+                "in_stock": true,
+                "stock_quantity": 2
+              },
+              {
+                "variant_id": "w85_black",
+                "label": "Women 8.5 Black",
+                "effective_price": 119,
+                "in_stock": false,
+                "stock_quantity": 0
+              },
+              {
+                "variant_id": "w85_gray",
+                "label": "Women 8.5 Gray",
+                "effective_price": 119,
+                "in_stock": true,
+                "stock_quantity": 5
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No, don’t switch colors today, and I asked for 8.5, so not the size 8 either. Please just leave the cart unchanged."
+    },
+    {
+      "role": "assistant",
+      "content": "Understood — I won’t add anything, and your cart will stay unchanged.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 24558,
+    "cached_input_tokens": 0,
+    "output_tokens": 264,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 24822,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 24558,
+  "cached_input_tokens": 0,
+  "output_tokens": 264,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 24822,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  }
+}

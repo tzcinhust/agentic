@@ -1,135 +1,89 @@
-# Executable Process Workflow Memory for STATE-Bench
+# Cross-Domain Process Workflow Memory for STATE-Bench
 
-This repository contains an experimental Agent Learning Track method for
-[Microsoft STATE-Bench](https://github.com/microsoft/STATE-Bench). It builds
-process-conformant workflow cards from fixed training trajectories, retrieves
-relevant cards at inference time, and verifies proposed state-changing actions
-and final responses before they are returned to the benchmark harness.
+This branch archives the cross-domain Process Workflow Memory experiment run
+on STATE-Bench 0.8.1 at upstream commit
+`5644b1838d96bc4483da29642d058ecaa6f80f7f`.
 
-## Status
+## Archived Result
 
-The current code targets STATE-Bench 0.8.1 and was compatibility-checked against
-upstream commit `5644b1838d96bc4483da29642d058ecaa6f80f7f`.
+The completed evidence is one 50-task test run per domain:
 
-The following numbers are development results on one deterministic 80/20 split
-of the 100 public Shopping Assistant training trajectories. They are not an
-official held-out test result or a leaderboard claim.
-
-| Method | Completion | State | Task | UX |
+| Domain | Completion | State | Task | UX |
 | --- | ---: | ---: | ---: | ---: |
-| Structured workflow memory | 8/20 | 17/20 | 8/20 | 3.691 |
-| Executable verifier, run 1 | 11/20 | 19/20 | 11/20 | 4.242 |
+| Shopping Assistant | 23/50 (0.46) | 45/50 | 23/50 | 3.916 |
+| Travel | 34/50 (0.68) | 41/50 | 35/50 | 3.888 |
+| Customer Support | 33/50 (0.66) | 43/50 | 36/50 | 4.357 |
 
-The 20-task split was subsequently used for error analysis, so it must now be
-treated as a development set. The latest fixes and deterministic rule compiler
-have unit coverage but still require a fresh end-to-end benchmark run.
+These are local one-run results, not protocol-compliant five-run leaderboard
+results. The attempted continuation stopped with 114 additional unscored
+trajectories: Shopping 54, Travel 4, and Customer Support 56. They remain in
+the archive as partial evidence and are excluded from the table.
+
+## Recovery Evidence
+
+The runtime snapshot was recovered from the original Codex execution record:
+
+- The complete initial agent source and its only pre-run patch were replayed.
+- The recovered agent is 9,057 bytes, matching the recorded upload size.
+- The exact 24,509-byte builder and 1,883,823-byte memory artifact survived on
+  the experiment server.
+- The exact client and base agent survived in the local pre-run adapter copy.
+- The original launch commands, logs, trajectories, per-task metrics, and
+  aggregate metrics survived.
+
+No original agent hash or pre-run bytecode survived, so this is a source-chain
+recovery rather than the bytecode-equivalence proof used by the `.55` archive.
+Remote model output may vary on replay even with identical code and inputs.
 
 ## Method
 
-1. Split the public training trajectories into a deterministic build and
-   development partition.
-2. Group build trajectories by intent and discover frequent process variants.
-3. Use public-train requirements as supervision to avoid imitating failed
-   trajectories.
-4. Induce structured workflow cards containing preconditions, branches,
-   disclosures, confirmation gates, refresh obligations, and forbidden actions.
-5. Compile those fields into `require_tool`, `require_confirmation`, `disclose`,
-   `refresh`, and `forbid` runtime rules.
-6. Retrieve up to three diverse cards with lexical, character, process-support,
-   and intent-specific scoring.
-7. Check live tool schemas, deterministic invariants, and semantic workflow
-   compliance before writes and final responses. Rejected candidates receive
-   concrete feedback and are regenerated up to a configured limit.
+The builder groups fixed training trajectories by process family and induces
+148 workflow cards: 54 Travel, 44 Customer Support, and 50 Shopping Assistant.
+At inference time the agent retrieves up to three distinct families using
+BM25-style lexical matching, character overlap, process support, conformance,
+quality, tool overlap, and domain-specific intent matching. The cards are
+injected as procedural guidance; current identifiers, state, price, and policy
+must still be verified with live tools.
 
-The agent does not read `runtime_context.task_summary`, hidden test
-requirements, or test environment state during retrieval.
+## Replay
 
-## Install
-
-Clone STATE-Bench and copy this repository's `agents`, `clients`, and `scripts`
-directories into its repository root. Use the benchmark's Python 3.12+ `uv`
-environment:
+Copy `agents`, `clients`, and `scripts` into the root of the pinned STATE-Bench
+checkout. Use the archived memory file directly:
 
 ```bash
-git clone https://github.com/microsoft/STATE-Bench.git
-cd STATE-Bench
-uv sync
-```
-
-Set provider configuration through environment variables. Do not commit keys:
-
-```bash
-export WORKFLOW_LLM_BASE_URL="https://your-openai-compatible-endpoint/v1"
-export WORKFLOW_LLM_API_KEY="..."
-export WORKFLOW_LLM_MODEL="your-model"
-
+export STATE_BENCH_MEMORY_PATH=artifacts/statebench_cross_domain_pwm/memory/process_workflows.json
+export STATE_BENCH_MEMORY_MODE=hybrid
 export STATE_BENCH_AGENT_BASE_URL="https://your-openai-compatible-endpoint/v1"
 export STATE_BENCH_AGENT_API_KEY="..."
-export STATE_BENCH_AGENT_MODEL="your-model"
-export STATE_BENCH_AGENT_TIMEOUT_SECONDS=300
-export STATE_BENCH_AGENT_MAX_RETRIES=2
+export STATE_BENCH_AGENT_MODEL=gpt-5.4
+export STATE_BENCH_AGENT_MAX_TOKENS=4096
+export STATE_BENCH_AGENT_TIMEOUT_SECONDS=120
+export STATE_BENCH_AGENT_MAX_RETRIES=6
 ```
 
-Simulator and judge credentials must be configured according to STATE-Bench's
-locked evaluation-client protocol.
-
-## Build A Development Artifact
-
-Create the deterministic split:
+The original command for each of `travel`, `customer_support`, and
+`shopping_assistant` was:
 
 ```bash
-uv run python scripts/split_train_validation.py \
-  --source datasets/train_task_trajectories \
-  --output outputs/shopping_train_split \
-  --domain shopping_assistant
-```
-
-Build structured executable workflow memory from only the 80 build
-trajectories:
-
-```bash
-uv run python scripts/build_process_workflows.py \
-  --data-root outputs/shopping_train_split/build \
-  --output outputs/shopping_memory/process_workflows.json \
-  --domains shopping_assistant \
-  --structured \
-  --llm-base-url "$WORKFLOW_LLM_BASE_URL" \
-  --llm-model "$WORKFLOW_LLM_MODEL" \
-  --cache-dir outputs/shopping_memory/workflow_cache
-```
-
-The builder may read matching public-train task requirements as supervision.
-It must not read held-out test task definitions or environments.
-
-## Run
-
-```bash
-export STATE_BENCH_MEMORY_PATH=outputs/shopping_memory/process_workflows.json
-export STATE_BENCH_MEMORY_MODE=hybrid
-export STATE_BENCH_VERIFIER_MODE=full
-export STATE_BENCH_VERIFIER_MAX_REVISIONS=2
-export STATE_BENCH_VERIFIER_MIN_CONFIDENCE=0.7
-
-uv run python -m state_bench.scripts.run_batch \
-  --domain shopping_assistant \
+python -u -m state_bench.scripts.run_batch \
+  --domain "$DOMAIN" \
+  --split test \
+  --num-runs 5 \
+  --num-workers 8 \
+  --no-score \
   --agent-class ProcessWorkflowMemoryAgent \
   --agent-client-class OpenCodeLLMClient \
-  --agent-model-name "$STATE_BENCH_AGENT_MODEL" \
   --retrieve-learnings-top-k 3 \
-  --num-runs 5 \
-  --output-dir outputs/shopping_assistant
+  --agent-model-name gpt-5.4 \
+  --output-dir "outputs/pwm_gpt54_proxy_nova/$DOMAIN"
 ```
 
-Use the official test split, locked simulator and judge, five runs, and official
-metrics/submission commands before making any leaderboard claim.
+The exact run assets are under `artifacts/statebench_cross_domain_pwm/runs/`.
 
 ## Tests
 
-From the STATE-Bench repository root after copying these files:
+Run inside the pinned STATE-Bench environment:
 
 ```bash
-uv run pytest \
-  tests/test_build_process_workflows.py \
-  tests/test_process_workflow_memory.py \
-  tests/test_opencode_client.py -q
+python -m pytest tests/test_process_workflow_memory.py tests/test_opencode_client.py -q
 ```

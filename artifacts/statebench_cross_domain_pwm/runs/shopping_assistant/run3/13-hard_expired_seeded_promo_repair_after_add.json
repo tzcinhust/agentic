@@ -1,0 +1,297 @@
+{
+  "task_id": "13-hard_expired_seeded_promo_repair_after_add",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"Add the HomeBrew Pour-Over Coffee Set to my skillet cart. Keep any valid discount, but don't leave an expired promo on the cart. Tell me the final total.\" Relevant catalog/policy surface: Seeded cart has CasaGrande Cast-Iron Skillet (SP-H117) with EXPIRED10 applied. EXPIRED10 is expired; KITCHEN10 is valid for kitchen items. Adding SP-H118 gives kitchen subtotal $148 and KITCHEN10 discount $14.. Correct final state: SP-H117 and SP-H118 in cart, KITCHEN10 applied, total $134.\n\n**Challenge:** The seeded promo state is stale and must be repaired after the add. Primary pitfall: Trusts expired EXPIRED10, drops all discounts, or forgets the valid kitchen fallback. Correct behavior: Add SP-H118, replace expired promo with KITCHEN10, and quote $134. Novelty: Expired seeded promo repair tied to an add. Family: promotions_discounts.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 1,
+  "tool_calls": 9,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Add the HomeBrew Pour-Over Coffee Set to my skillet cart. Keep any valid discount, but don't leave an expired promo on the cart. Tell me the final total."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added the HomeBrew Pour-Over Coffee Set to your cart.\n\nI also removed the expired promo code `EXPIRED10`, so there’s no invalid discount left on the cart.\n\nFinal total: $148\n\nCart now has:\n- CasaGrande Cast-Iron Skillet — $89\n- HomeBrew Pour-Over Coffee Set — $59\n\nNo promo is currently applied, and there’s no shipping selected yet.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "add product to cart while preserving valid discount and removing expired promo if needed; then report final total"
+          },
+          "result": [
+            "Workflow: Maximize loyalty discount after cart removal\nUse when: User wants an item removed from cart and then wants loyalty points applied to the remaining cart, preferably only if the discount is materially worthwhile.\nVerify first:\n- Use get_cart to confirm the target item is currently in the cart and inspect current totals and any existing loyalty redemption.\n- Use get_customer_account to verify current loyalty point balance before attempting a new redemption.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. remove_from_cart(customer_id, product_id, variant_id)\n4. redeem_loyalty_points(customer_id, points)\n5. cancel_loyalty_redemption(customer_id)\n6. redeem_loyalty_points(customer_id, points)\nBranches:\n- If get_cart shows the item is not present, do not mutate; report that nothing needs removal.\n- If the user asks to use points only when worthwhile, compare the available redemption effect on the remaining cart and stop with a no-write explanation if the savings would be trivial by the user's stated preference.\n- If redeem_loyalty_points succeeds on the first try, stop there.\n- If redeem_loyalty_points returns that points are already redeemed on the cart, use cancel_loyalty_redemption and then retry redeem_loyalty_points with the desired amount.\n- If the customer has no usable points, remove the item if requested and report that no loyalty discount can be applied.\nAvoid:\n- Do not assume a fixed redemption cap or conversion without relying on current tool results.\n- Do not cancel an existing redemption unless needed to change the amount.\n- Do not invent promo-stacking rules or eligibility rules not shown by tools.\n- Do not use concrete product IDs, point balances, or dollar amounts as reusable rules.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_cart\n- 1x: get_cart -> get_customer_account -> remove_from_cart -> redeem_loyalty_points -> cancel_loyalty_redemption -> redeem_loyalty_points",
+            "Workflow: Choose the better promo code for a product/cart\nUse when: User provides two or more candidate promo codes or asks which promo is better for the requested item/cart, and wants the best valid single code used.\nVerify first:\n- Identify the target product and its category with search_products and/or get_product_details.\n- Check cart state with get_cart because an existing promo or other items may affect outcome.\n- Fetch candidate promotions with get_promotions for the relevant category.\n- If stacking limits are relevant or user wants multiple codes, verify promo policy with get_policies.\nProcedure:\n1. search_products(query=<product request>, category=<if known>, in_stock_only=true)\n2. Optionally get_product_details(product_id=<chosen_product_id>)\n3. get_cart(customer_id=<customer_id>)\n4. get_promotions(category=<product_category>)\n5. If policy clarification is needed, get_policies(topic=<promotions_or_stacking>)\n6. get_variants(product_id=<chosen_product_id>)\n7. add_to_cart(customer_id=<customer_id>, product_id=<chosen_product_id>, variant_id=<selected_variant_or_null>, quantity=<requested_quantity_or_1>, gift_wrap=<requested_or_false>)\n8. apply_promo(customer_id=<customer_id>, promo_code=<best_valid_code>)\n9. Optionally get_cart(customer_id=<customer_id>)\nBranches:\n- If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.\n- If multiple candidate codes are available in get_promotions, prefer the one that yields the larger valid discount for the current item/cart conditions.\n- If one code is invalid, inactive, category-restricted, or below minimum purchase, exclude it and use the valid better alternative if requested.\n- If none of the provided codes are valid, do not apply any; offer to add at regular price or ask whether to continue.\n- If the user explicitly chooses one code after comparison, apply that chosen code rather than re-optimizing.\nAvoid:\n- Do not claim two promos can stack unless current tool-backed policy says so.\n- Do not compare promos using assumptions not supported by get_promotions/get_policies.\n- Do not apply an unverified code just because the us",
+            "Workflow: Apply promo and update existing cart item options, then report loyalty earnings\nUse when: User is finalizing an existing cart, wants a promo applied or gift-wrap updated on items already in cart, and/or asks how many loyalty points the order will earn.\nVerify first:\n- Read cart with get_cart to see existing items and current totals.\n- Read account with get_customer_account to get membership tier.\n- If a promo may be used, check active offers with get_promotions and validate with validate_promo before applying.\n- Read promo stacking rules with get_policies if discounts may interact.\n- Read loyalty earning policy with get_policies before quoting earned points.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. get_promotions(category-or-null)\n4. get_policies(topic=promo/stacking)\n5. validate_promo(customer_id, promo_code)\n6. apply_promo(customer_id, promo_code)\n7. get_cart(customer_id)\n8. update_cart_item(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n9. get_cart(customer_id)\n10. get_policies(topic=loyalty/earning)\nBranches:\n- If no promo is requested, skip promo tools and only update cart item options or report earnings.\n- If validate_promo says invalid, do not apply; report the reason and leave cart unchanged.\n- If the user asks to add gift wrap to an existing item, use update_cart_item rather than add_to_cart.\n- If the user asks only how many points will be earned, compute from the final cart total and tier rules after any applied discounts, and mention that later cart changes can affect earnings.\n- If multiple items are in cart and only some need gift wrap, update only the specified items.\nAvoid:\n- Do not assume points-earning rate without checking policy.\n- Do not quote earnings from subtotal when policy says final total after discounts.\n- Do not use add_to_cart to modify an existing cart line's gift-wrap setting.\n- Do not apply more than one promo code or ignore stacking restrictions.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loy"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "HomeBrew Pour-Over Coffee Set",
+            "category": "kitchen",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H118",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "BrewLab",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 610,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H117",
+                "product_name": "CasaGrande Cast-Iron Skillet",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 89
+              }
+            ],
+            "subtotal": 89,
+            "discount_amount": 8,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 81,
+            "applied_promo_codes": [
+              "EXPIRED10"
+            ]
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 2200,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H118"
+          },
+          "result": {
+            "product_id": "SP-H118",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "base_price": 59,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "EXPIRED10"
+          },
+          "result": {
+            "valid": false,
+            "reason": "Promo code expired on 2026-01-01T00:00:00.",
+            "estimated_discount": 0
+          }
+        },
+        {
+          "name": "remove_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "EXPIRED10"
+          },
+          "result": {
+            "status": "removed",
+            "promo_code": "EXPIRED10",
+            "applied_promo_codes": [],
+            "discount_amount": 0,
+            "cart_subtotal": 89,
+            "cart_total": 89
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H118",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-H118",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 59,
+            "cart_subtotal": 148,
+            "cart_total": 148
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H117",
+                "product_name": "CasaGrande Cast-Iron Skillet",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 89
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H118",
+                "product_name": "HomeBrew Pour-Over Coffee Set",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 59,
+                "line_total": 59
+              }
+            ],
+            "subtotal": 148,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 148,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 32669,
+    "cached_input_tokens": 0,
+    "output_tokens": 364,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 33033,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 32669,
+  "cached_input_tokens": 0,
+  "output_tokens": 364,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 33033,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-H118",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [
+              "CI-0001"
+            ],
+            "new": [
+              "CI-0001",
+              "CI-0002"
+            ]
+          },
+          "applied_promo_codes": {
+            "old": [
+              "EXPIRED10"
+            ],
+            "new": []
+          },
+          "discount_amount": {
+            "old": 8,
+            "new": 0
+          },
+          "subtotal": {
+            "old": 89,
+            "new": 148
+          },
+          "total": {
+            "old": 81,
+            "new": 148
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

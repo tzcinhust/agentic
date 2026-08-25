@@ -1,4 +1,4 @@
-"""Custom STATE-Bench agent backed by an OpenAI-compatible chat client."""
+"""Custom STATE-Bench agent backed by an OpenAI-compatible Chat Completions API."""
 
 from __future__ import annotations
 

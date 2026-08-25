@@ -1,0 +1,315 @@
+{
+  "task_id": "89-stock_exactly_sufficient_regression_guard",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A Standard-tier returning customer (shop_004, Taylor Kim) with an empty cart asks to add 3 PixelShot Webcams (SP-2005, $79 each). Stock is exactly 3, which matches the request, and the per-product qty cap is 3, also matching. Both constraints allow the add. Agent must call add_to_cart with qty=3 and confirm subtotal $237. Final cart: SP-2005 qty=3, subtotal $237, total $237.\n\n**Challenge:** Don't manufacture stock anxiety. Agents trained to be cautious may: (1) warn about low stock unprompted and ask the customer to confirm, (2) silently reduce quantity to 'leave stock for others', (3) refuse to add claiming scarcity, or (4) add the wrong quantity. The correct behavior is clean execution of a valid request. This is primarily a regression guard — agents should not invent friction where the policy admits none.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "added_full_quantity",
+      "kind": "must",
+      "requirement": "Agent added SP-2005 with quantity 3 (either in a single add_to_cart call or equivalent). Adding fewer than 3 fails — the customer asked for 3 and stock allowed it.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool call add_to_cart was made for product_id SP-2005 with quantity 3. Follow-up get_cart confirms SP-2005 in cart with quantity 3."
+    },
+    {
+      "id": "did_not_silently_reduce_qty",
+      "kind": "must_not",
+      "requirement": "Agent did NOT silently reduce the quantity below 3 on its own initiative. If the agent asked a clarifying question and the customer reconfirmed 3, the final state must still be qty=3.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There was no add_to_cart call with quantity below 3 and no evidence of any reduction; the only cart write added quantity 3 as requested."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "No set_shipping_option or redeem_loyalty_points tool calls appear in the transcript; only product lookup/cart retrieval and add_to_cart were used."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.95,
+  "ux_reasoning": "The agent cleanly executed the exact requested cart change with the correct quantity and then clearly reported the resulting total, with no unnecessary confirmation step or surprise behavior. It did not invent stock scarcity, reduce quantity, or add friction despite stock exactly matching the request, which is especially important in this task. Tool use was appropriate and internally verified the product, non-variant status, and final cart state without making the user restate anything. The final message was concise, directly answered the request, and included the key state change and subtotal.",
+  "turns": 1,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hey — add three PixelShot webcams to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added 3 PixelShot Webcam 1080p units to your cart.\n\nCart total so far: $237\n\nIf you want, I can also check for any eligible promo codes or shipping options.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "add specific product to cart search variants details quantity 3"
+          },
+          "result": [
+            "Workflow: Add requested product/variant to cart and confirm cart\nUse when: User wants a specific product added to cart, possibly with quantity, variant attributes, and gift-wrap preference, and the product can be identified via catalog search.\nVerify first:\n- Identify the intended product from catalog results.\n- Verify variant requirements and whether a variant_id is needed.\n- If the user requested a specific quantity or variant, verify stock/availability from search and variant data before writing when possible.\nProcedure:\n1. search_products(query, optional filters)\n2. get_variants(product_id)\n3. add_to_cart(customer_id, product_id, variant_id or null, quantity, gift_wrap)\n4. get_cart(customer_id)\nBranches:\n- If initial search returns no match, refine and repeat search_products with relaxed or adjusted filters; if still no match, stop with a no-write outcome.\n- If get_variants shows no variants, use null variant_id in add_to_cart.\n- If the requested variant exists and appears available, add the requested quantity; then use get_cart to confirm resulting cart contents and totals.\n- If the user only asked for availability and not to add unless conditions are met, stop before add_to_cart when those conditions are not satisfied.\nAvoid:\n- Do not invent product_ids, variant_ids, prices, or stock counts.\n- Do not skip get_variants when the product may have variants.\n- Do not claim cart totals without reading get_cart after a write.\n- Do not add a partial quantity when the user explicitly forbids partial fulfillment.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_products -> search_products -> search_products -> get_variants\n- 1x: search_products -> get_variants -> add_to_cart -> get_policies -> get_customer_account -> add_to_cart -> get_cart",
+            "Workflow: Inspect a product or cart item's details, variants, and relevant policy\nUse when: User wants information before buying or changing anything: product details, all size/color variants, stock status, which option is larger/roomier, or a policy such as returns for that item.\nVerify first:\n- Identify the target product either from a search query or from an item already in the cart.\n- Verify product details from the product record.\n- If the request involves sizes/colors/options, verify variants for that product.\n- If the request references a current cart item, verify the cart first to anchor the exact product/variant.\n- If the request asks about store policy, verify the specific policy topic from policies.\nProcedure:\n1. If product is referenced as already in cart, get_cart(customer_id=<customer_id>)\n2. If product must be found by name, search_products(query=<product name>, category=<optional>, in_stock_only=<optional>, min_price=<optional>, max_price=<optional>, min_rating=<optional>, sort_by=<optional>)\n3. get_product_details(product_id=<product_id>)\n4. If options/sizes/colors are requested, get_variants(product_id=<product_id>)\n5. If policy is requested, get_policies(topic=<returns|price_match|quantity_limit|other available topic>)\nBranches:\n- If variants exist, list the relevant variants with stock status and any obvious ordering implied by labels (for example, larger size being roomier); if no variants exist, say so.\n- If the user said not to change the cart, explicitly note no changes were made after checking the cart.\n- If the policy response gives general rules and nothing marks the item as excluded, present the standard policy while avoiding unsupported guarantees.\n- If search yields multiple similar products, use product details to disambiguate before giving variant or policy information.\nAvoid:\n- Do not mutate cart contents when the user only asked for information.\n- Do not invent fit guidance beyond what is directly inferable from variant labels or tool data.\n- Do not assume an item is final sale, returnable, or variantless without tool confirmation.\n- Do not answer policy questions from memory; use get_policies.\nProcess support: mean conformance=",
+            "Workflow: Search item, resolve variant, and add to cart\nUse when: User wants one or more specific products added to cart and the exact cart-ready product/variant is not yet fully resolved from the request alone.\nVerify first:\n- Identify the intended product(s) from the user's wording or provided product identifier.\n- Verify the selected catalog item exists via search_products or get_product_details.\n- Check whether a variant_id is required via get_variants.\n- If the user mentioned compatibility-sensitive context, verify with get_product_details and optionally check_compatibility before adding.\nProcedure:\n1. search_products(query=<requested item>, category=<if known>, in_stock_only=<if user requires>)\n2. get_variants(product_id=<selected product>)\n3. get_product_details(product_id=<selected product>)\n4. check_compatibility(device_name=<user device>, product_id=<selected product>)\n5. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<resolved variant or null>, quantity=<requested qty>, gift_wrap=<requested flag>)\nBranches:\n- If the user provides an exact product_id and intent is clear, you may skip search_products and start with get_variants or get_product_details.\n- If get_variants shows no variants, add with variant_id=null.\n- If variants exist and the user did not specify one, do not add yet; ask for the needed option.\n- If product details show out of stock, do not assume it is addable; check get_policies(topic=<out_of_stock/backorder>) and offer the available no-write option if policy/details allow.\n- If compatibility is relevant and check_compatibility indicates incompatible or unknown, warn the user; if they explicitly still want it, add_to_cart is allowed.\n- If the user requests multiple items, repeat the resolve-and-add sequence per item.\nAvoid:\n- Do not invent variant choices or compatibility outcomes.\n- Do not promise restock, backorder, deposits, or timelines without get_product_details/get_policies confirmation.\n- Do not treat a search hit as sufficient when a variant may be required.\n- Do not block an explicit override solely because of a compatibility warning if the tool-confirmed item can still be added.\nProcess support: "
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "PixelShot webcam",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-2005",
+                "name": "PixelShot Webcam 1080p",
+                "brand": "PixelShot",
+                "category": "electronics",
+                "subcategory": "webcam",
+                "price": 79,
+                "rating": 4.1,
+                "review_count": 680,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-2005"
+          },
+          "result": {
+            "product_id": "SP-2005",
+            "product_name": "PixelShot Webcam 1080p",
+            "base_price": 79,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-2005"
+          },
+          "result": {
+            "product_id": "SP-2005",
+            "name": "PixelShot Webcam 1080p",
+            "category": "electronics",
+            "subcategory": "webcam",
+            "brand": "PixelShot",
+            "price": 79,
+            "rating": 4.1,
+            "review_count": 680,
+            "description": "1080p webcam for video calls.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 3,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-2005",
+            "quantity": 3,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-2005",
+            "product_name": "PixelShot Webcam 1080p",
+            "variant_id": null,
+            "quantity": 3,
+            "gift_wrap": false,
+            "unit_price": 79,
+            "cart_subtotal": 237,
+            "cart_total": 237
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-2005",
+                "product_name": "PixelShot Webcam 1080p",
+                "quantity": 3,
+                "gift_wrap": false,
+                "unit_price": 79,
+                "line_total": 237
+              }
+            ],
+            "subtotal": 237,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 237,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 30919,
+    "cached_input_tokens": 0,
+    "output_tokens": 257,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 31176,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 30919,
+  "cached_input_tokens": 0,
+  "output_tokens": 257,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 31176,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-2005",
+          "quantity": 3,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 237
+          },
+          "total": {
+            "old": 0,
+            "new": 237
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 237
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 237
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-2005",
+        "gift_wrap": false,
+        "quantity": 3
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

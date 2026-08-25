@@ -1,0 +1,293 @@
+{
+  "task_id": "84-hard_platinum_loyalty_bonus_compensation_cap",
+  "user_id": "cust_001",
+  "task_summary": "**Task:** A Platinum customer with 50+ prior orders had a $43-total phone-case order delivered in the 3-5 day late tier. Correct handling is to compute the $30 Platinum late-delivery credit, ask whether the one-time $50 loyalty bonus has already been used, recognize the uncapped $80 compensation, and apply the 50%-of-order-total cap so only $21 is refunded to original payment.\n\n**Challenge:** This targets the under-used loyalty-bonus branch plus the policy cap interaction. Weak agents stop at $30, pay the full $80, forget to ask whether the loyalty bonus was already used, or mutate the order instead of issuing capped compensation.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 3,
+  "tool_calls": 7,
+  "tool_errors": 1,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "ORD-7561 was only a phone case, but it arrived four days late. I'm Platinum with a lot of orders; can you check the full compensation?"
+    },
+    {
+      "role": "assistant",
+      "content": "I checked it: the order was delivered 4 days late, which puts it in the 3–5 day tier. For Platinum, the $15 late-delivery credit doubles to $30, but the policy caps total compensation at 50% of the order total; since your order total was $43, the maximum comes to $21.\n\nI also previewed it, and the eligible compensation is **$21 back to your original payment method**. If you want, I can process that now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7561"
+          },
+          "result": {
+            "order_id": "ORD-7561",
+            "customer_id": "cust_001",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK71593840",
+            "delivery_date": "2026-07-10T14:00:00",
+            "delivery_promised_date": "2026-07-06T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 43
+            },
+            "subtotal": 35,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 43,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10561",
+                "order_id": "ORD-7561",
+                "product_id": "PROD-4561",
+                "quantity": 1,
+                "unit_price": 35,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4561",
+                  "name": "UltraShield Phone Case",
+                  "category": "accessories",
+                  "price": 35,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 3,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_001"
+          },
+          "result": {
+            "customer_id": "cust_001",
+            "name": "Emma Chen",
+            "email": "emma.chen@example.com",
+            "membership_tier": "platinum",
+            "account_created": "2020-03-15",
+            "total_orders": 87,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 150,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "2.0x",
+              "restocking_fee_waiver": true,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "rules": {
+              "not_received": {
+                "under_500": "Delivered but not received (<$500): reship or refund.",
+                "over_500": "Delivered but not received (>=$500): mandatory investigation (3-5 business days).",
+                "signature_on_file": "Delivery with signature on file: claim denied."
+              },
+              "lost_in_transit": {
+                "under_500": "Lost in transit (<$500): immediate reship or refund.",
+                "over_500": "Lost in transit (>=$500): carrier claim required first.",
+                "stuck_7_days": "No tracking update for 7+ days: treat as lost."
+              },
+              "damaged": {
+                "rule": "Damaged in transit: full refund or replacement.",
+                "fragile_bonus": "Fragile items damaged in transit qualify for a separate $10 goodwill credit, issued as a refund in addition to the return refund."
+              },
+              "late_delivery_compensation": {
+                "tiers": {
+                  "1_to_2_days_late": "$5 credit",
+                  "3_to_5_days_late": "$15 credit",
+                  "6_plus_days_late": "Full shipping refund + $15 credit"
+                },
+                "shipping_refund_basis": "When refunding shipping, refund the actual shipping cost the customer was charged on the order — read order.shipping_cost. Standard policy charges $0 on free-shipping orders (subtotal >= $100) and $8 otherwise.",
+                "tier_multipliers": {
+                  "gold": "1.5x multiplier on the base late-delivery credit only (NOT on shipping refund or goodwill). Rounded down (e.g., int(15*1.5) = 22).",
+                  "platinum": "2x multiplier on the base late-delivery credit only. Rounded down."
+                },
+                "repeated_issues": "3+ PRIOR issues in 6 months (not counting current incident): additional $25 goodwill credit.",
+                "loyalty_bonus": "Platinum members with 50+ total orders: one-time $50 loyalty bonus on next compensation claim. Confirm with customer if already redeemed.",
+                "max_cap": "Maximum compensation: 50% of order total (rounded down).",
+                "calculation_order": "1) Compute base credit by days-late tier. 2) Apply tier multiplier to base credit only. 3) Add shipping refund (if 6+ days late) using order.shipping_cost. 4) Add goodwill (if 3+ prior issues or fragile damage). 5) Apply loyalty bonus if eligible. 6) Apply 50%-of-order cap on the sum."
+              }
+            }
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10561",
+            "refund_method": "original_payment",
+            "amount": 21
+          },
+          "result": {
+            "error": "Policy review required. Call get_policies(topic='refund') first."
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10561",
+            "refund_method": "original_payment",
+            "amount": 21
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10561",
+            "refund_amount": 21,
+            "refund_method": "original_payment"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Does my Platinum account history add anything else here, or is that the full available compensation?"
+    },
+    {
+      "role": "assistant",
+      "content": "That’s the full amount available on this claim. Your Platinum status did help by doubling the base late-delivery credit, but the 50%-of-order cap reduced it to **$21**.\n\nThere is also a one-time Platinum loyalty bonus for customers with 50+ orders, but it still can’t push this claim above the same cap, so it wouldn’t increase the payout on this order.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Thanks for checking. If my one-time Platinum loyalty bonus hasn’t been used, and the cap still keeps this order at $21 total, that’s fine — please just confirm the $21 refund to my original payment has been processed for ORD-7561."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — the **$21 refund** has been processed to your **original payment method** for **ORD-7561**. The Platinum loyalty bonus wouldn’t increase the payout on this order because the compensation cap still limits it to $21 total.",
+      "tool_calls": [
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10561",
+            "refund_method": "original_payment",
+            "amount": 21,
+            "confirm": true
+          },
+          "result": {
+            "status": "refunded",
+            "item_id": "ITEM-10561",
+            "mode": "refund",
+            "refund_amount": 21,
+            "refund_method": "original_payment",
+            "total_goodwill_credit": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 34777,
+    "cached_input_tokens": 0,
+    "output_tokens": 437,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 35214,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 34777,
+  "cached_input_tokens": 0,
+  "output_tokens": 437,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 35214,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10561": {
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 21
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

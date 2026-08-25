@@ -1,0 +1,280 @@
+{
+  "task_id": "147-hard_compound_valid_promo_invalid_points",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"Add the TechPhone Lite with SAVE10, and also use 200 of my points even if it is below the normal minimum.\" Relevant catalog/policy surface: TechPhone Lite 15 (SP-H105). Correct final state: Add phone, apply valid promo, decline below-minimum points.\n\n**Challenge:** Valid promo action plus invalid points request. Primary pitfall: Redeems points or declines whole task. Correct behavior: Add phone, apply valid promo, decline below-minimum points. Novelty: Valid action plus invalid loyalty branch. Family: compound.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 1,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Add the TechPhone Lite with SAVE10, and also use 200 of my points even if it is below the normal minimum."
+    },
+    {
+      "role": "assistant",
+      "content": "I added the TechPhone Lite 15 and applied SAVE10.\n\nI could not use 200 loyalty points, because store policy requires a minimum redemption of 500 points, and your account isn’t eligible for any exception:\n- You have 2,200 points\n- Minimum redemption is 500 points\n- You’re not a first-time customer, so there’s no welcome-discount conflict here\n\nCurrent cart after the promo:\n- TechPhone Lite 15: $499\n- SAVE10 discount: -$49\n- Cart total: $450\n\nIf you want, I can redeem 500 points next, which would take an additional $5 off.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "TechPhone Lite",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H105",
+                "name": "TechPhone Lite 15",
+                "brand": "Orion",
+                "category": "electronics",
+                "subcategory": "phone",
+                "price": 499,
+                "rating": 4.4,
+                "review_count": 2100,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 2200,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_redemption"
+          },
+          "result": {
+            "topic": "loyalty_redemption",
+            "summary": "Loyalty points can be redeemed at checkout to offset part of the cart total. 100 points = $1.",
+            "rules": [
+              "Rate: 100 loyalty points = $1.00 off.",
+              "Cap: redemption cannot exceed 50% of the current cart total.",
+              "Minimum redemption: 500 points ($5).",
+              "Stacking: stacks with promo codes and category bundles.",
+              "Restriction: not combinable with the first-time welcome discount.",
+              "Points are debited from the customer's balance at redemption.",
+              "Agent action rule: do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points."
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "welcome_discount"
+          },
+          "result": {
+            "topic": "welcome_discount",
+            "summary": "First-time customers receive an automatic 5% welcome discount on their first order.",
+            "rules": [
+              "Eligibility: customer.is_first_time is True (empty purchase history).",
+              "Application: applied automatically at checkout, not via promo code.",
+              "Stacking: not combinable with promo codes. Customer gets the better of the two.",
+              "One-time: returning customers are not eligible."
+            ]
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H105"
+          },
+          "result": {
+            "product_id": "SP-H105",
+            "product_name": "TechPhone Lite 15",
+            "base_price": 499,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 0
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add a specific no-variant product to cart, then apply a promo code if valid, and handle a user request to redeem fewer loyalty points than the minimum by explaining policy limits and offering the minimum allowed instead."
+          },
+          "result": [
+            "Workflow: Check variant stock and avoid partial add when minimum quantity is required\nUse when: User wants a specific variant and sets a minimum acceptable quantity, especially saying not to add anything unless at least that many are available.\nVerify first:\n- Find the product match in catalog.\n- Read variant list for the requested size/color/style.\n- Verify the exact stock_quantity or in-stock state for the requested variant before any write.\nProcedure:\n1. search_products(query, optional filters)\n2. get_variants(product_id)\nBranches:\n- If search returns no match under strict filters, refine and repeat search_products; if still no match, stop with a no-write outcome.\n- If the requested variant is found and stock_quantity is at least the requested minimum, add_to_cart(customer_id, product_id, variant_id, quantity, gift_wrap) and optionally get_cart if the user asked for confirmation.\n- If the requested variant stock is below the user's minimum, do not call add_to_cart; report the exact stock situation.\n- If the variant is missing or unavailable, do not add; report that the requested variant is not available.\nAvoid:\n- Do not add a partial quantity when the user said not to.\n- Do not infer variant stock without get_variants.\n- Do not substitute a different variant without explicit user approval.\n- Do not write to cart when the user's stock condition is unmet.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_products -> search_products -> search_products -> get_variants\n- 1x: search_products -> get_variants -> add_to_cart -> get_policies -> get_customer_account -> add_to_cart -> get_cart",
+            "Workflow: Add item with loyalty redemption while honoring policy limits\nUse when: User wants an item added and wants to redeem loyalty points, or asks for the maximum allowed points discount on the resulting cart.\nVerify first:\n- Check customer loyalty balance and first-time status with get_customer_account.\n- Review loyalty and stacking rules with get_policies when the request involves possible conflicts or edge cases.\n- Identify the product and any needed variant via search_products, get_product_details, and get_variants.\n- Inspect current cart with get_cart before redemption to understand subtotal and any existing redemption.\nProcedure:\n1. get_customer_account\n2. get_policies\n3. search_products\n4. get_product_details\n5. get_variants\n6. get_cart\n7. add_to_cart\n8. redeem_loyalty_points\n9. get_cart\nBranches:\n- If loyalty policy makes the requested redemption ineligible (for example below minimum or conflicts with another discount), return a no-write or add-without-points outcome if the user permitted that fallback.\n- If the user asks for the maximum allowed points discount on a changed cart, first get_cart; if an existing redemption may no longer be optimal, use cancel_loyalty_redemption then redeem_loyalty_points for the needed amount, then get_cart.\n- If the user is first-time and policies indicate loyalty cannot combine with the welcome discount, do not try to use both; follow the user's stated preference when allowed, otherwise explain the conflict.\n- If the customer lacks enough points, redeem only what tools allow or stop and report the limit.\n- If the user declines all substitute discounts, add the item only and do not redeem points.\nAvoid:\n- Do not combine loyalty redemption with discounts that policy says are incompatible.\n- Do not redeem fewer than the policy minimum when the user said not to substitute or force another discount.\n- Do not spend extra points after cart changes without recalculating against current cart state.\n- Do not assume the prior redemption remains maximal after removing items.\nProcess support: mean conformance=0.973\nObserved frequent paths:\n- 1x: search_products -> get_customer_account -> get_cart -> get_product_details -> get_var",
+            "Workflow: Compare promo versus loyalty points, then redeem only after cart-based cap is known\nUse when: User wants to know whether a promo code or loyalty points can be used, compare them, or redeem points on a cart item while avoiding immediate promo application.\nVerify first:\n- Read current cart with get_cart because loyalty redemption depends on current cart total.\n- Read customer balance/tier with get_customer_account before discussing available points.\n- Read redemption and stacking rules with get_policies.\n- If comparing against a promo code, check validity/estimated discount with validate_promo.\n- If the comparison requires a product-specific cart total, ensure the item is in cart before redemption by confirming details and adding it if the user authorizes.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. get_policies(topic=loyalty/redemption)\n4. get_policies(topic=promo/stacking)\n5. validate_promo(customer_id, promo_code)\n6. search_products(query/filters)\n7. get_product_details(product_id)\n8. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n9. redeem_loyalty_points(customer_id, points)\n10. get_cart(customer_id)\nBranches:\n- If the user asks to compare but not apply anything yet, stop after read-only tools and explain allowed paths without calling apply_promo or redeem_loyalty_points.\n- If the item is not yet in cart and the points cap depends on current cart total, add it only after the user approves the comparison path.\n- If requested points exceed policy limits or cart-based cap, redeem only the amount accepted by the tool and then confirm the actual redeemed points from tool output.\n- If the user chooses promo instead of points, validate first and only then proceed to promo workflow; do not redeem points.\n- If the user says not to use points, do not call redeem_loyalty_points.\nAvoid:\n- Do not compute an authoritative capped redemption without first checking current cart and policies.\n- Do not assume requested points will be accepted exactly; rely on redeem_loyalty_points output.\n- Do not apply a promo during a comparison-only request.\n- Do not state stacking behavior without checking current polic"
+          ]
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H105",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-H105",
+            "product_name": "TechPhone Lite 15",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 499,
+            "cart_subtotal": 499,
+            "cart_total": 499
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "SAVE10",
+            "applied_promo_codes": [
+              "SAVE10"
+            ],
+            "discount_amount": 49,
+            "cart_subtotal": 499,
+            "cart_total": 450
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for checking. Please leave the points off since 200 is below the minimum, and keep the TechPhone Lite with SAVE10 as-is. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 29278,
+    "cached_input_tokens": 0,
+    "output_tokens": 441,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 29719,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 29278,
+  "cached_input_tokens": 0,
+  "output_tokens": 441,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 29719,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-H105",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "applied_promo_codes": {
+            "old": [],
+            "new": [
+              "SAVE10"
+            ]
+          },
+          "discount_amount": {
+            "old": 0,
+            "new": 49
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 499
+          },
+          "total": {
+            "old": 0,
+            "new": 450
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

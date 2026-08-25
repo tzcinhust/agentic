@@ -1,0 +1,263 @@
+{
+  "task_id": "117-hard_loyalty_cancel_redemption_before_change",
+  "user_id": "shop_005",
+  "task_summary": "**Task:** Customer shop_005 opens with: \"I used points on this cart, but now I want the phone case removed too. First tell me exactly how many points will come back and what stays in the cart, then do it after I confirm.\" Relevant catalog/policy surface: ProBook Laptop 13 (SP-H102), ClearGrip Slim Case for iPhone 14 (SP-H109). Correct final state: Preview restored points and kept laptop, get consent, cancel loyalty redemption, then remove only the phone case.\n\n**Challenge:** Sequenced loyalty reversal requires a numeric/account preview before mutation. Primary pitfall: Mutates before preview/consent, removes the laptop, or gives vague points narration. Correct behavior: Preview restored points and kept laptop, get consent, cancel loyalty redemption, then remove only the phone case. Novelty: Tests redemption reversal as the primary workflow. Family: loyalty_account.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 3,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I used points on this cart, but now I want the phone case removed too. First tell me exactly how many points will come back and what stays in the cart, then do it after I confirm."
+    },
+    {
+      "role": "assistant",
+      "content": "If I remove the phone case, the cart would keep:\n\n- ProBook Laptop 13 — $999\n\nWhat should come back from the current points redemption:\n\n- Right now, 51,700 points are redeemed for a $517 discount on a $1,034 subtotal.\n- After removing the $35 phone case, the new subtotal would be $999.\n- The redemption cap is 50% of cart total before shipping, so the max loyalty discount would become $499.50.\n- Since redemption works in whole-point increments at 100 points = $1, the usable discount would be $499.\n- That means the redeemed points would adjust to 49,900 points.\n\nPoints returned to your balance:\n- 1,800 points\n\nProjected cart after removal:\n- Subtotal: $999\n- Loyalty discount: $499\n- Total: $500\n\nI haven’t changed anything yet. If you want, reply with “confirm” and I’ll remove the phone case and update the loyalty redemption.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H102",
+                "product_name": "ProBook Laptop 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 999,
+                "line_total": 999
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H109",
+                "product_name": "ClearGrip Slim Case for iPhone 14",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 35,
+                "line_total": 35
+              }
+            ],
+            "subtotal": 1034,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 517,
+            "loyalty_points_redeemed": 51700,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 517,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "customer_id": "shop_005",
+            "name": "Morgan Patel",
+            "email": "morgan.patel@example.com",
+            "tier": "platinum",
+            "is_first_time": false,
+            "loyalty_points": 52300,
+            "purchase_history": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Before you change anything, I want the existing 51,700-point redemption canceled entirely, not adjusted. Please confirm that 51,700 points will come back and that only the ProBook Laptop 13 will remain in the cart, then I can approve it."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed — if we do that, the result will be:\n\nPoints returned:\n- 51,700 points will be credited back from the current redemption.\n\nCart contents afterward:\n- ProBook Laptop 13 only\n- The phone case will be removed\n\nProjected cart totals after those changes:\n- Subtotal: $999\n- Loyalty discount: $0\n- Total: $999\n\nI have not made the changes yet. If you approve, I’ll cancel the redemption and remove the phone case.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Approved — please cancel the 51,700-point redemption and remove only the phone case, with the ProBook Laptop 13 staying in the cart."
+    },
+    {
+      "role": "assistant",
+      "content": "Done.\n\nUpdated result:\n- 51,700 points were credited back\n- The phone case was removed\n- The cart now contains only:\n  - ProBook Laptop 13 — $999\n\nCurrent cart totals:\n- Subtotal: $999\n- Loyalty discount: $0\n- Total: $999\n\nIf you want, I can also help you re-apply a different amount of points.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Cancel existing loyalty redemption entirely and remove one specified cart item after user approval, leaving remaining cart item unchanged; verify prior cart state and then perform state changes."
+          },
+          "result": [
+            "Workflow: Adjust loyalty redemption and restore prior state if user changes mind\nUse when: User wants to apply, maximize, reduce, or undo loyalty points on the current cart, or asks to leave an existing redemption unchanged after a trial change.\nVerify first:\n- Verify account exists and current loyalty balance with get_customer_account.\n- Verify current cart totals and whether loyalty points are already redeemed with get_cart.\n- If user asks to maximize or compare options, verify policy constraints with get_policies on loyalty redemption rules before mutating.\nProcedure:\n1. get_customer_account(<customer_id>)\n2. get_cart(<customer_id>)\n3. get_policies(topic='loyalty_redemption')\n4. cancel_loyalty_redemption(<customer_id>)\n5. redeem_loyalty_points(<customer_id>, <points_to_apply_within_policy_and_user_intent>)\nBranches:\n- If the cart already has a redemption and the user wants a different amount, cancel first, then redeem the new amount.\n- If the user asks to use all remaining points, cap the request by current balance, minimum redemption, and any redemption cap from current policy/cart state.\n- If the user reverses the request after a new redemption was applied, cancel the new redemption and, if there was a prior redemption, re-apply the prior amount.\n- If the user says not to use points or to leave things as they are, stop after read-only checks and provide the current cart state without mutation.\n- If policy or balance prevents the requested amount, do not force a partial change unless it matches the user's intent; report the limit.\nAvoid:\n- Do not redeem points without first checking current balance and cart state.\n- Do not assume a fixed point-to-dollar rate or cap without consulting current policy output.\n- Do not leave the cart in an intermediate cancelled state if the user wanted the previous redemption restored.\n- Do not apply multiple redemptions in sequence without a clear reason and state check.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> get_promotions -> get_policies -> get_policies -> get_policies -> get_policies -> get_policies\n- 1x: get_customer_account -> search_products -> get_polic",
+            "Workflow: Maximize loyalty discount after cart removal\nUse when: User wants an item removed from cart and then wants loyalty points applied to the remaining cart, preferably only if the discount is materially worthwhile.\nVerify first:\n- Use get_cart to confirm the target item is currently in the cart and inspect current totals and any existing loyalty redemption.\n- Use get_customer_account to verify current loyalty point balance before attempting a new redemption.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. remove_from_cart(customer_id, product_id, variant_id)\n4. redeem_loyalty_points(customer_id, points)\n5. cancel_loyalty_redemption(customer_id)\n6. redeem_loyalty_points(customer_id, points)\nBranches:\n- If get_cart shows the item is not present, do not mutate; report that nothing needs removal.\n- If the user asks to use points only when worthwhile, compare the available redemption effect on the remaining cart and stop with a no-write explanation if the savings would be trivial by the user's stated preference.\n- If redeem_loyalty_points succeeds on the first try, stop there.\n- If redeem_loyalty_points returns that points are already redeemed on the cart, use cancel_loyalty_redemption and then retry redeem_loyalty_points with the desired amount.\n- If the customer has no usable points, remove the item if requested and report that no loyalty discount can be applied.\nAvoid:\n- Do not assume a fixed redemption cap or conversion without relying on current tool results.\n- Do not cancel an existing redemption unless needed to change the amount.\n- Do not invent promo-stacking rules or eligibility rules not shown by tools.\n- Do not use concrete product IDs, point balances, or dollar amounts as reusable rules.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_cart\n- 1x: get_cart -> get_customer_account -> remove_from_cart -> redeem_loyalty_points -> cancel_loyalty_redemption -> redeem_loyalty_points",
+            "Workflow: Remove a specified item from cart and confirm updated cart\nUse when: User wants a named product removed from their cart and may ask to confirm the remaining cart contents afterward.\nVerify first:\n- Use get_cart to inspect current cart items.\n- Verify the target product is present in the cart.\n- If variants are represented, identify the matching variant_id from the cart item before removal.\nProcedure:\n1. get_cart(customer_id)\n2. remove_from_cart(customer_id, product_id, variant_id)\n3. get_cart(customer_id)\nBranches:\n- If get_cart shows the cart is empty, do not remove anything; confirm nothing was removed.\n- If the requested product is not present in the cart, do not remove anything; explain that the item is not currently in the cart.\n- If multiple cart items could match the user's description and the tool data does not clearly disambiguate them, do not guess; ask the user to clarify.\n- After a successful remove_from_cart call, use the final get_cart result as the authoritative updated cart summary.\nAvoid:\n- Do not call remove_from_cart before checking the cart contents.\n- Do not invent product_id or variant_id; derive them from get_cart output.\n- Do not claim an item was removed without confirming via tool output.\n- Do not infer updated totals without re-reading the cart when the user asked for confirmation.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_cart\n- 1x: get_cart -> remove_from_cart -> get_cart"
+          ]
+        },
+        {
+          "name": "cancel_loyalty_redemption",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "status": "cancelled",
+            "points_credited": 51700,
+            "new_balance": 104000,
+            "cart_subtotal": 1034,
+            "cart_total": 1034
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_005",
+            "product_id": "SP-H109"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_005",
+            "product_id": "SP-H109",
+            "variant_id": null,
+            "cart_subtotal": 999,
+            "cart_total": 999
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H102",
+                "product_name": "ProBook Laptop 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 999,
+                "line_total": 999
+              }
+            ],
+            "subtotal": 999,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 999,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 39039,
+    "cached_input_tokens": 0,
+    "output_tokens": 578,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 39617,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 39039,
+  "cached_input_tokens": 0,
+  "output_tokens": 578,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 39617,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "customers": {
+        "shop_005": {
+          "loyalty_points": {
+            "old": 52300,
+            "new": 104000
+          }
+        }
+      },
+      "carts": {
+        "CART-shop_005": {
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "loyalty_discount": {
+            "old": 517,
+            "new": 0
+          },
+          "loyalty_points_redeemed": {
+            "old": 51700,
+            "new": 0
+          },
+          "subtotal": {
+            "old": 1034,
+            "new": 999
+          },
+          "total": {
+            "old": 517,
+            "new": 999
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_005",
+          "product_id": "SP-H109",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  }
+}

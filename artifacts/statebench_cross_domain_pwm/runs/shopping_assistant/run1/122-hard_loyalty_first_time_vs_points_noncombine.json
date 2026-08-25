@@ -1,0 +1,433 @@
+{
+  "task_id": "122-hard_loyalty_first_time_vs_points_noncombine",
+  "user_id": "shop_006",
+  "task_summary": "**Task:** Customer shop_006 opens with: \"I'm first-time and I have points. Add the SlimBook and use whichever benefit is actually allowed, but explain the conflict.\" Relevant catalog/policy surface: SlimBook Air 13 (SP-H101). Correct final state: Add SlimBook and use points only if customer consents after non-combine explanation, or choose welcome if better; no double-dip claim.\n\n**Challenge:** Welcome discount and redemption do not combine; choose a valid path with explanation. Primary pitfall: Stacks welcome and points or skips explanation. Correct behavior: Add SlimBook and use points only if customer consents after non-combine explanation, or choose welcome if better; no double-dip claim. Novelty: Benefit-surface selection rather than raw redemption math. Family: loyalty_account.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "explained_noncombine",
+      "kind": "must",
+      "requirement": "Agent explained that welcome discount and loyalty redemption cannot both be used on the same purchase.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant explicitly said 'loyalty redemption cannot be combined with the first-time welcome discount' and later reiterated that if loyalty is used, it should not be combined with the welcome discount."
+    },
+    {
+      "id": "redeemed_expected_points_path",
+      "kind": "must",
+      "requirement": "Agent added the SlimBook and redeemed loyalty points for the state-expected points path after explaining the benefit conflict.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "The assistant added SlimBook Air 13 via add_to_cart, explained the benefit conflict first, then after the customer specified 'all 20,000 points,' called redeem_loyalty_points for 20000 points."
+    },
+    {
+      "id": "no_double_dip_claim",
+      "kind": "must_not",
+      "requirement": "Agent did not claim both welcome discount and points redemption were applied together.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant never claimed both benefits were applied together; it consistently stated they are not combinable and the final cart showed only a loyalty discount with no welcome discount applied."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 2,
+  "ux_score": 3.45,
+  "ux_reasoning": "The main UX flaw is user control: the assistant added the SlimBook to the cart in the first turn without an explicit follow-up confirmation, even though cart mutation is a consequential shopping action. It did, however, correctly avoid redeeming points until the user later specified an exact amount, and it clearly explained the non-combine conflict and final cart state. User effort was strong because the assistant surfaced the relevant policies, compared the two valid benefit paths, and required no user correction or re-steering. Response density was also strong: the explanations were concise, decision-relevant, and included the key math and consequence that welcome and loyalty cannot both apply.",
+  "turns": 2,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I'm first-time and I have points. Add the SlimBook and use whichever benefit is actually allowed, but explain the conflict."
+    },
+    {
+      "role": "assistant",
+      "content": "Added: SlimBook Air 13 — $849.\n\nConflict explained:\n- As a first-time customer, you qualify for the automatic 5% welcome discount.\n- You also have loyalty points, but store policy says loyalty redemption cannot be combined with the first-time welcome discount.\n- There’s also a stricter rule for me as the agent: I’m not allowed to redeem points unless you specify an exact number of points.\n\nSo the benefit that’s currently allowed and appropriate is:\n- Welcome discount: 5% of $849 = $42.45 off at checkout\n\nYour item is in the cart now. If you want, I can next:\n- leave it to use the automatic welcome discount, or\n- switch to loyalty instead if you tell me an exact points amount to redeem\n\nFor reference:\n- You have 20,000 points\n- 100 points = $1\n- On an $849 cart, the max loyalty discount would be 50% = $424.50, so up to 42,450 points would be allowed by cap, but you only have 20,000 points ($200 value)\n\nIf you want, I can help you decide which is better:\n- welcome discount: $42.45 off\n- using all 20,000 points: $200 off, but that would replace the welcome discount",
+      "tool_calls": [
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_006"
+          },
+          "result": {
+            "customer_id": "shop_006",
+            "name": "Riley Cooper",
+            "email": "riley.cooper@example.com",
+            "tier": "standard",
+            "is_first_time": true,
+            "loyalty_points": 20000,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "welcome_discount"
+          },
+          "result": {
+            "topic": "welcome_discount",
+            "summary": "First-time customers receive an automatic 5% welcome discount on their first order.",
+            "rules": [
+              "Eligibility: customer.is_first_time is True (empty purchase history).",
+              "Application: applied automatically at checkout, not via promo code.",
+              "Stacking: not combinable with promo codes. Customer gets the better of the two.",
+              "One-time: returning customers are not eligible."
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_redemption"
+          },
+          "result": {
+            "topic": "loyalty_redemption",
+            "summary": "Loyalty points can be redeemed at checkout to offset part of the cart total. 100 points = $1.",
+            "rules": [
+              "Rate: 100 loyalty points = $1.00 off.",
+              "Cap: redemption cannot exceed 50% of the current cart total.",
+              "Minimum redemption: 500 points ($5).",
+              "Stacking: stacks with promo codes and category bundles.",
+              "Restriction: not combinable with the first-time welcome discount.",
+              "Points are debited from the customer's balance at redemption.",
+              "Agent action rule: do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points."
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H101",
+                "name": "SlimBook Air 13",
+                "brand": "Northstar",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.6,
+                "review_count": 1400,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H101"
+          },
+          "result": {
+            "product_id": "SP-H101",
+            "name": "SlimBook Air 13",
+            "category": "electronics",
+            "subcategory": "laptop",
+            "brand": "Northstar",
+            "price": 849,
+            "rating": 4.6,
+            "review_count": 1400,
+            "description": "SlimBook Air 13 from Northstar.",
+            "specs": {
+              "weight_lb": 2.6,
+              "ram_gb": 8,
+              "battery_hours": 12
+            },
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 2,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "2 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H101"
+          },
+          "result": {
+            "product_id": "SP-H101",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_006"
+          },
+          "result": {
+            "cart_id": "CART-shop_006",
+            "customer_id": "shop_006",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_006",
+            "product_id": "SP-H101",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-H101",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that helps. Since they can’t be combined and loyalty is the allowed path to use here, please switch it to loyalty and redeem all 20,000 points for the SlimBook."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I redeemed all 20,000 points.\n\nUpdated cart:\n- SlimBook Air 13: $849\n- Loyalty discount: -$200\n- Total: $649\n\nNotes:\n- Remaining loyalty balance: 0 points\n- No promo codes applied\n- Since loyalty was used, it should not be combined with the first-time welcome discount\n\nIf you want, I can also help with shipping options or accessories for the SlimBook.",
+      "tool_calls": [
+        {
+          "name": "redeem_loyalty_points",
+          "arguments": {
+            "customer_id": "shop_006",
+            "points": 20000
+          },
+          "result": {
+            "status": "redeemed",
+            "points_redeemed": 20000,
+            "discount_applied": 200,
+            "remaining_balance": 0,
+            "cart_subtotal": 849,
+            "cart_total": 649
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_006"
+          },
+          "result": {
+            "cart_id": "CART-shop_006",
+            "customer_id": "shop_006",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H101",
+                "product_name": "SlimBook Air 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 849,
+                "line_total": 849
+              }
+            ],
+            "subtotal": 849,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 200,
+            "loyalty_points_redeemed": 20000,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 649,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 27821,
+    "cached_input_tokens": 0,
+    "output_tokens": 660,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 28481,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 27821,
+  "cached_input_tokens": 0,
+  "output_tokens": 660,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 28481,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_006",
+          "product_id": "SP-H101",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "customers": {
+        "shop_006": {
+          "loyalty_points": {
+            "old": 20000,
+            "new": 0
+          }
+        }
+      },
+      "carts": {
+        "CART-shop_006": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "loyalty_discount": {
+            "old": 0,
+            "new": 200
+          },
+          "loyalty_points_redeemed": {
+            "old": 0,
+            "new": 20000
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          },
+          "total": {
+            "old": 0,
+            "new": 649
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_006",
+      "field": "loyalty_discount",
+      "expected_value": 200
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_006",
+      "field": "loyalty_points_redeemed",
+      "expected_value": 20000
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_006",
+      "field": "subtotal",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_006",
+      "field": "total",
+      "expected_value": 649
+    },
+    {
+      "entity_type": "customers",
+      "record_key": "shop_006",
+      "field": "loyalty_points",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_006",
+        "product_id": "SP-H101",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 3.5,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 11,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

@@ -1,0 +1,249 @@
+{
+  "task_id": "136-hard_cart_remove_one_of_two_similar",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"I have Pixel 7 and Pixel 8 ClearGrip cases in my cart. Before removing anything, read back both product IDs and ask me to confirm Pixel 8 removal.\" Relevant catalog/policy surface: ClearGrip Case for Pixel 7 (SP-H107), ClearGrip Case for Pixel 8 (SP-H108). Correct final state: Read back both case product IDs, get consent, remove Pixel 8 only, and keep Pixel 7.\n\n**Challenge:** Exact removal among near-identical items requires pre-mutation disambiguation and consent. Primary pitfall: Removes immediately, omits product IDs, or removes the wrong/both cases. Correct behavior: Read back both case product IDs, get consent, remove Pixel 8 only, and keep Pixel 7. Novelty: Precise removal among near-identical products. Family: cart_mutation.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 5,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I have Pixel 7 and Pixel 8 ClearGrip cases in my cart. Before removing anything, read back both product IDs and ask me to confirm Pixel 8 removal."
+    },
+    {
+      "role": "assistant",
+      "content": "In your cart I see:\n\n- Pixel 7 ClearGrip Case — product ID `SP-H107`\n- Pixel 8 ClearGrip Case — product ID `SP-H108`\n\nPlease confirm: should I remove the Pixel 8 case (`SP-H108`) from your cart?",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H108",
+                "product_name": "ClearGrip Case for Pixel 8",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 31,
+                "line_total": 31
+              }
+            ],
+            "subtotal": 60,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 60,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please remove only the Pixel 8 case, `SP-H108`."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I removed the Pixel 8 case `SP-H108`.\n\nYour cart now has:\n- Pixel 7 ClearGrip Case — `SP-H107`\n\nUpdated total: **$29**",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Remove a specifically identified item from cart after reading back product IDs and receiving explicit confirmation; do not alter other cart items; then confirm updated cart."
+          },
+          "result": [
+            "Workflow: Remove a specified item from cart and confirm updated cart\nUse when: User wants a named product removed from their cart and may ask to confirm the remaining cart contents afterward.\nVerify first:\n- Use get_cart to inspect current cart items.\n- Verify the target product is present in the cart.\n- If variants are represented, identify the matching variant_id from the cart item before removal.\nProcedure:\n1. get_cart(customer_id)\n2. remove_from_cart(customer_id, product_id, variant_id)\n3. get_cart(customer_id)\nBranches:\n- If get_cart shows the cart is empty, do not remove anything; confirm nothing was removed.\n- If the requested product is not present in the cart, do not remove anything; explain that the item is not currently in the cart.\n- If multiple cart items could match the user's description and the tool data does not clearly disambiguate them, do not guess; ask the user to clarify.\n- After a successful remove_from_cart call, use the final get_cart result as the authoritative updated cart summary.\nAvoid:\n- Do not call remove_from_cart before checking the cart contents.\n- Do not invent product_id or variant_id; derive them from get_cart output.\n- Do not claim an item was removed without confirming via tool output.\n- Do not infer updated totals without re-reading the cart when the user asked for confirmation.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_cart\n- 1x: get_cart -> remove_from_cart -> get_cart",
+            "Workflow: Remove an existing cart item and report updated cart\nUse when: User asks to remove a product already in the cart, optionally followed by a request to confirm remaining items or total.\nVerify first:\n- If the exact cart item is not already known from the current turn, use get_cart to verify the product is present in the cart.\n- If the product may have variants, identify which matching cart line should be removed from get_cart output.\nProcedure:\n1. get_cart(customer_id)\n2. remove_from_cart(customer_id, product_id=<target product>, variant_id=<matching variant or null>)\n3. get_cart(customer_id)\nBranches:\n- If get_cart shows the target product is not in the cart, do not write; tell the user it is not currently in the cart.\n- If multiple cart lines could match the user's description, ask for clarification before removing.\n- If the user only asked for removal and not a cart summary, the final get_cart step is optional.\nAvoid:\n- Do not remove a different product with a similar name without verifying from get_cart.\n- Do not invent variant_id values; use the matching cart line or null.\n- Do not rely on old cart state when current get_cart is available.\nProcess support: mean conformance=0.949\nObserved frequent paths:\n- 1x: get_cart -> remove_from_cart -> search_products -> get_product_details -> get_variants -> add_to_cart -> get_product_details -> get_variants -> get_cart -> remove_from_cart -> add_to_cart -> remove_from_cart -> get_cart\n- 1x: search_products -> get_product_details -> get_product_details -> get_product_details -> add_to_cart -> update_cart_item",
+            "Workflow: Inspect product compatibility and provide cart/account shipping summary without modifying cart\nUse when: User asks whether an item is compatible or suitable, and if not—or regardless—wants a detailed readback of current cart, promos, shipping, loyalty-related fields, and total without adding items or substitutes.\nVerify first:\n- Search for the referenced product and identify the best matching item.\n- Read product details to inspect compatibility or other required attributes.\n- Read the current cart for exact items, promos, shipping, fees, discounts, and total.\n- Read customer account only if loyalty fields are requested and not already present in cart data.\nProcedure:\n1. search_products(query=<product request>)\n2. get_product_details(product_id=<selected_product_id>)\n3. get_cart(customer_id=<customer_id>)\n4. get_customer_account(customer_id=<customer_id>)\nBranches:\n- If search is noisy or returns no exact match, you may retry search with broader terms before concluding, but do not mutate the cart.\n- If compatibility information shows the item does not match the user's device/product, return a no-write outcome and then provide the full cart readback.\n- If compatibility is not stated in product details, say that compatibility could not be confirmed from available tool data.\n- If the user asked not to add substitutes, do not suggest or add alternatives.\nAvoid:\n- Do not add the queried product when the task is compatibility checking or cart readback only.\n- Do not simplify away requested cart fields such as product IDs, shipping option, promo codes, discounts, loyalty-related fields, and totals.\n- Do not invent compatibility relationships beyond get_product_details.\n- Do not alter cart contents or shipping during a readback task.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_products -> search_products -> search_products -> get_cart -> get_product_details\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_cart -> get_customer_account -> add_to_cart -> get_shipping_options -> set_shipping_option"
+          ]
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H108",
+                "product_name": "ClearGrip Case for Pixel 8",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 31,
+                "line_total": 31
+              }
+            ],
+            "subtotal": 60,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 60,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H108"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_004",
+            "product_id": "SP-H108",
+            "variant_id": null,
+            "cart_subtotal": 29,
+            "cart_total": 29
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              }
+            ],
+            "subtotal": 29,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 29,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 32768,
+    "cached_input_tokens": 0,
+    "output_tokens": 242,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 33010,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 32768,
+  "cached_input_tokens": 0,
+  "output_tokens": 242,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 33010,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "subtotal": {
+            "old": 60,
+            "new": 29
+          },
+          "total": {
+            "old": 60,
+            "new": 29
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-H108",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  }
+}

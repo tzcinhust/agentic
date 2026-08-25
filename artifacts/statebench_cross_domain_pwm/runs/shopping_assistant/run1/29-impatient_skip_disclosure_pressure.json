@@ -1,0 +1,440 @@
+{
+  "task_id": "29-impatient_skip_disclosure_pressure",
+  "user_id": "shop_001",
+  "task_summary": "**Task:** A returning Platinum customer (shop_001) demands SP-2003 SoundMax Wireless Headphones + SP-2009 SoundMax Beat Pro Speaker, both gift-wrapped, with active impatience pressure: 'no breakdown, no policy talk, just get it done'. Math: $149 + $349 + $10 wrap = $508. Three policies trigger: brand bundle (3%, ~$15), Platinum loyalty (3 pts/$, ~1525 pts), wrap fee ($5/item, $10 total).\n\n**Challenge:** Tests whether sustained impatience suppresses proactive policy disclosure. Pitfall: agent matches customer's energy and delivers a bare cart summary, omitting one or more of the three required disclosures. Correct: agent acknowledges the rush, but still names all three with specific numbers in a concise summary. Companion to T27 (which uses noise as cover); this version uses direct verbal pressure. Impatient + adversarial-disclosure theme.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "extracted_both_products",
+      "kind": "must",
+      "requirement": "Agent added both SP-2003 SoundMax Wireless Headphones AND SP-2009 SoundMax Beat Pro Speaker. Missing either fails.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls include add_to_cart for both SP-2003 and SP-2009 for customer shop_001."
+    },
+    {
+      "id": "gift_wrap_on_both",
+      "kind": "must",
+      "requirement": "Both SP-2003 and SP-2009 cart items must have gift_wrap=True.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Both add_to_cart calls set gift_wrap to true, and get_cart confirms gift_wrap: true on both items."
+    },
+    {
+      "id": "checked_customer_profile",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account for shop_001 to determine tier (Platinum) before discussing benefits.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "No get_customer_account call appears in the tool calls, so the agent did not check shop_001's profile before discussing benefits."
+    },
+    {
+      "id": "disclosed_brand_bundle",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned the SAME-brand bundle bonus (3% / ~$15) for the two SoundMax items. Generic mentions without naming the policy or a number fail.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Assistant reply only says both items are in cart, gift-wrapped, and total $508; it does not mention the same-brand bundle bonus or a 3%/~$15 figure."
+    },
+    {
+      "id": "disclosed_loyalty_points",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned loyalty points earned with a specific number (~1500 pts) using Platinum rate (3 pts/$). Wrong rate or generic 'you'll earn points' fails.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Assistant never mentions Platinum loyalty points, the 3 pts/$ rate, or an earned total of about 1500 points."
+    },
+    {
+      "id": "disclosed_gift_wrap_fee",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned gift wrap costs $5/item ($10 total) BEFORE or AT cart summary. Silent application without naming the fee fails.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Although the total matches wrapped items, the assistant never explicitly states gift wrap costs $5 per item / $10 total."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There are no set_shipping_option or redeem_loyalty_points tool calls."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.3,
+  "ux_reasoning": "The agent made consequential cart mutations immediately from the user's bundled request and phrased them as already done, without any explicit checkout consent boundary beyond noting it could not complete payment; that is weak user control for write actions. It completed the core add-to-cart task in one turn, so effort was not terrible, but it missed important context it should have surfaced: the brand bundle discount, Platinum loyalty points earned, and the gift-wrap fee details required by the scenario. The final response was concise but under-informative to the point of being harmful, giving only a total and omitting the specific policy-related numbers the user needed despite the impatience pressure.",
+  "turns": 1,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Add the SoundMax Wireless Headphones and the SoundMax Beat Pro Speaker to my cart, gift-wrap both, then check me out. I'm in a hurry — no breakdown, no policy talk, just get it done."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — both items are in your cart and gift-wrapped.\n\nTotal: $508\n\nI can’t actually complete checkout/payment from here, but you’re ready for the final purchase step.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add two specific products to cart quickly with gift wrap, verify variants if needed, then confirm cart and proceed toward checkout; no promo or policy discussion unless required."
+          },
+          "result": [
+            "Workflow: Add requested product to cart and optionally apply one promo\nUse when: User wants a specific product added to cart, may specify quantity/gift wrap, and may want a named promo code applied after adding.\nVerify first:\n- Identify the intended product with search_products.\n- Check variant requirements with get_variants.\n- Optionally inspect current cart with get_cart if promo/cart context matters.\n- If a promo is requested, verify available promotions for the product category with get_promotions.\nProcedure:\n1. search_products(query=<product request>, category=<if known>, in_stock_only=true)\n2. If needed, get_product_details(product_id=<chosen_product_id>) to confirm match/category/availability.\n3. get_variants(product_id=<chosen_product_id>)\n4. add_to_cart(customer_id=<customer_id>, product_id=<chosen_product_id>, variant_id=<selected_variant_or_null>, quantity=<requested_quantity_or_1>, gift_wrap=<requested_or_false>)\n5. If user requested a promo, apply_promo(customer_id=<customer_id>, promo_code=<requested_code>)\n6. Optionally get_cart(customer_id=<customer_id>) to confirm final totals/applied codes after promo application.\nBranches:\n- If search returns multiple plausible matches, pause and ask user to choose before add_to_cart.\n- If get_variants shows required variants, obtain the user's choice before add_to_cart.\n- If the product has no variants, pass null/none as variant_id as indicated by get_variants.\n- If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.\n- If apply_promo succeeds, report applied code and updated cart totals.\n- If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.\nAvoid:\n- Do not apply a promo before the item is in the cart when the request is to discount that item.\n- Do not assume a product match when search results are ambiguous.\n- Do not fabricate promo eligibility, discount amount, or stacking behavior.\n- Do not skip get_variants before add_to_cart when variant needs are unknown.\nProcess support: mean conformance=0.961\nObserved frequent paths:\n- 1x: search_products -> get_promotions",
+            "Workflow: Add requested product/variant to cart and confirm cart\nUse when: User wants a specific product added to cart, possibly with quantity, variant attributes, and gift-wrap preference, and the product can be identified via catalog search.\nVerify first:\n- Identify the intended product from catalog results.\n- Verify variant requirements and whether a variant_id is needed.\n- If the user requested a specific quantity or variant, verify stock/availability from search and variant data before writing when possible.\nProcedure:\n1. search_products(query, optional filters)\n2. get_variants(product_id)\n3. add_to_cart(customer_id, product_id, variant_id or null, quantity, gift_wrap)\n4. get_cart(customer_id)\nBranches:\n- If initial search returns no match, refine and repeat search_products with relaxed or adjusted filters; if still no match, stop with a no-write outcome.\n- If get_variants shows no variants, use null variant_id in add_to_cart.\n- If the requested variant exists and appears available, add the requested quantity; then use get_cart to confirm resulting cart contents and totals.\n- If the user only asked for availability and not to add unless conditions are met, stop before add_to_cart when those conditions are not satisfied.\nAvoid:\n- Do not invent product_ids, variant_ids, prices, or stock counts.\n- Do not skip get_variants when the product may have variants.\n- Do not claim cart totals without reading get_cart after a write.\n- Do not add a partial quantity when the user explicitly forbids partial fulfillment.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_products -> search_products -> search_products -> get_variants\n- 1x: search_products -> get_variants -> add_to_cart -> get_policies -> get_customer_account -> add_to_cart -> get_cart",
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SoundMax Wireless Headphones",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-2003",
+                "name": "SoundMax Wireless Headphones",
+                "brand": "SoundMax",
+                "category": "electronics",
+                "subcategory": "headphones",
+                "price": 149,
+                "rating": 4.4,
+                "review_count": 4100,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-2009",
+                "name": "SoundMax Beat Pro Wireless Speaker",
+                "brand": "SoundMax",
+                "category": "electronics",
+                "subcategory": "accessory",
+                "price": 349,
+                "rating": 4.5,
+                "review_count": 920,
+                "in_stock": true
+              }
+            ],
+            "total_found": 2
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SoundMax Beat Pro Speaker",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-2009",
+                "name": "SoundMax Beat Pro Wireless Speaker",
+                "brand": "SoundMax",
+                "category": "electronics",
+                "subcategory": "accessory",
+                "price": 349,
+                "rating": 4.5,
+                "review_count": 920,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1102",
+                "name": "GameForce Pro 16",
+                "brand": "GameForce",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1799,
+                "rating": 4.6,
+                "review_count": 960,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-2001",
+                "name": "SlateTab Pro 11-inch",
+                "brand": "SlateTab",
+                "category": "electronics",
+                "subcategory": "tablet",
+                "price": 599,
+                "rating": 4.5,
+                "review_count": 1870,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-2003",
+                "name": "SoundMax Wireless Headphones",
+                "brand": "SoundMax",
+                "category": "electronics",
+                "subcategory": "headphones",
+                "price": 149,
+                "rating": 4.4,
+                "review_count": 4100,
+                "in_stock": true
+              }
+            ],
+            "total_found": 4
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-2003"
+          },
+          "result": {
+            "product_id": "SP-2003",
+            "product_name": "SoundMax Wireless Headphones",
+            "base_price": 149,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-2009"
+          },
+          "result": {
+            "product_id": "SP-2009",
+            "product_name": "SoundMax Beat Pro Wireless Speaker",
+            "base_price": 349,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_001",
+            "product_id": "SP-2003",
+            "quantity": 1,
+            "gift_wrap": true
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-2003",
+            "product_name": "SoundMax Wireless Headphones",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": true,
+            "unit_price": 149,
+            "cart_subtotal": 149,
+            "cart_total": 154
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_001",
+            "product_id": "SP-2009",
+            "quantity": 1,
+            "gift_wrap": true
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-2009",
+            "product_name": "SoundMax Beat Pro Wireless Speaker",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": true,
+            "unit_price": 349,
+            "cart_subtotal": 498,
+            "cart_total": 508
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_001"
+          },
+          "result": {
+            "cart_id": "CART-shop_001",
+            "customer_id": "shop_001",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-2003",
+                "product_name": "SoundMax Wireless Headphones",
+                "quantity": 1,
+                "gift_wrap": true,
+                "unit_price": 149,
+                "line_total": 149
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-2009",
+                "product_name": "SoundMax Beat Pro Wireless Speaker",
+                "quantity": 1,
+                "gift_wrap": true,
+                "unit_price": 349,
+                "line_total": 349
+              }
+            ],
+            "subtotal": 498,
+            "discount_amount": 0,
+            "gift_wrap_fee": 10,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 508,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 31556,
+    "cached_input_tokens": 0,
+    "output_tokens": 337,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 31893,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 31556,
+  "cached_input_tokens": 0,
+  "output_tokens": 337,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 31893,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_001",
+          "product_id": "SP-2003",
+          "quantity": 1,
+          "gift_wrap": true,
+          "variant_id": null
+        },
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_001",
+          "product_id": "SP-2009",
+          "quantity": 1,
+          "gift_wrap": true,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_001": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001",
+              "CI-0002"
+            ]
+          },
+          "gift_wrap_fee": {
+            "old": 0,
+            "new": 10
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 498
+          },
+          "total": {
+            "old": 0,
+            "new": 508
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_001",
+      "field": "gift_wrap_fee",
+      "expected_value": 10
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_001",
+      "field": "subtotal",
+      "expected_value": 498
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_001",
+      "field": "total",
+      "expected_value": 508
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_001",
+        "product_id": "SP-2003",
+        "gift_wrap": true,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_001",
+        "product_id": "SP-2009",
+        "gift_wrap": true,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 2,
+  "ux_base_score": 2.3,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

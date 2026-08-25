@@ -1,0 +1,584 @@
+{
+  "task_id": "63-proactive_loyalty_redemption",
+  "user_id": "shop_005",
+  "task_summary": "**Task:** A Platinum returning customer (shop_005, Morgan Patel) with 104,000 loyalty points asks to add the ProBook 15 ($1,299) and check out. The customer does NOT mention points in the opener. The agent must proactively detect the large balance via get_customer_account, quantify redemption value in dollars ($1,040 theoretical max, or 50% cap = $649.50 on this cart), and offer the customer a choice. Customer picks 50,000 points → $500 off. Final cart: SP-1101 qty=1 no wrap, subtotal $1,299, loyalty_discount $500, total $799.\n\n**Challenge:** Proactive loyalty detection as a customer-value signal. The failure mode is silent — the agent completes a $1,299 checkout without ever surfacing that the customer could save $500. Pitfall 1: silent completion at full price. Pitfall 2: vague mention ('you have points') without quantifying in dollars. Pitfall 3: auto-applying an amount without customer consent on the size. Pitfall 4: offering an amount exceeding the 50% cap. Distinct from T10 (customer already asked to redeem, stacking rule), T17/T18/T31/T36 (compound scenarios where points show up mid-flow) — T63 tests the PURELY PROACTIVE axis: customer makes zero mention, agent must notice.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_customer_account",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account (at least once) to discover the loyalty balance. Proactive surfacing without checking the account would be fabrication.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed: the agent called get_customer_account for customer_id shop_005 and retrieved the 104,000-point balance."
+    },
+    {
+      "id": "proactively_surfaced_redemption",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned loyalty redemption as an option BEFORE the customer asked about points. The customer's opener did not mention points, so any mention by the agent before the customer's second turn counts as proactive.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Failed: the agent did not mention loyalty redemption before the customer asked about points. The first loyalty mention occurred only after the user's third turn explicitly asking about loyalty redemption options."
+    },
+    {
+      "id": "quantified_redemption_in_dollars",
+      "kind": "must",
+      "requirement": "Agent quantified the redemption value in dollars (e.g., '100 points = $1', 'worth up to $X off'), not just vaguely referenced the balance. Saying 'you have 104,000 points' without a dollar value does not satisfy this.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Passed: the agent quantified value in dollars, stating '100 points = $1,' the 50% cap as '$649.50 off,' and multiple point-to-dollar examples including 50,000 points = $500 off."
+    },
+    {
+      "id": "customer_chose_amount",
+      "kind": "must",
+      "requirement": "Agent let the customer choose the redemption amount rather than auto-applying a unilateral choice. The redeem_loyalty_points call must occur AFTER the customer's second turn (where they pick 50,000).",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed: redeem_loyalty_points was called only after the customer explicitly chose '50,000 points for $500 off' in a later turn."
+    },
+    {
+      "id": "respected_cap",
+      "kind": "must",
+      "requirement": "Agent did not offer or apply a redemption amount exceeding 50% of cart total (cart subtotal $1,299 → max redemption $649 → max points 64,950). Offering 100,000 points or applying >64,950 points fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Passed: the agent discussed a maximum of 64,900 points for $649 off, which does not exceed the 50% cap, and actually applied only 50,000 points."
+    },
+    {
+      "id": "no_shipping_selection",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option. This task is only about adding the laptop and proactively offering loyalty redemption; shipping selection is explicitly out of scope.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed: there was no set_shipping_option tool call anywhere in the trace."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.3,
+  "ux_reasoning": "The agent handled consent well for material writes: it asked about gift wrap before adding the item, did not auto-redeem points, and only redeemed after the user specified 50,000 points. However, it missed the key proactive loyalty step from the outset and moved toward checkout at full price until the user explicitly asked about redemption options, which is a meaningful UX miss in this scenario. User effort was therefore poor because the user had to surface an important savings opportunity that the agent should have detected via account lookup and quantified in dollars earlier. Response length and structure were generally good: totals, caps, and examples were clear and concise, though the max redemption math was slightly imprecise in cents ($649 vs. $649.50).",
+  "turns": 5,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hey — please add the ProBook 15 to my cart and let's get checked out."
+    },
+    {
+      "role": "assistant",
+      "content": "I found the ProBook 15: ProBook Laptop 15-inch at $1,299, and it’s in stock.\n\nBefore I add it: do you want gift wrap? It’s available for this item. If you don’t care, I’ll add it without gift wrap.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "add specific product to cart and proceed checkout; check variants before add; customer shop_005"
+          },
+          "result": [
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies",
+            "Workflow: Validate promo or discount request and proceed without unsupported discount\nUse when: User asks for a named or informal discount that may not exist, or asks whether a bundle/brand discount qualifies, before deciding whether to add items or use no promo.\nVerify first:\n- Identify the product(s) involved with search_products when needed.\n- Inspect the cart with get_cart if qualification depends on current contents.\n- Check available promotions with get_promotions for the relevant category.\n- Check store rules with get_policies when qualification or stacking must be explained.\nProcedure:\n1. If product-specific, search_products(query=<product or brand request>, category=<if known>, in_stock_only=true)\n2. get_cart(customer_id=<customer_id>)\n3. get_promotions(category=<relevant_category>)\n4. get_policies(topic=<promotions_or_bundle_rules>)\n5. If user decides to continue without the unsupported discount, get_variants(product_id=<chosen_product_id>)\n6. If user decides to continue without the unsupported discount, add_to_cart(customer_id=<customer_id>, product_id=<chosen_product_id>, variant_id=<selected_variant_or_null>, quantity=<requested_quantity_or_1>, gift_wrap=<requested_or_false>)\nBranches:\n- If the requested discount is not found in get_promotions, clearly state it is unavailable and do not apply any promo.\n- If policy shows the requested benefit is informational/manual rather than auto-applied in cart, explain qualification and estimated effect without calling apply_promo.\n- If current cart does not qualify for a bundle/brand rule, explain the missing condition and suggest qualifying item types only if the user asks.\n- If the user opts to buy at regular price, add the item normally without apply_promo.\n- If the user declines after hearing the rule, stop with no write.\nAvoid:\n- Do not turn policy descriptions into promo applications when no promo code/tool result supports it.\n- Do not auto-apply a non-existent sustainability or bundle code.\n- Do not infer bundle qualification from item count alone when policy depends on shared brand/category.\n- Do not mutate the cart after the user declines or before they confirm proceeding without the discount.\nProcess",
+            "Workflow: Inspect a product or cart item's details, variants, and relevant policy\nUse when: User wants information before buying or changing anything: product details, all size/color variants, stock status, which option is larger/roomier, or a policy such as returns for that item.\nVerify first:\n- Identify the target product either from a search query or from an item already in the cart.\n- Verify product details from the product record.\n- If the request involves sizes/colors/options, verify variants for that product.\n- If the request references a current cart item, verify the cart first to anchor the exact product/variant.\n- If the request asks about store policy, verify the specific policy topic from policies.\nProcedure:\n1. If product is referenced as already in cart, get_cart(customer_id=<customer_id>)\n2. If product must be found by name, search_products(query=<product name>, category=<optional>, in_stock_only=<optional>, min_price=<optional>, max_price=<optional>, min_rating=<optional>, sort_by=<optional>)\n3. get_product_details(product_id=<product_id>)\n4. If options/sizes/colors are requested, get_variants(product_id=<product_id>)\n5. If policy is requested, get_policies(topic=<returns|price_match|quantity_limit|other available topic>)\nBranches:\n- If variants exist, list the relevant variants with stock status and any obvious ordering implied by labels (for example, larger size being roomier); if no variants exist, say so.\n- If the user said not to change the cart, explicitly note no changes were made after checking the cart.\n- If the policy response gives general rules and nothing marks the item as excluded, present the standard policy while avoiding unsupported guarantees.\n- If search yields multiple similar products, use product details to disambiguate before giving variant or policy information.\nAvoid:\n- Do not mutate cart contents when the user only asked for information.\n- Do not invent fit guidance beyond what is directly inferable from variant labels or tool data.\n- Do not assume an item is final sale, returnable, or variantless without tool confirmation.\n- Do not answer policy questions from memory; use get_policies.\nProcess support: mean conformance="
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "ProBook 15",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1101",
+                "name": "ProBook Laptop 15-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1299,
+                "rating": 4.7,
+                "review_count": 1890,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1105",
+                "name": "CreatorStudio 15",
+                "brand": "CreatorStudio",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1499,
+                "rating": 4.7,
+                "review_count": 720,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-2004",
+                "name": "TechPhone Lite 15",
+                "brand": "TechPhone",
+                "category": "electronics",
+                "subcategory": "phone",
+                "price": 499,
+                "rating": 4.3,
+                "review_count": 2200,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-2006",
+                "name": "ProBook USB-C Dock",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "accessory",
+                "price": 129,
+                "rating": 4.3,
+                "review_count": 920,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1106",
+                "name": "ProBook Chromebook 11",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 329,
+                "rating": 3.9,
+                "review_count": 530,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1103",
+                "name": "BudgetLine Notebook 15",
+                "brand": "BudgetLine",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 449,
+                "rating": 3.4,
+                "review_count": 210,
+                "in_stock": true
+              }
+            ],
+            "total_found": 8
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-1101"
+          },
+          "result": {
+            "product_id": "SP-1101",
+            "name": "ProBook Laptop 15-inch",
+            "category": "electronics",
+            "subcategory": "laptop",
+            "brand": "ProBook",
+            "price": 1299,
+            "rating": 4.7,
+            "review_count": 1890,
+            "description": "Premium 15-inch laptop. Heavier, pricier, made for power users.",
+            "specs": {
+              "weight_lb": 4.1,
+              "battery_hours": 10,
+              "ram": "16GB",
+              "ssd": "512GB",
+              "screen_inches": 15
+            },
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 18,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1101"
+          },
+          "result": {
+            "product_id": "SP-1101",
+            "product_name": "ProBook Laptop 15-inch",
+            "base_price": 1299,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No gift wrap, please — just add it and let’s keep moving to checkout."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — the ProBook Laptop 15-inch is in your cart.\n\nCurrent cart:\n- ProBook Laptop 15-inch ×1 — $1,299\n- Total so far: $1,299\n\nTo keep moving to checkout, I need your shipping choice. If you want, I can pull the available shipping options and ETAs next.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_005",
+            "product_id": "SP-1101",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1101",
+            "product_name": "ProBook Laptop 15-inch",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 1299,
+            "cart_subtotal": 1299,
+            "cart_total": 1299
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-1101",
+                "product_name": "ProBook Laptop 15-inch",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 1299,
+                "line_total": 1299
+              }
+            ],
+            "subtotal": 1299,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 1299,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I’d rather not choose shipping right now. If there are any loyalty redemption options on this order, please tell me what they’re worth in dollars; otherwise I’m ready to confirm the ProBook 15 at the current total."
+    },
+    {
+      "role": "assistant",
+      "content": "You do have loyalty redemption available.\n\nWhat it’s worth on this order:\n- Your balance: 104,000 points\n- Redemption rate: 100 points = $1\n- Cart total right now: $1,299\n- Max allowed redemption: 50% of cart total = $649.50 off\n- So the practical maximum you could use here is 64,900 points for $649 off\n- Minimum redemption is 500 points = $5 off\n\nExamples:\n- 500 points = $5 off\n- 5,000 points = $50 off\n- 10,000 points = $100 off\n- 25,000 points = $250 off\n- 50,000 points = $500 off\n- 64,900 points = $649 off\n\nCurrent total without shipping or redemption:\n- $1,299\n\nIf you want, tell me the exact number of points to redeem. Otherwise, you’re set to confirm the ProBook 15 at the current total.",
+      "tool_calls": [
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "customer_id": "shop_005",
+            "name": "Morgan Patel",
+            "email": "morgan.patel@example.com",
+            "tier": "platinum",
+            "is_first_time": false,
+            "loyalty_points": 104000,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-1101",
+                "product_name": "ProBook Laptop 15-inch",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 1299,
+                "line_total": 1299
+              }
+            ],
+            "subtotal": 1299,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 1299,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_redemption"
+          },
+          "result": {
+            "topic": "loyalty_redemption",
+            "summary": "Loyalty points can be redeemed at checkout to offset part of the cart total. 100 points = $1.",
+            "rules": [
+              "Rate: 100 loyalty points = $1.00 off.",
+              "Cap: redemption cannot exceed 50% of the current cart total.",
+              "Minimum redemption: 500 points ($5).",
+              "Stacking: stacks with promo codes and category bundles.",
+              "Restriction: not combinable with the first-time welcome discount.",
+              "Points are debited from the customer's balance at redemption.",
+              "Agent action rule: do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Let’s redeem 50,000 points for $500 off. What would the updated total be before shipping?"
+    },
+    {
+      "role": "assistant",
+      "content": "Updated total before shipping: $799\n\nApplied:\n- 50,000 points redeemed\n- Loyalty discount: $500\n\nCart now:\n- Subtotal: $1,299\n- Loyalty discount: -$500\n- Shipping: not selected\n- Total before shipping: $799\n\nRemaining loyalty balance:\n- 54,000 points\n\nIf you want, I can leave shipping unset for now and you can confirm the order total as-is before shipping.",
+      "tool_calls": [
+        {
+          "name": "redeem_loyalty_points",
+          "arguments": {
+            "customer_id": "shop_005",
+            "points": 50000
+          },
+          "result": {
+            "status": "redeemed",
+            "points_redeemed": 50000,
+            "discount_applied": 500,
+            "remaining_balance": 54000,
+            "cart_subtotal": 1299,
+            "cart_total": 799
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-1101",
+                "product_name": "ProBook Laptop 15-inch",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 1299,
+                "line_total": 1299
+              }
+            ],
+            "subtotal": 1299,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 500,
+            "loyalty_points_redeemed": 50000,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 799,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Looks good — please confirm it as the ProBook 15 with 50,000 points redeemed for $500 off, total $799 before shipping."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed.\n\nYour cart is set as:\n- ProBook Laptop 15-inch ×1\n- No gift wrap\n- 50,000 loyalty points redeemed\n- $500 off applied\n- Total before shipping: $799\n\nShipping is still not selected.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 82082,
+    "cached_input_tokens": 0,
+    "output_tokens": 811,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 82893,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 82082,
+  "cached_input_tokens": 0,
+  "output_tokens": 811,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 82893,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_005",
+          "product_id": "SP-1101",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "customers": {
+        "shop_005": {
+          "loyalty_points": {
+            "old": 104000,
+            "new": 54000
+          }
+        }
+      },
+      "carts": {
+        "CART-shop_005": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "loyalty_discount": {
+            "old": 0,
+            "new": 500
+          },
+          "loyalty_points_redeemed": {
+            "old": 0,
+            "new": 50000
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 1299
+          },
+          "total": {
+            "old": 0,
+            "new": 799
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_005",
+      "field": "loyalty_discount",
+      "expected_value": 500
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_005",
+      "field": "loyalty_points_redeemed",
+      "expected_value": 50000
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_005",
+      "field": "subtotal",
+      "expected_value": 1299
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_005",
+      "field": "total",
+      "expected_value": 799
+    },
+    {
+      "entity_type": "customers",
+      "record_key": "shop_005",
+      "field": "loyalty_points",
+      "expected_value": 54000
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_005",
+        "product_id": "SP-1101",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 11,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

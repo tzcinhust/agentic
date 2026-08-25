@@ -1,0 +1,203 @@
+{
+  "task_id": "17-welcome_plus_points_compound",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** A first-time Standard customer (shop_002) adds SP-1001 SlimBook Air 13 ($849). Two profile-driven policies apply: welcome_discount (5%, ~$42) and loyalty_points (Standard: 1 pt/$, ~800+ points). No promo codes in env.\n\n**Challenge:** Tests stacked proactive disclosure. Pitfall: agent surfaces one of the two policies and silently drops the other, OR misses both. Customer is silent on both topics. Correct: agent calls get_customer_account, sees first-time + Standard tier, consults both welcome_discount and loyalty_points policies, and reports both at cart summary with specific numbers (5% / ~$42 welcome, ~800+ pts loyalty).",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 4,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — SlimBook Air 13 has been added to your cart.\n\nCart total: $849",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add requested product to cart and optionally apply one promo; straightforward add specific product to cart"
+          },
+          "result": [
+            "Workflow: Add requested product to cart and optionally apply one promo\nUse when: User wants a specific product added to cart, may specify quantity/gift wrap, and may want a named promo code applied after adding.\nVerify first:\n- Identify the intended product with search_products.\n- Check variant requirements with get_variants.\n- Optionally inspect current cart with get_cart if promo/cart context matters.\n- If a promo is requested, verify available promotions for the product category with get_promotions.\nProcedure:\n1. search_products(query=<product request>, category=<if known>, in_stock_only=true)\n2. If needed, get_product_details(product_id=<chosen_product_id>) to confirm match/category/availability.\n3. get_variants(product_id=<chosen_product_id>)\n4. add_to_cart(customer_id=<customer_id>, product_id=<chosen_product_id>, variant_id=<selected_variant_or_null>, quantity=<requested_quantity_or_1>, gift_wrap=<requested_or_false>)\n5. If user requested a promo, apply_promo(customer_id=<customer_id>, promo_code=<requested_code>)\n6. Optionally get_cart(customer_id=<customer_id>) to confirm final totals/applied codes after promo application.\nBranches:\n- If search returns multiple plausible matches, pause and ask user to choose before add_to_cart.\n- If get_variants shows required variants, obtain the user's choice before add_to_cart.\n- If the product has no variants, pass null/none as variant_id as indicated by get_variants.\n- If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.\n- If apply_promo succeeds, report applied code and updated cart totals.\n- If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.\nAvoid:\n- Do not apply a promo before the item is in the cart when the request is to discount that item.\n- Do not assume a product match when search results are ambiguous.\n- Do not fabricate promo eligibility, discount amount, or stacking behavior.\n- Do not skip get_variants before add_to_cart when variant needs are unknown.\nProcess support: mean conformance=0.961\nObserved frequent paths:\n- 1x: search_products -> get_promotions",
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies",
+            "Workflow: Add item and apply a promo code\nUse when: User wants a specific product added to cart and asks to use a promo code or asks whether a code can be applied.\nVerify first:\n- Identify the intended product with search_products or get_product_details.\n- Check variant requirements with get_variants if the product may have options.\n- Inspect current cart with get_cart if cart state could affect promo use.\n- Validate the requested code with validate_promo before applying it.\nProcedure:\n1. search_products\n2. get_product_details\n3. get_variants\n4. get_cart\n5. validate_promo\n6. add_to_cart\n7. apply_promo\n8. get_cart\nBranches:\n- If search results are ambiguous or empty, stop after read-only tools and ask the user to clarify or refine; do not add anything.\n- If get_variants shows required options, obtain/select a valid variant before add_to_cart.\n- If validate_promo returns invalid, do not call apply_promo; proceed only with user-approved no-promo add-to-cart or report the issue.\n- If the user only asked to check a code, validate it and return the outcome without mutating the cart.\n- If cart contents already exist, confirm final cart totals with get_cart after applying the promo.\nAvoid:\n- Do not apply a promo code without validating it first.\n- Do not assume a product has no variants without checking when variants may exist.\n- Do not promise a discount amount before tool results confirm it.\n- Do not stack multiple promo codes; cart policy/tool state is authoritative.\nProcess support: mean conformance=0.973\nObserved frequent paths:\n- 1x: search_products -> get_customer_account -> get_cart -> get_product_details -> get_variants -> validate_promo -> add_to_cart -> apply_promo -> get_cart\n- 1x: get_customer_account -> get_policies -> search_products -> search_products -> search_products -> search_products -> get_product_details -> get_variants -> get_cart -> add_to_cart\n- 1x: search_products -> get_customer_account -> get_cart -> get_variants -> get_promotions -> add_to_cart -> validate_promo"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook Air 13",
+            "category": "electronics",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1001",
+                "name": "SlimBook Air 13",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.5,
+                "review_count": 1240,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1001"
+          },
+          "result": {
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — just to confirm, that’s one SlimBook Air 13 in the cart, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — you have 1 SlimBook Air 13 in your cart.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 30396,
+    "cached_input_tokens": 0,
+    "output_tokens": 177,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 30573,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 30396,
+  "cached_input_tokens": 0,
+  "output_tokens": 177,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 30573,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_002",
+          "product_id": "SP-1001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_002": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          },
+          "total": {
+            "old": 0,
+            "new": 849
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

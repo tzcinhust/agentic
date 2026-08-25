@@ -1,0 +1,605 @@
+{
+  "task_id": "90-challenge_second_change_cumulative_with_dates",
+  "user_id": "user_001",
+  "task_summary": "**Task:** A traveler is changing a booking for the second time and asks both about the new fee and the cumulative fees paid across both changes. Correct resolution: The second change fee for the booking is $75.\n\n**Challenge:** The agent uses the current booking’s departure timing for the second-change fee, keeps cumulative fee accounting straight, and does not reuse the earlier fee window incorrectly.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "state_second_change_fee",
+      "kind": "must",
+      "requirement": "Agent must explain that the second change fee for this booking is $75.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent eventually states the second change fee is $75, but earlier told the user the second change fee would be $150. Because the evaluation is strict about wrong explanations and false claims in the conversation, this requirement fails."
+    },
+    {
+      "id": "state_cumulative_fees",
+      "kind": "must",
+      "requirement": "Agent must explain that the cumulative change fees paid across the first and second changes total $225.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent eventually corrects the cumulative change fees to $225, but earlier incorrectly said the combined total across both changes would be $520 instead of clearly stating cumulative change fees total $225. Given the prior wrong explanation, this requirement fails."
+    },
+    {
+      "id": "state_current_departure_basis",
+      "kind": "must",
+      "requirement": "Agent must explain or clearly imply that the second-change fee is based on the current booked departure timing rather than on the older pre-change itinerary date.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly explains that the second-change fee is based on the current booked departure timing of BK-1000 and not the older itinerary date, including a corrected preview showing the $75 fee from that basis."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 2.8,
+  "ux_reasoning": "The agent ultimately respected approval boundaries: it used preview mode while the user was still evaluating options, preserved stated booking preferences, and only executed the change after explicit authorization. However, it initially gave a wrong second-change fee of $150 and then produced incorrect cumulative accounting by folding a cheaper replacement fare into total-paid logic, which materially weakened informed decision support until the user corrected it. That correction was avoidable and central to the task, so user effort was poor despite eventual recovery. Responses were generally readable, but the incorrect intermediate math and discussion of `price_paid` created unnecessary confusion and buried the clean decision picture the traveler needed.",
+  "turns": 5,
+  "tool_calls": 15,
+  "tool_errors": 0,
+  "redundant_calls": 8,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I already changed my flight BK-1000 once before. Now I need to change it again to June 28.  What will the fee be for this second change? My user ID is user_001."
+    },
+    {
+      "role": "assistant",
+      "content": "For BK-1000, the change fee for changing it again would be:\n\n- $150 if this is a personal change, because the current flight departs on 2026-06-24, which is within 7 days\n- Plus any fare difference for the new June 28 flight\n\nI don’t see any rule that makes a second change cost more just because it’s the second time. The fee is based on the current booking’s cabin and timing, not the number of prior changes.\n\nYour booking details:\n- Booking: BK-1000\n- Route: ORD → DEN\n- Cabin: Economy\n- Current departure: 2026-06-24 09:45\n- Route type: Domestic\n\nPossible exceptions:\n- Medical: 50% off the standard fee\n- Bereavement: 75% off\n- Jury duty / military / schedule change / weather: free change\n\nIf you want, I can also look up June 28 flight options and preview the exact total cost to change, including the fare difference, without making the change yet.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 500,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 150,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-24T09:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_001"
+          },
+          "result": {
+            "user_id": "user_001",
+            "name": "Emma Smith",
+            "email": "emma.smith@example.com",
+            "loyalty_tier": "gold",
+            "loyalty_points": 75000
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I thought the second-change fee should be based on the current booked departure timing, but can you double-check that? Also, once you have the right second-change fee, please tell me the total I’ll have paid across both changes, and if that looks right, you can check June 28 options for BK-1000."
+    },
+    {
+      "role": "assistant",
+      "content": "I double-checked it against the current booking and a June 28 replacement preview.\n\nFor this second change, the fee is based on the current booked departure timing of BK-1000. Since the current flight departs on 2026-06-24 and the change is being evaluated more than 7 days before the new June 28 flight, the previewed second-change fee is:\n\n- Change fee: $75\n- Fare difference: $10\n- Total due for this new change: $85\n\nAbout the total across both changes:\n- Your current booking shows `price_paid: $500`\n- The June 28 change preview shows `price_paid: $435`, with a $75 change fee and $10 fare difference\n\nThat combination implies you have already effectively paid for the first change and the current booking’s paid amount is now $435 before this next change. So if you make this second change, your total paid across the itinerary after both changes would be:\n\n- Current amount tied to booking: $435\n- Second change total: $85\n- Combined total after both changes: $520\n\nJune 28 option found for BK-1000:\n- UA101\n- ORD → DEN\n- 2026-06-28 12:00 PM\n- Nonstop\n- Economy fare: $360\n\nSo yes — the corrected second-change fee looks like $75, not $150, and the all-in total after both changes would be $520.\n\nIf you want, I can now help you compare other June 28 options too, or preview this exact UA101 change again before you decide.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "User wants to double-check second change fee based on current booked departure timing, calculate total paid across both changes, and if that looks right then check June 28 options for BK-1000. Need no state change first; verify booking, current timing-based fee, maybe search June 28 options after answering."
+          },
+          "result": [
+            "Workflow: Use preview mode for cancellation or change cost checks\nUse when: User asks for fees, refund amounts, change totals, or whether an option is cheaper, but has not yet authorized final action.\nVerify first:\n- Use get_booking to verify the target booking exists and identify the route/cabin context.\n- Use cancel_booking with non-confirming preview behavior to inspect cancellation fee and refund amount.\n- When evaluating a specific replacement on the existing booking, use update_booking with non-confirming preview behavior to inspect change fee and fare difference.\n- Use search_flights first if a specific target flight must be identified before an update preview can be run.\nProcedure:\n1. get_booking\n2. search_flights\n3. cancel_booking\n4. update_booking\nBranches:\n- If only cancellation economics are needed, stop after the cancel preview and provide a no-write answer.\n- If only direct-change economics are needed, stop after the update preview and provide a no-write answer.\n- If both paths are requested, compute and present both from preview outputs, then wait for approval.\n- If previews cannot be produced because no suitable replacement flight is found, return available cancellation information and explain the gap.\nAvoid:\n- Do not convert a preview into a final status in the narrative.\n- Do not make extra write calls after the user asked only for costs or comparison.\n- Do not assume previewed values remain valid for a different flight/date/search result without rerunning the relevant tool.\nProcess support: mean conformance=0.962\nObserved frequent paths:\n- 1x: get_booking -> cancel_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> update_booking -> update_booking -> cancel_booking -> create_booking\n- 1x: get_booking -> cancel_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> update_booking -> search_flights -> search_flights -> cancel_booking -> cr",
+            "Workflow: Recommend cancel now vs wait to change later under a loss threshold\nUse when: User wants a decision recommendation based on a cancellation-loss cap or similar rule, without authorizing any booking mutation.\nVerify first:\n- Use get_booking to confirm cabin class and route context.\n- Use cancel_booking with confirm=false to obtain the actual cancellation loss/refund.\n- If change-fee rules matter and no specific new flight is chosen, use get_user_details and get_policies to verify whether change fees are generally waived or conditional.\nProcedure:\n1. get_booking(booking_id)\n2. cancel_booking(booking_id, confirm=false)\n3. If needed for fee rules, get_user_details(user_id)\n4. get_policies(cabin_class, loyalty_tier, route_type, topic)\n5. Compare the previewed cancellation loss against the user's threshold and explain whether canceling now or keeping the booking for a later change better fits the constraint\nBranches:\n- If cancellation loss is above the user's threshold, recommend not canceling now; suggest keeping the booking and changing later if policy allows.\n- If cancellation loss is within the user's threshold, present canceling as acceptable under the stated rule, while noting any future fare-difference uncertainty if they instead change later.\n- If the user asks whether free changes imply free cancellation, explicitly separate the two using policy plus cancellation preview.\n- If no threshold is given, provide a neutral explanation instead of a recommendation.\nAvoid:\n- Do not execute cancellation or change when the user asks only for a recommendation.\n- Do not conflate change-fee waivers with cancellation-fee waivers.\n- Do not invent future fare differences when no replacement flight has been searched.\n- Do not use a one-off fee amount as a general rule.\nProcess support: mean conformance=0.966\nObserved frequent paths:\n- 1x: get_booking -> cancel_booking -> get_user_details -> get_policies\n- 1x: get_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> update_booking -> cancel_booking -> search_flights -> get_user_details -> update_booking -> get_policies -> update_booking\n- 1x: get_booking",
+            "Workflow: Search flights, relax constraints, then book selected itinerary\nUse when: User wants a flight booked and provides route/date plus optional preferences such as airline, time range, stops, cabin, and budget; no booking should be created until a specific itinerary is selected or confirmed.\nVerify first:\n- Verify the requested origin, destination, date, and target cabin class from the conversation.\n- If the user mentions a budget, airline preference, time window, or stop limit, treat them as initial search filters.\n- If payment will use loyalty points or points-plus-cash, get the user's current loyalty details before booking.\nProcedure:\n1. search_flights(initial filters from user: origin, destination, date, airline if specified, max_stops if specified, time_range if specified, max_price if specified)\n2. search_flights(adjust one or more user-declared preferences only after the user asks for alternatives or accepts broader options; keep core route/date fixed)\n3. create_booking(selected flight_id, confirmed cabin_class, payment_method, cash_amount, points_used, seat_type, meal_preference, add_wifi, add_extra_legroom, add_insurance, paid_checked_bags, user_id if available)\nBranches:\n- If the first search returns no flights, present that result and continue searching only with user-approved relaxations such as different airline or time range.\n- If multiple searches are needed, iterate search_flights with revised filters until a viable option is found or the user declines alternatives.\n- If the user asks for a preview/confirmation before booking, stop after search results and do not call create_booking until explicit approval.\n- If no acceptable flights are found under the confirmed constraints, end with a no-booking outcome.\nAvoid:\n- Do not create a booking before the user selects or confirms a specific flight.\n- Do not silently relax airline, budget, stop, or time constraints without user approval.\n- Do not assume seat, meal, Wi-Fi, bags, or insurance defaults if the user provided preferences.\n- Do not rely on prior search results once the tool returns a different authoritative result set.\nProcess support: mean conformance=0.979\nObserved frequent paths:\n- 1x:"
+          ]
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 500,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 150,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-24T09:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "DEN",
+            "date": "2026-06-28",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA101",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "DEN",
+                "departure_time": "2026-06-28T12:00:00",
+                "arrival_time": "2026-06-28T15:09:00",
+                "duration_minutes": 189,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 360,
+                  "business": 900
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_fee": 75,
+            "fare_difference": 10,
+            "price_paid": 435
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for double-checking the timing basis, but the cumulative total doesn’t look right to me. If the second-change fee is $75, my total change fees across both changes should be $225, and I wouldn’t want a cheaper replacement fare treated like it refunds past change fees.\n\nPlease check June 28 options again for BK-1000 with that cumulative fee picture kept separate, and if UA101 is still the best option, let me know the final amount due just for this change."
+    },
+    {
+      "role": "assistant",
+      "content": "You’re right to keep the cumulative change fees separate.\n\nUsing that view:\n\n- First change fee already on the booking: $150\n- Second change fee preview: $75\n- Total change fees across both changes: $225\n\nFor June 28, I rechecked BK-1000 and still found only:\n\n- UA101 — ORD to DEN\n- Departs 2026-06-28 12:00 PM\n- Nonstop\n- Economy fare: $360\n\nPreview for changing BK-1000 to UA101:\n- Change fee: $75\n- Fare difference: $10\n- Final amount due for this change only: $85\n\nSo yes, UA101 is still the best available June 28 option I found, and the amount due just for this change would be $85.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 500,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 150,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-24T09:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "DEN",
+            "date": "2026-06-28",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA101",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "DEN",
+                "departure_time": "2026-06-28T12:00:00",
+                "arrival_time": "2026-06-28T15:09:00",
+                "duration_minutes": 189,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 360,
+                  "business": 900
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_fee": 75,
+            "fare_difference": 10,
+            "price_paid": 435
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That looks right now. If you go ahead with the June 28 change to UA101, please preserve the existing booking preferences, and then confirm the final booking details, the $75 second-change fee, the $10 fare difference, and that the cumulative change fees remain $225."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-1000 has been changed to June 28 on UA101, and your existing preferences were preserved.\n\nFinal booking details:\n- Booking ID: BK-1000\n- Flight: UA101\n- Route: ORD → DEN\n- Departure: 2026-06-28 12:00 PM\n- Status: Confirmed\n- Cabin: Economy\n\nPreserved preferences:\n- Seat: Aisle\n- Meal: Kosher\n- Wi‑Fi: Yes\n- Extra legroom: Yes\n- Insurance: No\n- Paid checked bags: 0\n\nChange pricing for this second change:\n- Second-change fee: $75\n- Fare difference: $10\n- Amount due for this change: $85\n\nCumulative change fees across both changes:\n- First change fee: $150\n- Second change fee: $75\n- Total change fees: $225\n\nOne note: the booking record now shows `price_paid: $435`, which appears to be the system’s stored booking amount after the update. I’ve kept that separate from the cumulative change-fee accounting you asked for.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 500,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 150,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-24T09:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "DEN",
+            "date": "2026-06-28",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA101",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "DEN",
+                "departure_time": "2026-06-28T12:00:00",
+                "arrival_time": "2026-06-28T15:09:00",
+                "duration_minutes": 189,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 360,
+                  "business": 900
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_fee": 75,
+            "fare_difference": 10,
+            "price_paid": 435
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 435,
+            "change_fee": 75,
+            "fare_difference": 10
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "UA101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 435,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 75,
+            "fare_difference": 10,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-28T12:00:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Just to confirm the preserved booking preferences are still the existing ones for the booking: cabin class, aisle seat, kosher meal, Wi‑Fi yes, extra legroom yes, and insurance no, right? If so, everything looks good."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — confirmed. The booking still shows these preserved preferences:\n\n- Cabin class: Economy\n- Seat: Aisle\n- Meal: Kosher\n- Wi‑Fi: Yes\n- Extra legroom: Yes\n- Insurance: No\n\nEverything looks good.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 139129,
+    "cached_input_tokens": 0,
+    "output_tokens": 1718,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 140847,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 139129,
+  "cached_input_tokens": 0,
+  "output_tokens": 1718,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 140847,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "fare_difference": {
+            "old": null,
+            "new": 10
+          },
+          "change_fee": {
+            "old": 150,
+            "new": 75
+          },
+          "price_paid": {
+            "old": 500,
+            "new": 435
+          },
+          "flight_id": {
+            "old": "UA100",
+            "new": "UA101"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 75
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 10
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "UA101"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 435
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 3,
+  "ux_base_score": 3.2,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.4,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 15,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 8,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 3,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

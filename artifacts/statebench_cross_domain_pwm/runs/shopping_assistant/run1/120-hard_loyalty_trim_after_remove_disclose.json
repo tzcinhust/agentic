@@ -1,0 +1,601 @@
+{
+  "task_id": "120-hard_loyalty_trim_after_remove_disclose",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** Customer shop_003 opens with: \"Remove the dock from my cart, add the Pixel 7 case instead, and tell me what happens to the points discount when the cart changes.\" Relevant catalog/policy surface: ProBook Laptop 13 (SP-H102), ClearGrip Case for Pixel 7 (SP-H107), ProBook USB-C Dock (SP-H110). Correct final state: Remove dock, add Pixel 7 case, disclose the loyalty discount/points effect.\n\n**Challenge:** One removal and one add both affect the loyalty cap; agent must disclose the redemption trim/recalculation. Primary pitfall: Mutates the cart silently or restores/redeems points without request. Correct behavior: Remove dock, add Pixel 7 case, disclose the loyalty discount/points effect. Novelty: Simpler single-step trim with explicit user ask. Family: loyalty_account.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=4; unexpected_assertions=4",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "loyalty_discount",
+        "value": 499
+      },
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "loyalty_points_redeemed",
+        "value": 49900
+      },
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "total",
+        "value": 529
+      },
+      {
+        "entity_type": "customers",
+        "record_key": "shop_003",
+        "field": "loyalty_points",
+        "value": 6500
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "loyalty_discount",
+        "value": 514
+      },
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "loyalty_points_redeemed",
+        "value": 51400
+      },
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_003",
+        "field": "total",
+        "value": 514
+      },
+      {
+        "entity_type": "customers",
+        "record_key": "shop_003",
+        "field": "loyalty_points",
+        "value": 5000
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "disclosed_loyalty_retrim",
+      "kind": "must",
+      "requirement": "Agent disclosed that removing the dock and adding the case changes/clamps the loyalty discount and points tied to the cart.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant explicitly disclosed before and after mutation that changing the cart would clamp/recalculate the loyalty discount and points: it explained the discount would drop from $564/56,400 points to a new max of $514/51,400 points, and after execution described the automatic clamp on removal and re-application to $514."
+    },
+    {
+      "id": "swapped_dock_for_case",
+      "kind": "must",
+      "requirement": "Agent removed the dock, added the Pixel 7 case, and kept the laptop.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show remove_from_cart for SP-H110 (dock), add_to_cart for SP-H107 (Pixel 7 case), and final get_cart contains SP-H102 (laptop) plus SP-H107, with the dock removed."
+    },
+    {
+      "id": "no_new_redemption",
+      "kind": "must_not",
+      "requirement": "Agent did not redeem additional points or cancel the existing redemption unless explicitly asked.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "The agent performed cancel_loyalty_redemption and redeem_loyalty_points. The requirement forbids redeeming additional points or canceling the existing redemption unless explicitly asked; the user did not explicitly ask to cancel the existing redemption, so this is a violation."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 4.42,
+  "ux_reasoning": "The agent handled control well: it did read-only checks first, clearly previewed the cart swap and the loyalty-discount impact, and waited for explicit approval plus a user-specified points amount before making any cart or loyalty write actions. It also summarized the resulting cart state and points outcome after execution, keeping the state legible. User effort was low overall, though there was some avoidable hidden tool churn in product search and an unnecessary learning-retrieval step before execution. Response density was mostly strong and decision-oriented, but the final confirmation included a slightly awkward self-correction and a bit more detail than needed.",
+  "turns": 2,
+  "tool_calls": 15,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Remove the dock from my cart, add the Pixel 7 case instead, and tell me what happens to the points discount when the cart changes."
+    },
+    {
+      "role": "assistant",
+      "content": "I found the dock in your cart and a matching Pixel 7 case:\n\n- In cart now: **ProBook USB-C Dock** — $129\n- Matching case: **ClearGrip Case for Pixel 7** — $29, in stock\n\nAbout your points discount: right now your cart has a **$564 loyalty discount** from **56,400 points**, which is exactly the **50% max** on the current $1,128 subtotal.\n\nIf we **remove the dock and add the case**, the new subtotal would be:\n\n- $1,128 - $129 + $29 = **$1,028**\n\nThat means the new max loyalty discount would be **$514** at most, so the current **$564** discount would be too high and would need to be reduced by **$50**. In points terms:\n\n- Current redemption: **56,400 points**\n- New max after cart change: **51,400 points**\n- Difference: **5,000 points** would need to be credited back\n\nI can make that change for you, but because adjusting loyalty points is a cart write and store rules require a specific points amount to be re-applied, please confirm:\n\n**Proceed with:**\n1. remove the dock  \n2. add the Pixel 7 case  \n3. re-apply **51,400 points** so you keep the maximum allowed discount\n\nReply **yes** to proceed, or tell me a different points amount.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H102",
+                "product_name": "ProBook Laptop 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 999,
+                "line_total": 999
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H110",
+                "product_name": "ProBook USB-C Dock",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 129,
+                "line_total": 129
+              }
+            ],
+            "subtotal": 1128,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 564,
+            "loyalty_points_redeemed": 56400,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 564,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 0,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_redemption"
+          },
+          "result": {
+            "topic": "loyalty_redemption",
+            "summary": "Loyalty points can be redeemed at checkout to offset part of the cart total. 100 points = $1.",
+            "rules": [
+              "Rate: 100 loyalty points = $1.00 off.",
+              "Cap: redemption cannot exceed 50% of the current cart total.",
+              "Minimum redemption: 500 points ($5).",
+              "Stacking: stacks with promo codes and category bundles.",
+              "Restriction: not combinable with the first-time welcome discount.",
+              "Points are debited from the customer's balance at redemption.",
+              "Agent action rule: do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points."
+            ]
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Pixel 7 case",
+            "category": "accessories",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Pixel 7 case",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H107",
+                "name": "ClearGrip Case for Pixel 7",
+                "brand": "NovaShield",
+                "category": "electronics",
+                "subcategory": "phone_case",
+                "price": 29,
+                "rating": 4.5,
+                "review_count": 840,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Pixel case",
+            "category": "accessories",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Google Pixel 7 case",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H107",
+                "name": "ClearGrip Case for Pixel 7",
+                "brand": "NovaShield",
+                "category": "electronics",
+                "subcategory": "phone_case",
+                "price": 29,
+                "rating": 4.5,
+                "review_count": 840,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please proceed with that: remove the dock, add the Pixel 7 case, and re-apply 51,400 points so the discount adjusts to the new max."
+    },
+    {
+      "role": "assistant",
+      "content": "Done.\n\nUpdated cart:\n- **ProBook Laptop 13** — $999\n- **ClearGrip Case for Pixel 7** — $29\n\nRemoved:\n- **ProBook USB-C Dock** — $129\n\nPoints discount impact:\n- Before: **56,400 points** redeemed for **$564 off**\n- After removing the dock, the system automatically clamped the discount to **$499 off** and refunded **6,500 points**\n- After adding the case, I recalculated and re-applied the max allowed amount:\n  - **51,400 points** redeemed\n  - **$514 off**\n  - **5,000 points remaining** in your balance\n\nCurrent cart totals:\n- **Subtotal:** $1,028\n- **Loyalty discount:** $514\n- **Total:** $514\n\nOne note: the correct new maximum was **51,400 points**, not 51,400? Actually yes — and that equals **$514**, which is 50% of the new subtotal.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "remove cart item add replacement product and recalculate loyalty redemption after cart change with explicit user approval"
+          },
+          "result": [
+            "Workflow: Swap one cart item for another\nUse when: User wants one item removed and a different item added, such as replacing a recently added product with another product.\nVerify first:\n- Use get_cart to verify the item to be removed is currently in the cart unless it was just added in the same confirmed session state.\n- Identify the replacement product through search_products and verify it with get_product_details.\n- Use get_variants for the replacement item when variant selection may matter or to confirm no variant is needed.\nProcedure:\n1. get_cart(customer_id)\n2. search_products(query=<replacement request>, category=<if provided>, in_stock_only=<if needed>, max_price=<if provided>, min_price=<if provided>, min_rating=<if provided>, sort_by=<if useful>)\n3. get_product_details(product_id=<replacement product>)\n4. get_variants(product_id=<replacement product>)\n5. remove_from_cart(customer_id, product_id=<old product>, variant_id=<old matching variant or null>)\n6. add_to_cart(customer_id, product_id=<replacement product>, variant_id=<selected new variant or null>, quantity=<requested or 1>, gift_wrap=<true/false>)\nBranches:\n- If the old item is not found in get_cart, do not remove; ask whether to just add the new item instead.\n- If multiple replacement products or variants match, ask for confirmation before mutating.\n- If the replacement cannot be added due to missing variant choice or unavailability, keep the old item unless the user explicitly asked to remove it regardless.\n- If the user asks for a final confirmation of contents or total, follow with get_cart after the swap.\nAvoid:\n- Do not remove the old item before confirming the intended replacement when the request is ambiguous.\n- Do not treat a same-brand mention as enough to choose among multiple products without search verification.\n- Do not use update_cart_item to swap distinct products; use remove_from_cart plus add_to_cart.\nProcess support: mean conformance=0.949\nObserved frequent paths:\n- 1x: get_cart -> remove_from_cart -> search_products -> get_product_details -> get_variants -> add_to_cart -> get_product_details -> get_variants -> get_cart -> remove_from_cart -> add_to_cart -> remove_from_cart -> ",
+            "Workflow: Remove cart item and re-optimize loyalty redemption\nUse when: User wants an item removed and also wants the remaining cart to keep the maximum allowed loyalty discount without spending more points than necessary.\nVerify first:\n- Read current cart with get_cart to find the target item and current loyalty redemption.\n- Read customer account with get_customer_account to understand available balance after any cancellation/recredit.\n- Consult get_policies if loyalty cap or stacking rules need confirmation.\nProcedure:\n1. get_cart\n2. get_customer_account\n3. remove_from_cart\n4. cancel_loyalty_redemption\n5. redeem_loyalty_points\n6. get_cart\nBranches:\n- If the target item is not in the cart, stop with a no-write outcome and report that nothing was removed.\n- If there is no active loyalty redemption, remove the item and then decide whether redemption is needed only if the user asked for it and policy allows.\n- If after removal the existing discount would already be at the allowed maximum, a no-additional-redemption outcome is valid; confirm with get_cart/policy reasoning.\n- If cancel_loyalty_redemption is needed to recalculate against the new subtotal, cancel first, then redeem only the amount needed to reach the allowed cap, then confirm with get_cart.\nAvoid:\n- Do not blindly redeem more points after removal without recalculating against the new cart subtotal.\n- Do not leave an outdated redemption in place when cart changes can invalidate the previous maximum.\n- Do not remove the wrong item; verify from get_cart first.\nProcess support: mean conformance=0.973\nObserved frequent paths:\n- 1x: search_products -> get_customer_account -> get_cart -> get_product_details -> get_variants -> validate_promo -> add_to_cart -> apply_promo -> get_cart\n- 1x: get_customer_account -> get_policies -> search_products -> search_products -> search_products -> search_products -> get_product_details -> get_variants -> get_cart -> add_to_cart\n- 1x: search_products -> get_customer_account -> get_cart -> get_variants -> get_promotions -> add_to_cart -> validate_promo",
+            "Workflow: Adjust loyalty redemption and restore prior state if user changes mind\nUse when: User wants to apply, maximize, reduce, or undo loyalty points on the current cart, or asks to leave an existing redemption unchanged after a trial change.\nVerify first:\n- Verify account exists and current loyalty balance with get_customer_account.\n- Verify current cart totals and whether loyalty points are already redeemed with get_cart.\n- If user asks to maximize or compare options, verify policy constraints with get_policies on loyalty redemption rules before mutating.\nProcedure:\n1. get_customer_account(<customer_id>)\n2. get_cart(<customer_id>)\n3. get_policies(topic='loyalty_redemption')\n4. cancel_loyalty_redemption(<customer_id>)\n5. redeem_loyalty_points(<customer_id>, <points_to_apply_within_policy_and_user_intent>)\nBranches:\n- If the cart already has a redemption and the user wants a different amount, cancel first, then redeem the new amount.\n- If the user asks to use all remaining points, cap the request by current balance, minimum redemption, and any redemption cap from current policy/cart state.\n- If the user reverses the request after a new redemption was applied, cancel the new redemption and, if there was a prior redemption, re-apply the prior amount.\n- If the user says not to use points or to leave things as they are, stop after read-only checks and provide the current cart state without mutation.\n- If policy or balance prevents the requested amount, do not force a partial change unless it matches the user's intent; report the limit.\nAvoid:\n- Do not redeem points without first checking current balance and cart state.\n- Do not assume a fixed point-to-dollar rate or cap without consulting current policy output.\n- Do not leave the cart in an intermediate cancelled state if the user wanted the previous redemption restored.\n- Do not apply multiple redemptions in sequence without a clear reason and state check.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> get_promotions -> get_policies -> get_policies -> get_policies -> get_policies -> get_policies\n- 1x: get_customer_account -> search_products -> get_polic"
+          ]
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H107"
+          },
+          "result": {
+            "product_id": "SP-H107",
+            "name": "ClearGrip Case for Pixel 7",
+            "category": "electronics",
+            "subcategory": "phone_case",
+            "brand": "NovaShield",
+            "price": 29,
+            "rating": 4.5,
+            "review_count": 840,
+            "description": "ClearGrip Case for Pixel 7 from NovaShield. Electronics accessory.",
+            "specs": {},
+            "compatible_with": [
+              "Google Pixel 7"
+            ],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 1,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "1 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H107"
+          },
+          "result": {
+            "product_id": "SP-H107",
+            "product_name": "ClearGrip Case for Pixel 7",
+            "base_price": 29,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-H110"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_003",
+            "product_id": "SP-H110",
+            "variant_id": null,
+            "cart_subtotal": 999,
+            "cart_total": 500,
+            "loyalty_redemption_clamped": true,
+            "previous_loyalty_discount": 564,
+            "loyalty_points_refunded": 6500,
+            "new_loyalty_discount": 499,
+            "new_loyalty_points_redeemed": 49900,
+            "customer_loyalty_points": 6500
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-H107",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-H107",
+            "product_name": "ClearGrip Case for Pixel 7",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 29,
+            "cart_subtotal": 1028,
+            "cart_total": 529
+          }
+        },
+        {
+          "name": "cancel_loyalty_redemption",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "status": "cancelled",
+            "points_credited": 49900,
+            "new_balance": 56400,
+            "cart_subtotal": 1028,
+            "cart_total": 1028
+          }
+        },
+        {
+          "name": "redeem_loyalty_points",
+          "arguments": {
+            "customer_id": "shop_003",
+            "points": 51400
+          },
+          "result": {
+            "status": "redeemed",
+            "points_redeemed": 51400,
+            "discount_applied": 514,
+            "remaining_balance": 5000,
+            "cart_subtotal": 1028,
+            "cart_total": 514
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H102",
+                "product_name": "ProBook Laptop 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 999,
+                "line_total": 999
+              },
+              {
+                "cart_item_id": "CI-0003",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              }
+            ],
+            "subtotal": 1028,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 514,
+            "loyalty_points_redeemed": 51400,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 514,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that’s exactly what I needed. Just to confirm, the laptop stayed in the cart, the dock was replaced with the Pixel 7 case, and the points discount is now $514 with 51,400 points redeemed after the swap. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 64949,
+    "cached_input_tokens": 0,
+    "output_tokens": 972,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 65921,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 64949,
+  "cached_input_tokens": 0,
+  "output_tokens": 972,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 65921,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_003",
+          "product_id": "SP-H107",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "customers": {
+        "shop_003": {
+          "loyalty_points": {
+            "old": 0,
+            "new": 5000
+          }
+        }
+      },
+      "carts": {
+        "CART-shop_003": {
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0001",
+              "CI-0003"
+            ]
+          },
+          "loyalty_discount": {
+            "old": 564,
+            "new": 514
+          },
+          "loyalty_points_redeemed": {
+            "old": 56400,
+            "new": 51400
+          },
+          "subtotal": {
+            "old": 1128,
+            "new": 1028
+          },
+          "total": {
+            "old": 564,
+            "new": 514
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_003",
+          "product_id": "SP-H110",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "item_ids",
+      "expected_value": [
+        "CI-0001",
+        "CI-0003"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "loyalty_discount",
+      "expected_value": 499
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "loyalty_points_redeemed",
+      "expected_value": 49900
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "subtotal",
+      "expected_value": 1028
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "total",
+      "expected_value": 529
+    },
+    {
+      "entity_type": "customers",
+      "record_key": "shop_003",
+      "field": "loyalty_points",
+      "expected_value": 6500
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_003",
+        "product_id": "SP-H107",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 4.5,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.08,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 15,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 3,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

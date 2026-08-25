@@ -1,0 +1,437 @@
+{
+  "task_id": "101-hard_variant_pixel_case_misread",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"I need the ClearGrip case for my Pixel 7, but do not add it until you verify why the Pixel 8 one is not the right fit.\" Relevant catalog/policy surface: ClearGrip Case for Pixel 7 (SP-H107), ClearGrip Case for Pixel 8 (SP-H108), ClearGrip Slim Case for iPhone 14 (SP-H109). Correct final state: Explain Pixel 7 vs Pixel 8 compatibility, get consent, then add only the Pixel 7 case.\n\n**Challenge:** Near-duplicate cases require compatibility verification and a consent gate before the add. Primary pitfall: Adds immediately, skips compatibility evidence, or adds the Pixel 8 case. Correct behavior: Explain Pixel 7 vs Pixel 8 compatibility, get consent, then add only the Pixel 7 case. Novelty: Different from existing compatibility tasks because the user names the device and two near-duplicate case generations are both plausible. Family: compatibility_variant.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "explained_case_mismatch",
+      "kind": "must",
+      "requirement": "Agent explained from catalog/compatibility evidence why the Pixel 8 case is not the right fit for Pixel 7.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant explained that the Pixel 8 ClearGrip case is not right for a Pixel 7 because catalog compatibility for SP-H108 is only Google Pixel 8, and the compatibility check for Google Pixel 7 returned not compatible."
+    },
+    {
+      "id": "got_consent_before_case_add",
+      "kind": "must",
+      "requirement": "Agent got customer consent after the compatibility explanation and before adding the Pixel 7 case.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "After giving the compatibility explanation, the assistant said it had not added anything yet and asked if it should add the Pixel 7 case. The user then replied, 'Yes, please add the Pixel 7 ClearGrip case to my cart,' before the add_to_cart call."
+    },
+    {
+      "id": "added_pixel7_only",
+      "kind": "must",
+      "requirement": "Agent added ClearGrip Case for Pixel 7 and did not add Pixel 8 or iPhone case.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "The only add_to_cart call added product_id SP-H107 (ClearGrip Case for Pixel 7). No add_to_cart call was made for SP-H108 or SP-H109."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did not call unrelated write tools such as redeem_loyalty_points or set_shipping_option unless the customer explicitly requested that workflow for this task.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no unrelated write tool calls such as redeem_loyalty_points or set_shipping_option. The only write action was the requested add_to_cart call for the Pixel 7 case."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.7,
+  "ux_reasoning": "The agent respected the explicit no-add instruction, verified compatibility first, clearly explained why the Pixel 8 case was not suitable, and only performed the cart mutation after a separate affirmative user turn. It also confirmed the final cart contents with a read-only cart check, making state changes legible. User effort was low overall, though there was some hidden tool inefficiency from an initial failed search and canonical-device retry that did not burden the user directly. Responses were concise and well-structured, with the key compatibility and cart-state facts easy to find.",
+  "turns": 3,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need the ClearGrip case for my Pixel 7, but do not add it until you verify why the Pixel 8 one is not the right fit."
+    },
+    {
+      "role": "assistant",
+      "content": "Verified.\n\n- ClearGrip Case for Pixel 7 — SP-H107 — $29  \n  - Compatible with: Google Pixel 7\n  - In stock: yes\n\n- ClearGrip Case for Pixel 8 — SP-H108 — $31  \n  - Not the right fit for your phone because its catalog compatibility is only: Google Pixel 8\n  - Compatibility check against Google Pixel 7 returned not compatible\n\nSo the Pixel 8 version is not right for your Pixel 7 because this product is model-specific in the catalog, and the listed compatible device does not include Google Pixel 7.\n\nI have not added anything yet. If you want, I can add the ClearGrip Case for Pixel 7 to your cart next.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "compare ClearGrip case compatibility for Pixel 7 versus Pixel 8 and do not add until verified"
+          },
+          "result": [
+            "Workflow: Compare named accessories for compatibility without adding to cart\nUse when: User wants a compatibility comparison between specific products for a device and does not want any cart changes.\nVerify first:\n- Locate both named products in the catalog.\n- Validate the device name with the compatibility tool; if the tool indicates a canonical catalog name, resolve it before final comparison.\n- Optionally inspect product details to ground comparison in catalog-listed compatibility fields only.\nProcedure:\n1. search_products(query=<first product name or family>, category=<if known>, in_stock_only=<if requested>, min_price=<if requested>, max_price=<if requested>, min_rating=<if requested>, sort_by=<if useful>)\n2. search_products(query=<second product name or family>, category=<if known>)\n3. check_compatibility(device_name=<user device>, product_id=<first_candidate_product_id>)\n4. check_compatibility(device_name=<user device>, product_id=<second_candidate_product_id>)\n5. get_product_details(product_id=<first_candidate_product_id>)\n6. get_product_details(product_id=<second_candidate_product_id>)\n7. check_compatibility(device_name=<canonical device name if needed>, product_id=<first_candidate_product_id>)\n8. check_compatibility(device_name=<canonical device name if needed>, product_id=<second_candidate_product_id>)\nBranches:\n- If both initial compatibility checks succeed, compare based on those results and optional details; no write action.\n- If compatibility checks fail because the device name is unknown, use the canonical device name indicated by the tool and re-check.\n- If one or both products cannot be found, report comparison as incomplete rather than substituting another item.\n- If product details and compatibility results differ, treat the current tool outputs as authoritative and report the verified compatibility result.\nAvoid:\n- Do not call add_to_cart when the user asked for comparison only.\n- Do not invent technical specs, ports, display limits, or other attributes not returned by tools.\n- Do not assume shorthand device names are valid; confirm with check_compatibility.\n- Do not replace requested products with similar ones unless the user asks.\nProcess ",
+            "Workflow: Assess shipping impact before a cart swap or replacement\nUse when: User asks whether replacing one cart item with another would affect shipping, bundle discounts, or compatibility, and explicitly does not want the cart changed yet.\nVerify first:\n- Cart contents are loaded.\n- Relevant policy topics for bundle discounts and shipping are retrieved.\n- Candidate replacement product is found and its details are available.\n- If the product is device-specific, compatibility is verified.\n- Customer account tier is known before interpreting shipping eligibility.\n- Current shipping options are read from the authoritative tool output.\nProcedure:\n1. get_cart(customer_id=<customer>)\n2. get_policies(topic=<brand_bundle_or_discount_policy>)\n3. get_policies(topic=<shipping_policy>)\n4. search_products(query=<replacement_product_query>, category=<optional>, in_stock_only=<optional>, max_price=<optional>, min_price=<optional>, min_rating=<optional>, sort_by=<optional>)\n5. get_product_details(product_id=<current_cart_product>)\n6. get_product_details(product_id=<candidate_replacement_product>)\n7. check_compatibility(device_name=<target_device>, product_id=<candidate_replacement_product>)\n8. get_customer_account(customer_id=<customer>)\n9. get_shipping_options(customer_id=<customer>)\nBranches:\n- If search_products returns no match, report that the replacement item could not be confirmed and stop without any write.\n- If the candidate exists but is out of stock or otherwise unsuitable from get_product_details, explain that and stop without any write.\n- If compatibility is required and check_compatibility is false, explain incompatibility and stop without any write.\n- If bundle eligibility would change after the swap, explain the effect using policies plus observed brands/items, but do not modify the cart.\n- If shipping cost/ETA could differ, explain based on current options/policies and known item counts/tier; if exact post-swap totals cannot be computed from available tools, say so rather than guessing.\nAvoid:\n- Do not call set_shipping_option unless the user explicitly chooses a shipping option.\n- Do not mutate the cart or imply the swap was performed.\n- Do not treat a found ",
+            "Workflow: Search products, compare candidates, and optionally add selected item\nUse when: User wants recommendations or comparison for one product type, may give constraints like budget/portability/rating, and may or may not ask to add a chosen item.\nVerify first:\n- Clarify the target product category or query from the user request.\n- If the user names one or more candidates, verify each with search_products or get_product_details before advising.\n- Before any add_to_cart call, confirm the exact selected product and whether gift_wrap is requested; if unspecified, ask rather than assume.\nProcedure:\n1. search_products(query=<user need>, category=<if known>, max_price=<if given>, min_price=<if given>, min_rating=<if given>, in_stock_only=<if relevant>, sort_by=<best fit>)\n2. search_products(query=<broader or alternate keywords>, category=<same or adjusted>, max_price=<if initial search failed>, min_rating=<if initial search failed>)\n3. get_product_details(product_id=<candidate_1>)\n4. get_product_details(product_id=<candidate_2>)\n5. get_product_details(product_id=<additional candidate if needed>)\n6. add_to_cart(customer_id=<customer>, product_id=<selected_product>, quantity=<requested qty or 1>, gift_wrap=<user choice>, variant_id=<variant or null>)\nBranches:\n- If the user is only asking for information, stop after search_products/get_product_details and do not add anything.\n- If the first search returns no matches, retry with broader keywords or relaxed filters and explain which constraints were relaxed.\n- If the user asks whether one option is better for a stated priority, compare only using fields returned by get_product_details and search results.\n- If the user confirms a specific item to buy, add only that confirmed item.\n- If multiple items are requested as a bundle, repeat search and details review per item, then add each confirmed item separately.\nAvoid:\n- Do not add to cart when the user says they are not ready to buy.\n- Do not claim specs, compatibility, discounts, or policies not present in tool output.\n- Do not assume gift_wrap=false unless the user explicitly said no gift wrap.\n- Do not rely on a single failed search query; try sensible broader synonyms"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "ClearGrip case",
+            "category": "accessories",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "ClearGrip Pixel case",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H108",
+                "name": "ClearGrip Case for Pixel 8",
+                "brand": "NovaShield",
+                "category": "electronics",
+                "subcategory": "phone_case",
+                "price": 31,
+                "rating": 4.6,
+                "review_count": 760,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-H107",
+                "name": "ClearGrip Case for Pixel 7",
+                "brand": "NovaShield",
+                "category": "electronics",
+                "subcategory": "phone_case",
+                "price": 29,
+                "rating": 4.5,
+                "review_count": 840,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-H109",
+                "name": "ClearGrip Slim Case for iPhone 14",
+                "brand": "NovaShield",
+                "category": "electronics",
+                "subcategory": "phone_case",
+                "price": 35,
+                "rating": 4.7,
+                "review_count": 990,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "check_compatibility",
+          "arguments": {
+            "product_id": "SP-H107",
+            "device_name": "Pixel 7"
+          },
+          "result": {
+            "compatible": false,
+            "product_id": "SP-H107",
+            "device": "Pixel 7",
+            "reason": "Unknown device name 'Pixel 7'. Canonical devices in this catalog: Google Pixel 7, Google Pixel 8, iPhone 14.",
+            "canonical_devices": [
+              "Google Pixel 7",
+              "Google Pixel 8",
+              "iPhone 14"
+            ]
+          }
+        },
+        {
+          "name": "check_compatibility",
+          "arguments": {
+            "product_id": "SP-H108",
+            "device_name": "Pixel 7"
+          },
+          "result": {
+            "compatible": false,
+            "product_id": "SP-H108",
+            "device": "Pixel 7",
+            "reason": "Unknown device name 'Pixel 7'. Canonical devices in this catalog: Google Pixel 7, Google Pixel 8, iPhone 14.",
+            "canonical_devices": [
+              "Google Pixel 7",
+              "Google Pixel 8",
+              "iPhone 14"
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H107"
+          },
+          "result": {
+            "product_id": "SP-H107",
+            "name": "ClearGrip Case for Pixel 7",
+            "category": "electronics",
+            "subcategory": "phone_case",
+            "brand": "NovaShield",
+            "price": 29,
+            "rating": 4.5,
+            "review_count": 840,
+            "description": "ClearGrip Case for Pixel 7 from NovaShield. Electronics accessory.",
+            "specs": {},
+            "compatible_with": [
+              "Google Pixel 7"
+            ],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 1,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "1 business days (standard)"
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H108"
+          },
+          "result": {
+            "product_id": "SP-H108",
+            "name": "ClearGrip Case for Pixel 8",
+            "category": "electronics",
+            "subcategory": "phone_case",
+            "brand": "NovaShield",
+            "price": 31,
+            "rating": 4.6,
+            "review_count": 760,
+            "description": "ClearGrip Case for Pixel 8 from NovaShield. Electronics accessory.",
+            "specs": {},
+            "compatible_with": [
+              "Google Pixel 8"
+            ],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 1,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "1 business days (standard)"
+          }
+        },
+        {
+          "name": "check_compatibility",
+          "arguments": {
+            "product_id": "SP-H107",
+            "device_name": "Google Pixel 7"
+          },
+          "result": {
+            "compatible": true,
+            "product_id": "SP-H107",
+            "device": "Google Pixel 7",
+            "reason": "ClearGrip Case for Pixel 7 is compatible with Google Pixel 7."
+          }
+        },
+        {
+          "name": "check_compatibility",
+          "arguments": {
+            "product_id": "SP-H108",
+            "device_name": "Google Pixel 7"
+          },
+          "result": {
+            "compatible": false,
+            "product_id": "SP-H108",
+            "device": "Google Pixel 7",
+            "reason": "ClearGrip Case for Pixel 8 is not compatible with Google Pixel 7. Compatible devices for this product: Google Pixel 8."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please add the Pixel 7 ClearGrip case to my cart."
+    },
+    {
+      "role": "assistant",
+      "content": "Added to your cart:\n\n- ClearGrip Case for Pixel 7 — 1 × $29\n\nCart total: $29\n\nIf you want, I can also check for any eligible promo codes.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H107",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-H107",
+            "product_name": "ClearGrip Case for Pixel 7",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 29,
+            "cart_subtotal": 29,
+            "cart_total": 29
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No, not this time. Can you just confirm the cart summary is only the Pixel 7 ClearGrip case and that the Pixel 8 one was not added?"
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed.\n\nYour cart contains only:\n- ClearGrip Case for Pixel 7 — qty 1 — $29\n\nNot in cart:\n- ClearGrip Case for Pixel 8\n\nCurrent cart total: $29",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              }
+            ],
+            "subtotal": 29,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 29,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 57203,
+    "cached_input_tokens": 0,
+    "output_tokens": 581,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 57784,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 57203,
+  "cached_input_tokens": 0,
+  "output_tokens": 581,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 57784,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-H107",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 29
+          },
+          "total": {
+            "old": 0,
+            "new": 29
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 29
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 29
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-H107",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 5,
+  "ux_base_score": 4.7,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 11,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

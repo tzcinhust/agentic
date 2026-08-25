@@ -1,0 +1,465 @@
+{
+  "task_id": "127-hard_promo_invalidation_replace_after_remove",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** Customer shop_003 opens with: \"Remove the ErgoLift Standing Desk from my cart. If that makes OFFICE20 invalid, use the best valid remaining code instead, but tell me the promo impact before changing it.\" Relevant catalog/policy surface: Seeded cart with ErgoLift Standing Desk (SP-H120), LumaDesk Task Lamp (SP-H122), OFFICE20 applied, SAVE10 available. Correct final state: desk removed, lamp remains, OFFICE20 gone, SAVE10 applied, total is $63.\n\n**Challenge:** Removing the desk invalidates OFFICE20, but a weaker fallback code remains valid; the agent must plan the promo replacement before writing. Primary pitfall: Leaves invalid OFFICE20, fails to apply SAVE10, changes cart before explaining impact, or quotes wrong final total. Correct behavior: Check cart/promos, explain OFFICE20 invalidation and SAVE10 fallback, get consent, remove desk, apply SAVE10 only. Novelty: Cart removal forces promo replacement rather than simple promo drop disclosure. Family: promotions_discounts.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 16,
+  "tool_errors": 1,
+  "redundant_calls": 5,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Remove the ErgoLift Standing Desk from my cart. If that makes OFFICE20 invalid, use the best valid remaining code instead, but tell me the promo impact before changing it."
+    },
+    {
+      "role": "assistant",
+      "content": "Preview before I change anything:\n\n- Your cart currently has:\n  - ErgoLift Standing Desk — $299\n  - LumaDesk Task Lamp — $69\n- Current subtotal: $368\n- Current promo: `OFFICE20` for **$20 off**\n- Promo policy: **only one promo code per cart**\n\nIf I remove the **ErgoLift Standing Desk**, the remaining subtotal would be **$69**.\n\nPromo impact after removal:\n- `OFFICE20` would become **invalid** because it requires **$250+** in home office items.\n- Best valid remaining code would be **`SAVE10`**\n  - Estimated discount on the remaining cart: **$36** based on the current cart, but after removing the desk it would effectively be about **$6.90 off** the $69 lamp.\n- So your promo would change from **$20 off** to about **$6.90 off**\n- Net effect: **about $13.10 less discount than you have now**\n\nIf you want, I can now:\n1. remove the ErgoLift Standing Desk, and\n2. replace `OFFICE20` with `SAVE10`.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Remove cart item and compare current promo validity after removal, preview best remaining promo before applying any promo change; include cart and policy verification."
+          },
+          "result": [
+            "Workflow: Maximize loyalty discount after cart removal\nUse when: User wants an item removed from cart and then wants loyalty points applied to the remaining cart, preferably only if the discount is materially worthwhile.\nVerify first:\n- Use get_cart to confirm the target item is currently in the cart and inspect current totals and any existing loyalty redemption.\n- Use get_customer_account to verify current loyalty point balance before attempting a new redemption.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. remove_from_cart(customer_id, product_id, variant_id)\n4. redeem_loyalty_points(customer_id, points)\n5. cancel_loyalty_redemption(customer_id)\n6. redeem_loyalty_points(customer_id, points)\nBranches:\n- If get_cart shows the item is not present, do not mutate; report that nothing needs removal.\n- If the user asks to use points only when worthwhile, compare the available redemption effect on the remaining cart and stop with a no-write explanation if the savings would be trivial by the user's stated preference.\n- If redeem_loyalty_points succeeds on the first try, stop there.\n- If redeem_loyalty_points returns that points are already redeemed on the cart, use cancel_loyalty_redemption and then retry redeem_loyalty_points with the desired amount.\n- If the customer has no usable points, remove the item if requested and report that no loyalty discount can be applied.\nAvoid:\n- Do not assume a fixed redemption cap or conversion without relying on current tool results.\n- Do not cancel an existing redemption unless needed to change the amount.\n- Do not invent promo-stacking rules or eligibility rules not shown by tools.\n- Do not use concrete product IDs, point balances, or dollar amounts as reusable rules.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_cart\n- 1x: get_cart -> get_customer_account -> remove_from_cart -> redeem_loyalty_points -> cancel_loyalty_redemption -> redeem_loyalty_points",
+            "Workflow: Remove cart item and re-optimize loyalty redemption\nUse when: User wants an item removed and also wants the remaining cart to keep the maximum allowed loyalty discount without spending more points than necessary.\nVerify first:\n- Read current cart with get_cart to find the target item and current loyalty redemption.\n- Read customer account with get_customer_account to understand available balance after any cancellation/recredit.\n- Consult get_policies if loyalty cap or stacking rules need confirmation.\nProcedure:\n1. get_cart\n2. get_customer_account\n3. remove_from_cart\n4. cancel_loyalty_redemption\n5. redeem_loyalty_points\n6. get_cart\nBranches:\n- If the target item is not in the cart, stop with a no-write outcome and report that nothing was removed.\n- If there is no active loyalty redemption, remove the item and then decide whether redemption is needed only if the user asked for it and policy allows.\n- If after removal the existing discount would already be at the allowed maximum, a no-additional-redemption outcome is valid; confirm with get_cart/policy reasoning.\n- If cancel_loyalty_redemption is needed to recalculate against the new subtotal, cancel first, then redeem only the amount needed to reach the allowed cap, then confirm with get_cart.\nAvoid:\n- Do not blindly redeem more points after removal without recalculating against the new cart subtotal.\n- Do not leave an outdated redemption in place when cart changes can invalidate the previous maximum.\n- Do not remove the wrong item; verify from get_cart first.\nProcess support: mean conformance=0.973\nObserved frequent paths:\n- 1x: search_products -> get_customer_account -> get_cart -> get_product_details -> get_variants -> validate_promo -> add_to_cart -> apply_promo -> get_cart\n- 1x: get_customer_account -> get_policies -> search_products -> search_products -> search_products -> search_products -> get_product_details -> get_variants -> get_cart -> add_to_cart\n- 1x: search_products -> get_customer_account -> get_cart -> get_variants -> get_promotions -> add_to_cart -> validate_promo",
+            "Workflow: Compare promo versus loyalty points, then redeem only after cart-based cap is known\nUse when: User wants to know whether a promo code or loyalty points can be used, compare them, or redeem points on a cart item while avoiding immediate promo application.\nVerify first:\n- Read current cart with get_cart because loyalty redemption depends on current cart total.\n- Read customer balance/tier with get_customer_account before discussing available points.\n- Read redemption and stacking rules with get_policies.\n- If comparing against a promo code, check validity/estimated discount with validate_promo.\n- If the comparison requires a product-specific cart total, ensure the item is in cart before redemption by confirming details and adding it if the user authorizes.\nProcedure:\n1. get_cart(customer_id)\n2. get_customer_account(customer_id)\n3. get_policies(topic=loyalty/redemption)\n4. get_policies(topic=promo/stacking)\n5. validate_promo(customer_id, promo_code)\n6. search_products(query/filters)\n7. get_product_details(product_id)\n8. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n9. redeem_loyalty_points(customer_id, points)\n10. get_cart(customer_id)\nBranches:\n- If the user asks to compare but not apply anything yet, stop after read-only tools and explain allowed paths without calling apply_promo or redeem_loyalty_points.\n- If the item is not yet in cart and the points cap depends on current cart total, add it only after the user approves the comparison path.\n- If requested points exceed policy limits or cart-based cap, redeem only the amount accepted by the tool and then confirm the actual redeemed points from tool output.\n- If the user chooses promo instead of points, validate first and only then proceed to promo workflow; do not redeem points.\n- If the user says not to use points, do not call redeem_loyalty_points.\nAvoid:\n- Do not compute an authoritative capped redemption without first checking current cart and policies.\n- Do not assume requested points will be accepted exactly; rely on redeem_loyalty_points output.\n- Do not apply a promo during a comparison-only request.\n- Do not state stacking behavior without checking current polic"
+          ]
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H120",
+                "product_name": "ErgoLift Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 299,
+                "line_total": 299
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 368,
+            "discount_amount": 20,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 348,
+            "applied_promo_codes": [
+              "OFFICE20"
+            ]
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "home_office"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "OFFICE20",
+                "description": "$20 off home office over $250",
+                "discount_type": "fixed",
+                "discount_value": 20,
+                "min_purchase": 250,
+                "max_discount": 0,
+                "category_restriction": [
+                  "home_office"
+                ],
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              },
+              {
+                "promo_code": "SAVE10",
+                "description": "10% off eligible orders",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": null,
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "OFFICE20"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: $20 off home office over $250",
+            "estimated_discount": 20
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 36
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "ErgoLift Standing Desk",
+            "category": "home_office",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H120",
+                "name": "ErgoLift Standing Desk",
+                "brand": "WorkWell",
+                "category": "home_office",
+                "subcategory": "desk",
+                "price": 299,
+                "rating": 4.4,
+                "review_count": 500,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That doesn’t sound right — if only the $69 lamp is left, can you double-check the promo minimum and the actual post-removal discount? If it ends up being that `OFFICE20` is invalid and `SAVE10` is the best valid code for **$6 off / $63 total**, then yes, go ahead and remove the desk and switch to `SAVE10`."
+    },
+    {
+      "role": "assistant",
+      "content": "You were right to question it.\n\nDouble-check result:\n- `OFFICE20` minimum: **$250** in home office items\n- After removing the desk, only the **$69 lamp** remains\n- So `OFFICE20` is **not valid**\n- `SAVE10` is the best remaining valid code\n- Actual post-removal discount: **$6 off**\n- New total: **$63**\n\nI’ve gone ahead and made the change:\n- Removed **ErgoLift Standing Desk**\n- Applied **`SAVE10`**\n\nUpdated cart:\n- LumaDesk Task Lamp — $69\n- Promo discount — **$6**\n- Cart total — **$63**",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H120",
+                "product_name": "ErgoLift Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 299,
+                "line_total": 299
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 368,
+            "discount_amount": 20,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 348,
+            "applied_promo_codes": [
+              "OFFICE20"
+            ]
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "OFFICE20"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: $20 off home office over $250",
+            "estimated_discount": 20
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 36
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "home_office"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "OFFICE20",
+                "description": "$20 off home office over $250",
+                "discount_type": "fixed",
+                "discount_value": 20,
+                "min_purchase": 250,
+                "max_discount": 0,
+                "category_restriction": [
+                  "home_office"
+                ],
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              },
+              {
+                "promo_code": "SAVE10",
+                "description": "10% off eligible orders",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": null,
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-H120"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_003",
+            "product_id": "SP-H120",
+            "variant_id": null,
+            "cart_subtotal": 69,
+            "cart_total": 69
+          }
+        },
+        {
+          "name": "remove_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "OFFICE20"
+          },
+          "result": {
+            "error": "Promo code 'OFFICE20' is not currently applied to this cart."
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "SAVE10",
+            "applied_promo_codes": [
+              "SAVE10"
+            ],
+            "discount_amount": 6,
+            "cart_subtotal": 69,
+            "cart_total": 63
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 69,
+            "discount_amount": 6,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 63,
+            "applied_promo_codes": [
+              "SAVE10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 57982,
+    "cached_input_tokens": 0,
+    "output_tokens": 866,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 58848,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 57982,
+  "cached_input_tokens": 0,
+  "output_tokens": 866,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 58848,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "carts": {
+        "CART-shop_003": {
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0002"
+            ]
+          },
+          "applied_promo_codes": {
+            "old": [
+              "OFFICE20"
+            ],
+            "new": [
+              "SAVE10"
+            ]
+          },
+          "discount_amount": {
+            "old": 20,
+            "new": 6
+          },
+          "subtotal": {
+            "old": 368,
+            "new": 69
+          },
+          "total": {
+            "old": 348,
+            "new": 63
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_003",
+          "product_id": "SP-H120",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  }
+}

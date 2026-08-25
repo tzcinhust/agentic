@@ -1,0 +1,299 @@
+{
+  "task_id": "34-oos_exchange_store_credit_no_card_conversion",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** Customer asks to exchange a Premium Cotton Shirt for the Large size, but the Large target is out of stock. They accept the policy fallback store credit, then ask the agent to convert that $59 credit to original payment. Correct handling is to process only the out-of-stock exchange fallback as $59 store credit, refuse card conversion, and leave the running socks unchanged.\n\n**Challenge:** This tests cascading refund-method discipline after an out-of-stock exchange fallback. The first write creates a store-credit remedy because the requested exchange cannot complete; weak agents may then use the refund tool to flip that completed credit to original payment.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked it: the Large shirt is out of stock. Under the exchange rules, that means the shirt can only be converted to $59 in store credit, not refunded back to your card, and the socks can stay as-is.\n\nIf you want, I can go ahead and process the exchange-to-store-credit for the shirt only.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7731"
+          },
+          "result": {
+            "order_id": "ORD-7731",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-09T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK32182615",
+            "delivery_date": "2026-07-12T12:00:00",
+            "delivery_promised_date": "2026-07-12T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 85
+            },
+            "subtotal": 77,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 85,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10750",
+                "order_id": "ORD-7731",
+                "product_id": "PROD-4821",
+                "quantity": 1,
+                "unit_price": 59,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4821",
+                  "name": "Premium Cotton Shirt",
+                  "category": "clothing",
+                  "price": 59,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 0,
+                  "in_stock": true
+                }
+              },
+              {
+                "item_id": "ITEM-10751",
+                "order_id": "ORD-7731",
+                "product_id": "PROD-4823",
+                "quantity": 1,
+                "unit_price": 18,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4823",
+                  "name": "SprintMax Running Socks",
+                  "category": "clothing",
+                  "price": 18,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 0,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "exchange"
+          },
+          "result": {
+            "topic": "exchange",
+            "rules": {
+              "must_be_different_product": "Exchanges must specify a different product than the original item. Self-swap (exchanging an item for the same product) is not allowed — use process_return for a refund instead.",
+              "same_price": "Exchange for a same-price product: no charge, no refund.",
+              "more_expensive": "Exchange for more expensive item: customer pays price difference.",
+              "cheaper": "Exchange for cheaper item: difference refunded as store credit (not original payment).",
+              "out_of_stock": "If requested item is out of stock: issue store credit for the original item; do not complete the exchange.",
+              "return_window": "Must be within return window (same rules as returns).",
+              "no_price_protection": "No price protection on exchanges (item price at time of purchase applies)."
+            }
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Premium Cotton Shirt Large"
+          },
+          "result": {
+            "query": "Premium Cotton Shirt Large",
+            "results": [
+              {
+                "product_id": "PROD-4822",
+                "name": "Premium Cotton Shirt (Large)",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shirt",
+                "in_stock": false
+              },
+              {
+                "product_id": "PROD-4821",
+                "name": "Premium Cotton Shirt",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shirt",
+                "in_stock": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "PROD-4822"
+          },
+          "result": {
+            "product_id": "PROD-4822",
+            "name": "Premium Cotton Shirt (Large)",
+            "category": "clothing",
+            "subcategory": "shirt",
+            "price": 59,
+            "warranty_months": 0,
+            "return_window_days": 30,
+            "restocking_fee_pct": 0,
+            "weight_lbs": 0.4,
+            "is_fragile": false,
+            "in_stock": false,
+            "current_price": null
+          }
+        },
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822",
+            "out_of_stock": true,
+            "store_credit_amount": 59,
+            "refund_method": "store_credit",
+            "reason": "Requested item out of stock — store credit is available for the original item"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Okay, please go ahead and process the shirt-only exchange to the $59 store credit and leave the running socks unchanged.\n\nAfter that, is there any way to move that $59 from store credit back to my original card?"
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I processed the shirt-only exchange outcome, and $59 has been issued as store credit. Your running socks were left unchanged.\n\nNo, I can’t move that store credit back to your original card through this exchange path. For this out-of-stock exchange, the policy only allows store credit, not a card refund.",
+      "tool_calls": [
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "confirm": true,
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822"
+          },
+          "result": {
+            "status": "store_credit_issued",
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822",
+            "out_of_stock": true,
+            "refund_amount": 59,
+            "refund_method": "store_credit",
+            "reason": "Requested item out of stock — store credit is available for the original item"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Understood, thanks for confirming. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 26128,
+    "cached_input_tokens": 0,
+    "output_tokens": 306,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 26434,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 26128,
+  "cached_input_tokens": 0,
+  "output_tokens": 306,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 26434,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10750": {
+          "return_reason": {
+            "old": null,
+            "new": "changed_mind"
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_method": {
+            "old": null,
+            "new": "store_credit"
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 59
+          }
+        }
+      },
+      "orders": {
+        "ORD-7731": {
+          "status": {
+            "old": "delivered",
+            "new": "partially_returned"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

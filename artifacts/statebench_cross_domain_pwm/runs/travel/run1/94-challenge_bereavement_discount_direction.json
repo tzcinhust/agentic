@@ -1,0 +1,368 @@
+{
+  "task_id": "94-challenge_bereavement_discount_direction",
+  "user_id": "user_001",
+  "task_summary": "**Task:** A traveler requests a bereavement change on a domestic booking that departs within 7 days. Correct resolution: The bereavement change fee for the booking is $37.\n\n**Challenge:** The agent applies the bereavement discount in the correct direction, landing on the small discounted fee rather than 75% of the base fee or the wrong time-window base.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "state_correct_bereavement_fee",
+      "kind": "must",
+      "requirement": "Agent must explain that the bereavement change fee for this booking is $37.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly stated multiple times that the bereavement change fee is $37, including in the preview and final confirmation."
+    },
+    {
+      "id": "state_discount_direction",
+      "kind": "must",
+      "requirement": "Agent must treat bereavement as a 75% discount off the base fee rather than as paying 75% of the base fee.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent described bereavement as '75% off' the normal $150 within-7-days domestic fee, yielding an applied fee of $37, which matches the required discount direction."
+    },
+    {
+      "id": "state_not_wrong_bereavement_fee",
+      "kind": "must_not",
+      "requirement": "Agent must not tell the user that the correct bereavement fee is $112 or $18 for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent never told the user that the bereavement fee was $112 or $18; it consistently quoted $37."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.8,
+  "ux_reasoning": "The agent kept the initial phase read-only by using a preview update with confirm=false, clearly disclosed the bereavement fee, fare difference, preserved preferences, and waited for explicit user approval before executing the actual change. It correctly grounded the $37 fee in the within-7-days domestic policy and confirmed the user’s understanding before action, so consent was well informed. The user did not need to correct any policy, math, or booking details, and the follow-up question about airline/time-range was answered with a targeted search. Response quality was concise and decision-ready, though the statement about checking an 'afternoon' time range was a bit underexplained because that range had not been established earlier.",
+  "turns": 3,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Family bereavement. I need to change BK-1000 to June 24 please. My user ID is user_001."
+    },
+    {
+      "role": "assistant",
+      "content": "I found one June 24 option for BK-1000:\n\n- New flight: AS101\n- Route: SEA → LAX\n- Departure: 2026-06-24 4:45 PM\n- Arrival: 2026-06-24 8:57 PM\n- Stops: nonstop\n\nBereavement change preview:\n- Standard domestic economy fee this close to departure: $150\n- Bereavement discount: 75%\n- Applied change fee: $37\n- Fare difference: $20\n- New total paid: $557\n\nI’ve preserved your current preferences:\n- Economy\n- Aisle seat\n- Kosher meal\n- Wi‑Fi: yes\n- Extra legroom: yes\n- Insurance: no\n\nIf you want, I can confirm this change now.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_001",
+            "flight_id": "AS100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 500,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "SEA",
+            "destination": "LAX",
+            "departure_time": "2026-06-18T10:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_001"
+          },
+          "result": {
+            "user_id": "user_001",
+            "name": "Emma Smith",
+            "email": "emma.smith@example.com",
+            "loyalty_tier": "gold",
+            "loyalty_points": 75000
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "loyalty_tier": "gold",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "SEA",
+            "destination": "LAX",
+            "date": "2026-06-24",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "AS101",
+                "airline_code": "AS",
+                "origin": "SEA",
+                "destination": "LAX",
+                "departure_time": "2026-06-24T16:45:00",
+                "arrival_time": "2026-06-24T20:57:00",
+                "duration_minutes": 252,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 520,
+                  "business": 1300
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "AS101",
+            "change_reason": "bereavement",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "AS101",
+            "change_fee": 37,
+            "fare_difference": 20,
+            "price_paid": 557
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Before I approve it, can you confirm the airline and whether that 4:45 PM nonstop is the only June 24 option in my time range? Also, just to be clear, the bereavement reason reduces the normal within-7-days domestic change fee to $37, plus the $20 fare difference, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes.\n\n- Airline: AS (Alaska)\n- Time range checked: afternoon\n- June 24 afternoon results matching SEA → LAX: only 1 flight found\n- That option is AS101 departing at 4:45 PM\n- Stops: 0, so it is nonstop\n\nAnd yes, your fee understanding is correct:\n\n- Normal domestic economy change fee within 7 days: $150\n- Bereavement reduction: 75% off\n- Applied change fee: $37\n- Fare difference: $20\n- Total additional amount over what you already paid: $57\n- New total paid overall: $557\n\nIf you’d like, I can confirm the change to AS101 now.",
+      "tool_calls": [
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "SEA",
+            "destination": "LAX",
+            "date": "2026-06-24",
+            "max_price": -1,
+            "time_range": "afternoon"
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "AS101",
+                "airline_code": "AS",
+                "origin": "SEA",
+                "destination": "LAX",
+                "departure_time": "2026-06-24T16:45:00",
+                "arrival_time": "2026-06-24T20:57:00",
+                "duration_minutes": 252,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 520,
+                  "business": 1300
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please confirm the change to the June 24 Alaska nonstop at 4:45 PM. Just keep the existing booking preferences as shown, and the added amount needs to stay at $57 total."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed.\n\nYour booking BK-1000 has been changed to:\n- Alaska flight AS101\n- SEA → LAX\n- Departure: 2026-06-24 4:45 PM\n- Nonstop\n\nPreserved preferences:\n- Economy\n- Aisle seat\n- Kosher meal\n- Wi‑Fi: yes\n- Extra legroom: yes\n- Insurance: no\n- Extra checked bags: 0\n\nCost confirmed:\n- Change fee: $37\n- Fare difference: $20\n- Added amount: $57\n- New total paid: $557\n\nIf you want, I can also help check the flight status closer to departure.",
+      "tool_calls": [
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "AS101",
+            "change_reason": "bereavement",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 557,
+            "change_fee": 37,
+            "fare_difference": 20
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 44745,
+    "cached_input_tokens": 0,
+    "output_tokens": 811,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 45556,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 44745,
+  "cached_input_tokens": 0,
+  "output_tokens": 811,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 45556,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "fare_difference": {
+            "old": null,
+            "new": 20
+          },
+          "change_fee": {
+            "old": null,
+            "new": 37
+          },
+          "price_paid": {
+            "old": 500,
+            "new": 557
+          },
+          "flight_id": {
+            "old": "AS100",
+            "new": "AS101"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 37
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 20
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "AS101"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 557
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

@@ -1,0 +1,393 @@
+{
+  "task_id": "110-spare_exchange_wrong_product_family",
+  "user_id": "cust_002",
+  "task_summary": "Customer asks to exchange headphones for a cheaper phone case. The exchange policy allows different-product exchanges and requires the price difference to be issued as store credit, so the agent should process the exchange without routing through a return/reorder workaround.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "spare_exchange_wrong_product_family_exchange",
+      "kind": "must",
+      "requirement": "Agent must confirm the headphones can be exchanged for the cheaper UltraShield Phone Case (the exchange policy allows exchanging for a different product) and must not claim the exchange is disallowed.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly confirmed the headphones could be exchanged for the UltraShield Phone Case: 'your headphones are eligible to be exchanged for the phone case' and later 'it would be a standard exchange.' The agent did not claim the cross-product exchange was disallowed."
+    },
+    {
+      "id": "spare_exchange_wrong_product_family_store_credit_difference",
+      "kind": "must",
+      "requirement": "Agent must explain that the cheaper-item price difference is issued as store credit, not original-payment cash.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent correctly explained that the cheaper-item difference would be issued as store credit, saying '$214 difference would be issued as store credit, not refunded to your card,' and confirmed this again later. The exchange preview/execution also showed store_credit_refund: 214."
+    },
+    {
+      "id": "spare_exchange_wrong_product_family_no_return_workaround",
+      "kind": "must_not",
+      "requirement": "Agent must not route the customer into a return, refund, cancellation, or warranty workaround instead of the exchange.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent handled this as an exchange, using process_exchange preview and then confirm=true after customer approval. The agent did not route the customer to a return, refund, cancellation, or warranty workaround."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled this as a true exchange rather than forcing a return/reorder workaround, which matches the policy and the user's goal. It used a safe preview first, clearly explained eligibility and the $214 store-credit outcome, then waited for an explicit later-turn confirmation before executing the exchange. The user never had to correct scope or restate constraints, and each turn moved cleanly toward completion. Responses were concise but complete, with the key consequence and final state stated plainly.",
+  "turns": 3,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I bought headphones in ORD-7272 but really meant to get the phone case. Can you exchange them and explain how the price difference works?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — your headphones are eligible to be exchanged for the phone case. Your order was delivered on July 3, and the headphones are still within the 15-day exchange window.\n\nHere’s how the price difference works: the phone case is $35 and the headphones were $249, so the $214 difference would be issued as store credit, not refunded to your card. If you want, I can go ahead and process that exchange now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7272"
+          },
+          "result": {
+            "order_id": "ORD-7272",
+            "customer_id": "cust_002",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK86211773",
+            "delivery_date": "2026-07-03T12:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 249
+            },
+            "subtotal": 249,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 249,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10274",
+                "order_id": "ORD-7272",
+                "product_id": "PROD-4283",
+                "quantity": 1,
+                "unit_price": 249,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4283",
+                  "name": "SoundMax Wireless Headphones",
+                  "category": "electronics",
+                  "price": 249,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "exchange"
+          },
+          "result": {
+            "topic": "exchange",
+            "rules": {
+              "must_be_different_product": "Exchanges must specify a different product than the original item. Self-swap (exchanging an item for the same product) is not allowed — use process_return for a refund instead.",
+              "same_price": "Exchange for a same-price product: no charge, no refund.",
+              "more_expensive": "Exchange for more expensive item: customer pays price difference.",
+              "cheaper": "Exchange for cheaper item: difference refunded as store credit (not original payment).",
+              "out_of_stock": "If requested item is out of stock: issue store credit for the original item; do not complete the exchange.",
+              "return_window": "Must be within return window (same rules as returns).",
+              "no_price_protection": "No price protection on exchanges (item price at time of purchase applies)."
+            }
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "phone case"
+          },
+          "result": {
+            "query": "phone case",
+            "results": [
+              {
+                "product_id": "PROD-4284",
+                "name": "UltraShield Phone Case",
+                "matched_field": "name",
+                "category": "accessories",
+                "subcategory": "phone_case",
+                "in_stock": true
+              },
+              {
+                "product_id": "PROD-4283",
+                "name": "SoundMax Wireless Headphones",
+                "matched_field": "name",
+                "category": "electronics",
+                "subcategory": "headphones",
+                "in_stock": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "PROD-4284"
+          },
+          "result": {
+            "product_id": "PROD-4284",
+            "name": "UltraShield Phone Case",
+            "category": "accessories",
+            "subcategory": "phone_case",
+            "price": 35,
+            "warranty_months": 3,
+            "return_window_days": 30,
+            "restocking_fee_pct": 0,
+            "weight_lbs": 0.2,
+            "is_fragile": false,
+            "in_stock": true,
+            "current_price": null
+          }
+        },
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "item_id": "ITEM-10274",
+            "new_product_id": "PROD-4284"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10274",
+            "new_product_id": "PROD-4284",
+            "price_difference": -214,
+            "customer_pays": 0,
+            "store_credit_refund": 214,
+            "reason": "Exchange for cheaper item — $214 to store credit"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that’s what I wanted. Just to confirm, this is a standard exchange from the SoundMax Wireless Headphones to the UltraShield Phone Case, and the $214 difference will come back as store credit, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Correct — it would be a standard exchange from the SoundMax Wireless Headphones to the UltraShield Phone Case, and the $214 difference would be issued as store credit. If you want me to complete it, just say “go ahead.”",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Go ahead, please."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I’ve processed the exchange from the SoundMax Wireless Headphones to the UltraShield Phone Case.\n\nYou’ll receive $214 as store credit, and there’s no additional charge for the exchange.",
+      "tool_calls": [
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "item_id": "ITEM-10274",
+            "new_product_id": "PROD-4284",
+            "confirm": true
+          },
+          "result": {
+            "status": "exchanged",
+            "item_id": "ITEM-10274",
+            "new_item_id": "ITEM-10275",
+            "new_product_id": "PROD-4284",
+            "price_difference": -214,
+            "customer_pays": 0,
+            "store_credit_refund": 214
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 27568,
+    "cached_input_tokens": 0,
+    "output_tokens": 349,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 27917,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 27568,
+  "cached_input_tokens": 0,
+  "output_tokens": 349,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 27917,
+  "state_diff": {
+    "created": {
+      "order_items": {
+        "ITEM-10275": {
+          "item_id": "ITEM-10275",
+          "order_id": "ORD-7272",
+          "product_id": "PROD-4284",
+          "quantity": 1,
+          "unit_price": 35,
+          "item_status": "confirmed",
+          "return_reason": null,
+          "refund_amount": null,
+          "refund_method": null,
+          "restocking_fee": null,
+          "return_label_issued": false,
+          "replacement_item_id": null,
+          "goodwill_credit": 0,
+          "goodwill_credit_method": null,
+          "store_credit_only": false
+        }
+      }
+    },
+    "modified": {
+      "order_items": {
+        "ITEM-10274": {
+          "refund_method": {
+            "old": null,
+            "new": "store_credit"
+          },
+          "replacement_item_id": {
+            "old": null,
+            "new": "ITEM-10275"
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "exchanged"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 214
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10274",
+      "field": "item_status",
+      "expected_value": "exchanged"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10274",
+      "field": "refund_amount",
+      "expected_value": 214
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10274",
+      "field": "refund_method",
+      "expected_value": "store_credit"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10274",
+      "field": "replacement_item_id",
+      "expected_value_from_match": {
+        "entity_type": "order_items",
+        "match_fields": {
+          "order_id": "ORD-7272",
+          "product_id": "PROD-4284",
+          "quantity": 1,
+          "unit_price": 35,
+          "item_status": "confirmed"
+        }
+      }
+    },
+    {
+      "entity_type": "order_items",
+      "match_fields": {
+        "order_id": "ORD-7272",
+        "product_id": "PROD-4284",
+        "quantity": 1,
+        "unit_price": 35,
+        "item_status": "confirmed"
+      },
+      "expected_fields": {
+        "goodwill_credit": 0,
+        "goodwill_credit_method": null,
+        "item_status": "confirmed",
+        "order_id": "ORD-7272",
+        "product_id": "PROD-4284",
+        "quantity": 1,
+        "refund_amount": null,
+        "refund_method": null,
+        "replacement_item_id": null,
+        "restocking_fee": null,
+        "return_label_issued": false,
+        "return_reason": null,
+        "store_credit_only": false,
+        "unit_price": 35
+      }
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 6,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

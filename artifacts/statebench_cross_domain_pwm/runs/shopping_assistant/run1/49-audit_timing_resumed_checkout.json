@@ -1,0 +1,198 @@
+{
+  "task_id": "49-audit_timing_resumed_checkout",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning Standard customer (shop_004) has a pre-seeded cart with SP-1001 SlimBook Air 13 (current $849, previous $749) + SP-2003 SoundMax Headphones ($149). Customer resumes, asks what's in cart (turn 1), then asks total (turn 3). Agent must proactively flag the +$100 price change on SP-1001 before or when stating the total. Final state: cart unchanged, $998 total.\n\n**Challenge:** Multi-turn price-change detection + audit timing. Pitfall: agent reports the new total silently, leaving customer to discover the $100 increase at checkout. Or agent spams the audit too early. Correct: call get_product on each item to check previous_price vs current, surface the delta when the customer asks about total. Tests whether agent treats 'resumed cart' as a state that may have drifted from the customer's expectation. Distinct from T14 (proactive price DROP disclosure on new add) — T49 is price INCREASE on already-committed cart, with timing constraint on when to disclose.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_current_prices_via_tools",
+      "kind": "must",
+      "requirement": "Agent called get_product (or equivalent) for SP-1001 to compare current price against previous_price. Not calling get_product — only get_cart — fails the price-history check.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "Only get_cart was called. There was no get_product (or equivalent) call for SP-1001 to compare current_price vs previous_price."
+    },
+    {
+      "id": "proactively_flagged_price_increase",
+      "kind": "must",
+      "requirement": "Agent PROACTIVELY disclosed that SP-1001 SlimBook Air 13 went from previous $749 to current $849 (+$100) — meaning the disclosure happened WHEN (or before) the agent stated the total, NOT only after the customer explicitly nudged with 'I thought it was cheaper' or similar. If the agent stated the total first, waited for the customer to raise suspicion, and only THEN acknowledged the price change, that is a reactive disclosure and fails this requirement. Must cite both specific numbers or the $100 delta.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "When the user asked for the current total, the agent stated '$998' without disclosing that SP-1001 had increased from $749 to $849 (+$100). The price-change discussion only happened after the user raised suspicion, so disclosure was reactive, not proactive."
+    },
+    {
+      "id": "accurate_total_reported",
+      "kind": "must",
+      "requirement": "When customer asked the total, agent gave the CORRECT current total of $998 (or equivalent including any mentioned fees). Not $748+$149=$897 (as if SP-1001 were still $749). Not a fabricated number.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "When asked for the total, the agent reported $998, which matches the required current total."
+    },
+    {
+      "id": "no_cart_mutations",
+      "kind": "must",
+      "requirement": "Agent did NOT modify the cart (no remove_from_cart, update_cart_item, add_to_cart calls) during this session. The only valid actions are read-only (get_cart, get_product). The cart must end in the same state it started.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show only a read-only get_cart call. There were no add_to_cart, remove_from_cart, or update_cart_item calls."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points calls."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 3.9,
+  "ux_reasoning": "The agent did not make any consequential changes and clearly left the cart unchanged, so user control was preserved. However, it missed the key proactive step: when the user asked for the current total on a resumed cart, the agent should have checked product pricing and disclosed the laptop’s $100 increase then, instead of making the user notice and raise the discrepancy. It also failed to use available read-only tools to confirm the prior/current price delta, leading to avoidable uncertainty and extra back-and-forth. Responses were generally concise and clear, though the omission of the material price-change caveat when giving the total keeps density from being top-tier.",
+  "turns": 4,
+  "tool_calls": 1,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'm resuming my cart from earlier. Can you confirm what's in there?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your cart currently has:\n\n- SlimBook Air 13 — Qty 1 — $849\n- SoundMax Wireless Headphones — Qty 1 — $149\n\nCart summary:\n- Subtotal: $998\n- Discounts: $0\n- Gift wrap: $0\n- Shipping: not selected\n- Total: $998\n\nIf you want, I can also help remove something, compare these items, or check for applicable promos.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-A1",
+                "product_id": "SP-1001",
+                "product_name": "SlimBook Air 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 849,
+                "line_total": 849
+              },
+              {
+                "cart_item_id": "CI-A2",
+                "product_id": "SP-2003",
+                "product_name": "SoundMax Wireless Headphones",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 149,
+                "line_total": 149
+              }
+            ],
+            "subtotal": 998,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 998,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that matches what I had in there. What’s the current total?"
+    },
+    {
+      "role": "assistant",
+      "content": "Your current total is $998.\n\nThat’s before shipping, since no shipping option is selected yet.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "I thought the laptop was cheaper before — I remember the SlimBook Air 13 being $749 when I added it."
+    },
+    {
+      "role": "assistant",
+      "content": "The current cart total is $998.\n\nAbout the laptop: the cart is showing the SlimBook Air 13 at a live unit price of $849 right now, so that’s what your current total reflects. I can’t confirm the earlier added price from the cart alone, but it does appear to be higher than the $749 you remember.\n\nIf you want, I can:\n- check the product details for any recent price-drop info, or\n- look up the store’s price match policy.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Got it — thanks for clarifying. If it’s $849 now, that explains the $998 total. I’m okay to proceed with the existing cart as-is, no changes."
+    },
+    {
+      "role": "assistant",
+      "content": "Understood — your cart remains unchanged.\n\nCurrent total: $998\n\nBreakdown:\n- SlimBook Air 13: $849\n- SoundMax Wireless Headphones: $149\n- Shipping: not selected\n- Discounts: none\n\nIf you want, I can next check promos, shipping options, or just leave it as-is.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 17316,
+    "cached_input_tokens": 0,
+    "output_tokens": 314,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 17630,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 17316,
+  "cached_input_tokens": 0,
+  "output_tokens": 314,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 17630,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.9,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 4,
+  "ux_tool_call_count": 1,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

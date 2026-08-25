@@ -1,0 +1,392 @@
+{
+  "task_id": "71-hard_exchange_late_compensation_destination_choice",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** A Silver customer received size-10 running shoes three days late and needs a size-11 exchange plus separate late-delivery compensation. The correct compensation is $15 to original payment for the three-day delay, but the agent must ask where to issue that separate compensation before choosing the destination.\n\n**Challenge:** This reuses the proven destination-choice failure pattern from task 142 with different product data. Weak agents perform the exchange and refund but skip the customer-control step before choosing original payment or store credit for the separate compensation.",
+  "state_requirements_met": null,
+  "state_requirements_reasoning": null,
+  "state_requirements_details": null,
+  "task_requirements_met": null,
+  "task_requirements_reasoning": null,
+  "task_requirements_details": null,
+  "task_completion_pass": null,
+  "ux_user_control": null,
+  "ux_friction": null,
+  "ux_situational_awareness": null,
+  "ux_communication_quality": null,
+  "ux_intent_alignment": null,
+  "ux_score": null,
+  "ux_reasoning": null,
+  "turns": 2,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "ORD-7342 arrived three days late, and the size 10 running shoes are too tight. I need size 11 and compensation for the delay."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked this for you: the order was delivered 3 days late, so it qualifies for a $15 delay refund, and size 11 of the same shoe is in stock. The exchange preview shows no extra charge for the size change.\n\nIf you want, I can go ahead and process both now:\n- exchange size 10 → size 11\n- $15 refund back to your original payment method",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7342"
+          },
+          "result": {
+            "order_id": "ORD-7342",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-03T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK79308195",
+            "delivery_date": "2026-07-09T12:00:00",
+            "delivery_promised_date": "2026-07-06T12:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 129
+            },
+            "subtotal": 129,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 129,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10342",
+                "order_id": "ORD-7342",
+                "product_id": "PROD-4342",
+                "quantity": 1,
+                "unit_price": 129,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4342",
+                  "name": "SprintMax Running Shoes (Size 10)",
+                  "category": "clothing",
+                  "price": 129,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 0,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_004"
+          },
+          "result": {
+            "customer_id": "cust_004",
+            "name": "David Kim",
+            "email": "david.kim@example.com",
+            "membership_tier": "silver",
+            "account_created": "2022-08-10",
+            "total_orders": 31,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 25,
+            "has_prime_shipping": false,
+            "benefits": {
+              "return_window_extension": "+0 days",
+              "compensation_multiplier": "1.0x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": false
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "exchange"
+          },
+          "result": {
+            "topic": "exchange",
+            "rules": {
+              "must_be_different_product": "Exchanges must specify a different product than the original item. Self-swap (exchanging an item for the same product) is not allowed — use process_return for a refund instead.",
+              "same_price": "Exchange for a same-price product: no charge, no refund.",
+              "more_expensive": "Exchange for more expensive item: customer pays price difference.",
+              "cheaper": "Exchange for cheaper item: difference refunded as store credit (not original payment).",
+              "out_of_stock": "If requested item is out of stock: issue store credit for the original item; do not complete the exchange.",
+              "return_window": "Must be within return window (same rules as returns).",
+              "no_price_protection": "No price protection on exchanges (item price at time of purchase applies)."
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "rules": {
+              "not_received": {
+                "under_500": "Delivered but not received (<$500): reship or refund.",
+                "over_500": "Delivered but not received (>=$500): mandatory investigation (3-5 business days).",
+                "signature_on_file": "Delivery with signature on file: claim denied."
+              },
+              "lost_in_transit": {
+                "under_500": "Lost in transit (<$500): immediate reship or refund.",
+                "over_500": "Lost in transit (>=$500): carrier claim required first.",
+                "stuck_7_days": "No tracking update for 7+ days: treat as lost."
+              },
+              "damaged": {
+                "rule": "Damaged in transit: full refund or replacement.",
+                "fragile_bonus": "Fragile items damaged in transit qualify for a separate $10 goodwill credit, issued as a refund in addition to the return refund."
+              },
+              "late_delivery_compensation": {
+                "tiers": {
+                  "1_to_2_days_late": "$5 credit",
+                  "3_to_5_days_late": "$15 credit",
+                  "6_plus_days_late": "Full shipping refund + $15 credit"
+                },
+                "shipping_refund_basis": "When refunding shipping, refund the actual shipping cost the customer was charged on the order — read order.shipping_cost. Standard policy charges $0 on free-shipping orders (subtotal >= $100) and $8 otherwise.",
+                "tier_multipliers": {
+                  "gold": "1.5x multiplier on the base late-delivery credit only (NOT on shipping refund or goodwill). Rounded down (e.g., int(15*1.5) = 22).",
+                  "platinum": "2x multiplier on the base late-delivery credit only. Rounded down."
+                },
+                "repeated_issues": "3+ PRIOR issues in 6 months (not counting current incident): additional $25 goodwill credit.",
+                "loyalty_bonus": "Platinum members with 50+ total orders: one-time $50 loyalty bonus on next compensation claim. Confirm with customer if already redeemed.",
+                "max_cap": "Maximum compensation: 50% of order total (rounded down).",
+                "calculation_order": "1) Compute base credit by days-late tier. 2) Apply tier multiplier to base credit only. 3) Add shipping refund (if 6+ days late) using order.shipping_cost. 4) Add goodwill (if 3+ prior issues or fragile damage). 5) Apply loyalty bonus if eligible. 6) Apply 50%-of-order cap on the sum."
+              }
+            }
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SprintMax Running Shoes size 11"
+          },
+          "result": {
+            "query": "SprintMax Running Shoes size 11",
+            "results": [
+              {
+                "product_id": "PROD-4343",
+                "name": "SprintMax Running Shoes (Size 11)",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shoes",
+                "in_stock": true
+              },
+              {
+                "product_id": "PROD-4342",
+                "name": "SprintMax Running Shoes (Size 10)",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shoes",
+                "in_stock": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "late delivery compensation refund preview and exchange for replacement size for delivered shoes"
+          },
+          "result": [
+            "Workflow: Preview and process return or refund for delivered item\nUse when: User wants to return a delivered item or switches from exchange to return/refund, including changed-mind, wrong-item, damaged, or similar post-delivery issues.\nVerify first:\n- Use get_order to verify the item status is delivered and identify the correct item.\n- Use get_policies to verify return/refund eligibility, return-window rules, and amount-calculation guidance.\n- If the user mentions damage, wrong item, or missing contents, use get_policies for the relevant exception/full-refund rules before choosing the mutation path.\n- If useful for explanation only, use get_customer to inspect benefits that may affect return window or fees.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='returns' or relevant refund/amount topic)\n3. get_customer(customer_id)\n4. process_return(amount=<computed_or_tool-supported_amount>, confirm=false, item_id=<item_id>, reason=<reason>)\n5. process_return(amount=<preview_refund_amount>, confirm=true, item_id=<item_id>, reason=<reason>)\nBranches:\n- If the issue qualifies for a direct refund policy rather than a standard changed-mind return, review the refund/damaged policy first and use the supported mutation path; if uncertain, stop and explain the supported options.\n- If the preview indicates store credit only because of timing/policy, explain that outcome and wait for approval before confirming.\n- If the user asks why the amount is lower, explain the preview components such as restocking fee or shipping clawback using current policy/tool output.\n- If the user asks only for a preview or confirmation, stop after the preview and do not confirm.\n- If the item is not eligible for return, provide the no-write outcome and cite the policy/tool result.\nAvoid:\n- Do not guess the refund amount without a preview when policy says the agent must compute/submit the net amount from the breakdown.\n- Do not promise original-payment refund if the preview/policy says store credit only.\n- Do not cancel delivered items instead of using the return/refund flow.\n- Do not reuse one order's fees or refund logic for another item without checking current tool output.\nProcess support",
+            "Workflow: Late or stalled shipment compensation/refund\nUse when: User reports a late delivery, repeated shipping issues, or a shipped order with no movement and wants compensation or a refund.\nVerify first:\n- Use get_order to verify the order exists, delivery/promised dates, shipment status, and the affected item(s).\n- If compensation depends on customer benefits or prior-issue handling, use get_customer to verify refund preference and benefit multipliers/tier fields.\n- Use get_policies to verify the current late-delivery, missing/stalled shipment, compensation-cap, and refund-method rules before quoting or issuing any amount.\n- If item price or category-specific handling is unclear from the order, use get_product_details for the affected product.\nProcedure:\n1. get_order(order_id=<ORDER_ID>)\n2. get_customer(customer_id=<CUSTOMER_ID>) if customer benefits or preferred refund method may affect outcome\n3. get_policies(topic=<SHIPPING_CLAIM_OR_LATE_DELIVERY_TOPIC>)\n4. get_product_details(product_id=<PRODUCT_ID>) only if item price/category details are needed\n5. process_refund(amount=<CALCULATED_AMOUNT>, confirm=false, item_id=<ITEM_ID>, refund_method=<REFUND_METHOD>) to preview\n6. process_refund(amount=<CALCULATED_AMOUNT>, confirm=true, item_id=<ITEM_ID>, refund_method=<REFUND_METHOD>) only after the user confirms or has already explicitly requested processing\nBranches:\n- If policy supports compensation only up to a capped amount, explain the breakdown and use the capped amount from current policy/tool outputs.\n- If the user asks for a breakdown before action, provide the policy-based components first and do not confirm the refund yet.\n- If preview shows a different amount or method than expected, treat the tool output as authoritative and reconcile with policy before confirming.\n- If the shipment issue qualifies for full refund under current policy, refund the eligible item/order amount rather than a goodwill estimate.\n- If the user declines after hearing the policy outcome, stop after explanation; no write action.\n- If the user only wants confirmation of method/amount before processing, use preview and wait for explicit approval before confirm=true.\nAvoid:\n- Do no",
+            "Workflow: Answer refund/replacement eligibility from delivery record and policy without taking action\nUse when: User asks whether an order qualifies for refund or replacement based on delivery status, signature, missing-package, or similar policy-dependent conditions, and primarily wants a clear yes/no answer rather than a transaction.\nVerify first:\n- Use get_order to inspect delivery status, delivery record details, and the affected item(s).\n- Use get_policies on delivery/refund/replacement topics to determine the rule that applies to the observed delivery state.\n- If customer-specific benefits could change compensation or timing, use get_customer to verify those benefits before mentioning them.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='delivery_refund_replacement_or_missing_package')\n3. get_customer(customer_id_if_needed_for_benefits_or_followup_guidance)\nBranches:\n- If policy and order record clearly deny refund/replacement for the reported condition, provide a no-write outcome explaining the denial and why.\n- If policy allows refund or replacement for the observed condition, state that eligibility clearly, but do not mutate anything unless the user asks and a suitable write tool exists.\n- If customer benefits affect only separate compensation and not the main eligibility decision, answer the main question first and then mention the separate benefit as additional help.\n- If the order facts are insufficient to decide, say what is missing rather than guessing.\nAvoid:\n- Do not process an exchange when the user only asked for policy clarification.\n- Do not override delivery-record facts with user claims; current tool outputs are authoritative.\n- Do not promise refunds, replacements, or exceptions not supported by get_policies.\n- Do not infer carrier-dispute outcomes from customer status alone.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_order -> get_product_details -> get_policies -> search_products -> search_products -> search_products -> search_products -> search_products -> get_product_details -> process_exchange -> process_exchange\n- 1x: get_order -> get_policies -> get_customer"
+          ]
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "item_id": "ITEM-10342",
+            "new_product_id": "PROD-4343",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10342",
+            "new_product_id": "PROD-4343",
+            "price_difference": 0,
+            "customer_pays": 0,
+            "store_credit_refund": 0,
+            "reason": "Exchange for same-price item — no charge, no refund"
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10342",
+            "refund_method": "original_payment",
+            "amount": 15,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10342",
+            "refund_amount": 15,
+            "refund_method": "original_payment"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, that looks right — please go ahead and process both the size 11 exchange and the separate $15 delay refund to my original payment method."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — both have been processed.\n\n- Your shoes were exchanged to size 11\n- The $15 late-delivery refund was sent to your original payment method\n\nIf you want, I can also help you with when to expect the replacement shipment.",
+      "tool_calls": [
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "item_id": "ITEM-10342",
+            "new_product_id": "PROD-4343",
+            "confirm": true
+          },
+          "result": {
+            "status": "exchanged",
+            "item_id": "ITEM-10342",
+            "new_item_id": "ITEM-10343",
+            "new_product_id": "PROD-4343",
+            "price_difference": 0,
+            "customer_pays": 0,
+            "store_credit_refund": 0
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10342",
+            "refund_method": "original_payment",
+            "amount": 15,
+            "confirm": true
+          },
+          "result": {
+            "status": "refunded",
+            "item_id": "ITEM-10342",
+            "mode": "refund",
+            "refund_amount": 15,
+            "refund_method": "original_payment",
+            "total_goodwill_credit": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 33169,
+    "cached_input_tokens": 0,
+    "output_tokens": 477,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 33646,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 33169,
+  "cached_input_tokens": 0,
+  "output_tokens": 477,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 33646,
+  "state_diff": {
+    "created": {
+      "order_items": {
+        "ITEM-10343": {
+          "item_id": "ITEM-10343",
+          "order_id": "ORD-7342",
+          "product_id": "PROD-4343",
+          "quantity": 1,
+          "unit_price": 129,
+          "item_status": "confirmed",
+          "return_reason": null,
+          "refund_amount": null,
+          "refund_method": null,
+          "restocking_fee": null,
+          "return_label_issued": false,
+          "replacement_item_id": null,
+          "goodwill_credit": 0,
+          "goodwill_credit_method": null,
+          "store_credit_only": false
+        }
+      }
+    },
+    "modified": {
+      "order_items": {
+        "ITEM-10342": {
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "replacement_item_id": {
+            "old": null,
+            "new": "ITEM-10343"
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "exchanged"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 15
+          }
+        }
+      }
+    },
+    "deleted": {}
+  }
+}

@@ -1,0 +1,443 @@
+{
+  "task_id": "148-hard_shipping_threshold_refresh_after_update",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"My cart has 3 skillets with standard shipping. Add the pour-over set and thermal coffee maker too, then give me the updated final total.\" Relevant catalog/policy surface: Seeded cart with 3 CasaGrande Cast-Iron Skillets (SP-H117) and standard shipping; add HomeBrew Pour-Over Coffee Set (SP-H118) and BrewMaster Thermal Coffee Maker (SP-H119); shipping policy 5+ items gives free standard shipping. Correct final state: SP-H117 quantity is 3, SP-H118 quantity is 1, SP-H119 quantity is 1, shipping_option is standard, shipping_cost is 0, total is $455.\n\n**Challenge:** Cart mutation crosses the free-standard-shipping threshold even though the user only asks for an updated final total, so the agent must refresh shipping after adding items. Primary pitfall: Adds both items but leaves stale $6 standard shipping or quotes $461. Correct behavior: Add SP-H118 and SP-H119, re-set/check standard shipping, quote $455 total. Novelty: Stale shipping state after add sequence, with final state proving refresh. Family: inventory_shipping.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=2; unexpected_assertions=1",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_004",
+        "field": "shipping_cost",
+        "value": 0
+      },
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_004",
+        "field": "total",
+        "value": 455
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "carts",
+        "record_key": "CART-shop_004",
+        "field": "total",
+        "value": 461
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "refreshed_shipping_after_quantity_update",
+      "kind": "must",
+      "requirement": "Agent re-evaluated or reset standard shipping after adding the pour-over set and thermal coffee maker to the 3-skillet cart, rather than trusting the pre-add $6 standard shipping charge.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "After adding SP-H118 and SP-H119, the agent only retrieved the cart and reported standard shipping as $6; there is no evidence it re-evaluated or reset shipping after the cart reached 5 items."
+    },
+    {
+      "id": "recognized_free_standard_threshold",
+      "kind": "must",
+      "requirement": "Agent recognized that standard shipping should be free after the cart reached the 5+ item threshold, as shown by refreshing or setting standard shipping to shipping_cost 0.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The final cart shown by tool calls still has shipping_option 'standard' with shipping_cost 6, and the assistant quoted standard shipping as $6 instead of free at the 5+ item threshold."
+    },
+    {
+      "id": "quoted_correct_total",
+      "kind": "must",
+      "requirement": "Agent quoted the correct final total of $455 for 3 skillets, the pour-over set, and the thermal coffee maker with free standard shipping, not $461 with stale $6 shipping.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The assistant quoted a final total of $461, not the required $455."
+    },
+    {
+      "id": "added_two_items_and_standard_free",
+      "kind": "must",
+      "requirement": "Agent added HomeBrew Pour-Over Coffee Set (SP-H118) and BrewMaster Thermal Coffee Maker (SP-H119), kept the 3 CasaGrande skillets, and final cart shipping_option is standard with shipping_cost 0.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "Tool calls show the two requested items were added and the 3 skillets remained, but final shipping was standard with shipping_cost 6 rather than standard with shipping_cost 0."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.35,
+  "ux_reasoning": "The agent directly mutated the cart with two add_to_cart actions without previewing the resulting cart changes or getting explicit approval in a later turn, which is a consequential shopping action under the policy. It also missed an important downstream effect: after reaching 5 items, standard shipping should have refreshed to free, but the agent left stale $6 shipping and quoted the wrong final total of $461 instead of $455. The user did not have to correct the agent only because the conversation ended, but from a UX standpoint this is a material failure on both action handling and outcome accuracy. Response length and structure were otherwise clear and concise, with the totals easy to read.",
+  "turns": 1,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My cart has 3 skillets with standard shipping. Add the pour-over set and thermal coffee maker too, then give me the updated final total."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added:\n\n- 1 × HomeBrew Pour-Over Coffee Set — $59\n- 1 × BrewMaster Thermal Coffee Maker — $129\n\nYour updated cart is now:\n\n- 3 × CasaGrande Cast-Iron Skillet — $267\n- 1 × HomeBrew Pour-Over Coffee Set — $59\n- 1 × BrewMaster Thermal Coffee Maker — $129\n\nSubtotal: $455  \nStandard shipping: $6  \nFinal total: $461",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "pour-over set",
+            "category": "kitchen",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H118",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "BrewLab",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 610,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "thermal coffee maker",
+            "category": "kitchen",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H119",
+                "name": "BrewMaster Thermal Coffee Maker",
+                "brand": "BrewLab",
+                "category": "kitchen",
+                "subcategory": "coffee_maker",
+                "price": 129,
+                "rating": 4.5,
+                "review_count": 780,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-H118",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "BrewLab",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 610,
+                "in_stock": true
+              }
+            ],
+            "total_found": 2
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H117",
+                "product_name": "CasaGrande Cast-Iron Skillet",
+                "quantity": 3,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 267
+              }
+            ],
+            "subtotal": 267,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": "standard",
+            "shipping_cost": 6,
+            "total": 273,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H118"
+          },
+          "result": {
+            "product_id": "SP-H118",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "base_price": 59,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H119"
+          },
+          "result": {
+            "product_id": "SP-H119",
+            "product_name": "BrewMaster Thermal Coffee Maker",
+            "base_price": 129,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H118",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-H118",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 59,
+            "cart_subtotal": 326,
+            "cart_total": 332
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-H119",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-H119",
+            "product_name": "BrewMaster Thermal Coffee Maker",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 129,
+            "cart_subtotal": 455,
+            "cart_total": 461
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H117",
+                "product_name": "CasaGrande Cast-Iron Skillet",
+                "quantity": 3,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 267
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H118",
+                "product_name": "HomeBrew Pour-Over Coffee Set",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 59,
+                "line_total": 59
+              },
+              {
+                "cart_item_id": "CI-0003",
+                "product_id": "SP-H119",
+                "product_name": "BrewMaster Thermal Coffee Maker",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 129,
+                "line_total": 129
+              }
+            ],
+            "subtotal": 455,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": "standard",
+            "shipping_cost": 6,
+            "total": 461,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 20784,
+    "cached_input_tokens": 0,
+    "output_tokens": 360,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 21144,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 20784,
+  "cached_input_tokens": 0,
+  "output_tokens": 360,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 21144,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-H118",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_004",
+          "product_id": "SP-H119",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [
+              "CI-0001"
+            ],
+            "new": [
+              "CI-0001",
+              "CI-0002",
+              "CI-0003"
+            ]
+          },
+          "subtotal": {
+            "old": 267,
+            "new": 455
+          },
+          "total": {
+            "old": 273,
+            "new": 461
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "item_ids",
+      "expected_value": [
+        "CI-0001",
+        "CI-0002",
+        "CI-0003"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "shipping_cost",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 455
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 455
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-H118",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-H119",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 2.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

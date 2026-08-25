@@ -1,0 +1,338 @@
+{
+  "task_id": "142-strategy_personal_international_change_cheaper_far_out",
+  "user_id": "user_003",
+  "task_summary": "Traveler wants the cheaper valid way to move an existing booking to 2026-07-05 and explicitly asks the agent to compare direct change versus cancel-and-rebook. Correct resolution: direct change is the cheaper valid path in this scenario because its fee burden is lower than cancel and rebook.\n\nChallenge: This tests whether the agent preserves international route semantics inside a strategy comparison on a Canada itinerary where direct change remains cheaper than canceling outright.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "strategy_personal_international_change_cheaper_far_out_compare_both_paths",
+      "kind": "must",
+      "requirement": "Agent must compare the direct-change path against the cancel-and-rebook path before recommending or executing, using the direct-change fee and fare difference on one side and the cancellation fee, refund, and replacement fare on the other side.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly compared both options side by side before execution: direct change using change fee $100 and fare difference -$100, and cancel/rebook using cancellation fee $106, refund $424, and replacement fare $430."
+    },
+    {
+      "id": "strategy_personal_international_change_cheaper_far_out_choose_correct_strategy",
+      "kind": "must",
+      "requirement": "Agent must recommend direct change as the cheaper valid option for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent recommended direct change as cheaper, stating 'Changing the booking is cheaper by $6' and offering to process the direct change."
+    },
+    {
+      "id": "strategy_personal_international_change_cheaper_far_out_avoid_wrong_strategy",
+      "kind": "must_not",
+      "requirement": "Agent must not frame cancel and rebook as the cheaper valid option for this scenario.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent never framed cancel and rebook as the cheaper valid option; it stated cancel and rebook would cost $6 versus $0 for direct change."
+    },
+    {
+      "id": "strategy_personal_international_change_cheaper_far_out_international_fee_reasoning",
+      "kind": "must",
+      "requirement": "Agent must apply the international personal-change fee for the Toronto route — quoting the correct $100 economy international fee (the >7-day tier), not the $75 domestic figure — when presenting the direct-change cost. Quoting the correct $100 international fee satisfies this; a separate spoken statement that the route is \"international\" is not separately required.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "For the SFO→YYZ international route, the agent quoted the correct direct-change fee of $100, not the $75 domestic figure."
+    },
+    {
+      "id": "strategy_personal_international_change_cheaper_far_out_no_premature_write",
+      "kind": "must_not",
+      "requirement": "Agent must not cancel, create, or update any booking before comparing both paths and identifying the cheaper valid strategy.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Before the user approved, the agent only used preview/non-mutating calls: cancel_booking with confirm=false and update_booking with confirm=false. The actual update with confirm=true occurred only after the user said, 'Yes, please go ahead.'"
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.95,
+  "ux_reasoning": "The agent kept the initial comparison read-only by using preview-style cancellation and change checks, then waited for an explicit later user approval before executing the booking change. It correctly handled the international itinerary semantics, compared direct change against cancel-and-rebook with stable arithmetic, and identified the cheaper valid path as the direct change. The user did not need to correct any facts, costs, or preserved preferences, and the final response confirmed the updated itinerary plus unchanged preferences clearly and concisely. Responses were compact but decision-ready, with exact fees, fare difference, and bottom-line cost comparison up front.",
+  "turns": 2,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to move booking BK-1000 to July 5 for personal reasons. Which ends up cheaper: changing it or canceling and rebooking?"
+    },
+    {
+      "role": "assistant",
+      "content": "Here’s the side-by-side for moving BK-1000 from June 30 to July 5:\n\n- Current booking: SFO → YYZ, economy, paid $530\n- Replacement found: UA101 on 2026-07-05, economy, $430\n\nCheaper option:\n- Direct change: change fee $100 + fare difference -$100 = $0 net\n- Cancel and rebook:\n  - Cancellation fee: $106\n  - Refund: $424\n  - New ticket: $430\n  - Net out-of-pocket after refund: $6\n\nBottom line:\n- Changing the booking is cheaper by $6.\n- Direct change costs you $0 net.\n- Cancel and rebook costs you $6 net.\n\nIf you want, I can go ahead and process the direct change to UA101 on July 5.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 530,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "SFO",
+            "destination": "YYZ",
+            "departure_time": "2026-06-30T10:15:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "cancellation_fee": 106,
+            "refund_amount": 424,
+            "reason": "International economy cancellation fee: max($75, 20% of $530) = $106"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "SFO",
+            "destination": "YYZ",
+            "date": "2026-07-05",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA101",
+                "airline_code": "UA",
+                "origin": "SFO",
+                "destination": "YYZ",
+                "departure_time": "2026-07-05T15:00:00",
+                "arrival_time": "2026-07-05T20:42:00",
+                "duration_minutes": 342,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 430,
+                  "business": 1210
+                },
+                "status": "scheduled",
+                "route_type": "international"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_fee": 100,
+            "fare_difference": -100,
+            "price_paid": 530
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please go ahead with the direct change to July 5. Also, for this change, please keep the existing booking’s current preferences as they are."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-1000 has been changed to July 5.\n\nUpdated itinerary:\n- Flight: UA101\n- Route: SFO → YYZ\n- Departure: 2026-07-05 15:00\n- Status: confirmed\n\nYour existing preferences were preserved:\n- Cabin: economy\n- Seat: aisle\n- Meal: standard\n- Wi‑Fi: yes\n- Extra legroom: yes\n- Insurance: no\n- Extra checked bags: 0\n\nPrice impact:\n- Change fee: $100\n- Fare difference: -$100\n- Net change cost: $0\n\nAnything else you want to update on this booking?",
+      "tool_calls": [
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA101",
+            "change_reason": "personal",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 530,
+            "change_fee": 100,
+            "fare_difference": -100
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "UA101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 530,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 100,
+            "fare_difference": -100,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "SFO",
+            "destination": "YYZ",
+            "departure_time": "2026-07-05T15:00:00",
+            "route_type": "international"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 32518,
+    "cached_input_tokens": 0,
+    "output_tokens": 603,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 33121,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 32518,
+  "cached_input_tokens": 0,
+  "output_tokens": 603,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 33121,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "fare_difference": {
+            "old": null,
+            "new": -100
+          },
+          "change_fee": {
+            "old": null,
+            "new": 100
+          },
+          "flight_id": {
+            "old": "UA100",
+            "new": "UA101"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 100
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": -100
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "UA101"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 6,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

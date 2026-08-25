@@ -1,0 +1,449 @@
+{
+  "task_id": "27-hard_warranty_maxed_tablet_return_better",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** Customer asks for a no-cost warranty resolution for a defective tablet. The warranty has reached its claim cap, but the tablet is still inside the return window. Correct handling is to check both paths, explain that defective return is better than paid repair, and process the full refund.\n\n**Challenge:** Reuses tasks 100/126's reliable failure pattern: weak agents stop at the maxed warranty path instead of proactively checking the superior return path.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "166_check_warranty_and_return",
+      "kind": "must",
+      "requirement": "Agent must check warranty status and then check the return path before choosing, recommending, or previewing the final resolution.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Agent checked warranty first, but initially recommended/previewed the paid repair path before checking the return path. The return path was only checked later after the customer explicitly asked."
+    },
+    {
+      "id": "166_explain_return_better",
+      "kind": "must",
+      "requirement": "Agent must explain that the warranty path is maxed or paid and that a defective return is the better no-cost option before the customer asks about returns.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Before the customer asked about returns, the agent said paid repair was the next available option and only offered to check returns later. The agent did not proactively explain that the maxed warranty made defective return the better no-cost option."
+    },
+    {
+      "id": "166_process_defective_return",
+      "kind": "must",
+      "requirement": "Agent must process ITEM-10520 as a defective return for a full $599 original-payment refund with no restocking fee.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Agent previewed and then confirmed process_return for ITEM-10520 with reason 'defective'; final tool result shows status 'returned', refund_amount 599, refund_method original_payment, restocking_fee 0, and return_label_issued true."
+    },
+    {
+      "id": "166_no_paid_repair_or_claim",
+      "kind": "must_not",
+      "requirement": "Agent must not file another warranty claim, route the customer to paid repair, or stop after saying the warranty is maxed.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Agent explicitly routed the customer to paid repair by saying the next available option was a paid repair at 40% of item price. Although no extra warranty claim was filed, offering paid repair violates this must_not requirement."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.6,
+  "ux_reasoning": "The agent handled the consequential action correctly once the return path was raised: it previewed the refund terms, waited for explicit confirmation, and then processed the return with a clear summary, so control was good overall. However, the major UX flaw is that it initially stopped at the maxed-out warranty path and pitched a paid repair, instead of proactively checking the clearly superior no-cost defective return path despite the item being recently delivered; this forced the user to re-steer and ask for the right resolution. Response length and structure were strong throughout: concise, specific, and centered on the concrete refund terms without filler. Because the user had to recover the interaction from a materially worse default path, user effort is low even though the final outcome was correct.",
+  "turns": 3,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My SlateTab from ORD-7519 will not turn on again. I have a warranty, so please handle it without charging me."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked your order and warranty. Your SlateTab is still under active warranty, but this warranty has already reached its maximum of 3 claims, so I can’t process another no-charge warranty claim.\n\nWhat I can do instead is help with the next available option under the warranty terms: a paid repair at 40% of the item price. If you want, I can also check whether a return/refund path is still available, though the normal return window looks short for this item.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7519"
+          },
+          "result": {
+            "order_id": "ORD-7519",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK54293599",
+            "delivery_date": "2026-07-06T12:00:00",
+            "delivery_promised_date": "2026-07-06T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10520",
+                "order_id": "ORD-7519",
+                "product_id": "PROD-4522",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4522",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_warranty_status",
+          "arguments": {
+            "item_id": "ITEM-10520"
+          },
+          "result": {
+            "warranty_id": "WRT-4519",
+            "order_id": "ORD-7519",
+            "item_id": "ITEM-10520",
+            "product_id": "PROD-4522",
+            "warranty_type": "manufacturer",
+            "start_date": "2026-07-06",
+            "end_date": "2027-07-01",
+            "status": "active",
+            "claim_count": 3,
+            "max_claims": 3,
+            "coverage": "repair_or_replace",
+            "resolution": null,
+            "is_active": true,
+            "days_until_expiry": 353,
+            "days_past_expiry": 0,
+            "has_warranty": true
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "warranty"
+          },
+          "result": {
+            "topic": "warranty",
+            "rules": {
+              "active": "Active warranty: eligible for claim.",
+              "active_item_required": "Warranty claims require an active order item. Items already returned, exchanged, or cancelled are ineligible for a new warranty claim even if a warranty record still exists.",
+              "expired_recent": "Expired <30 days: 50% off repair.",
+              "expired_old": "Expired >30 days: full-price repair or 25% off replacement.",
+              "claim_limit": "Max claims reached: paid repair only (40% of item price).",
+              "repair_vs_replace": "Items <$100: replacement. Items >=$100: repair first.",
+              "recurring_defect": "2+ prior claims for same issue: automatic replacement.",
+              "manufacturer": "Manufacturer warranty covers first 12 months.",
+              "extended": "Extended warranty covers after manufacturer period.",
+              "void_exclusions": "Liquid, accidental, or user-caused physical damage (e.g. spills, drops, cracked screens from misuse) is NOT covered and voids the claim, even while the warranty is otherwise active. The eligibility check is date/claim-count based only and does not detect damage cause, so when the customer describes liquid/accidental/user damage, deny the claim on this exclusion and do not file it."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I’m not interested in a paid repair for a tablet that’s defective again. Please check whether there’s a no-cost return/refund option for this recently delivered SlateTab."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — there is a no-cost return/refund option for this defective SlateTab.\n\nI checked the return terms and previewed the return: you’re eligible for a full $599 refund to your original payment method, with no restocking fee and a free return label. If you want, I can process that return now.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "defective recently delivered item no-cost return refund after warranty max claims reached preview then offer customer confirmation"
+          },
+          "result": [
+            "Workflow: Preview and finalize a return with correct amount\nUse when: Customer wants refund details before approval, or asks to proceed with a return after reviewing the preview.\nVerify first:\n- Use get_order to identify the correct item and verify order/item status supports a return attempt.\n- Use get_policies to confirm return computation rules before final confirmation.\n- Obtain a preview from process_return(confirm=false) so the authoritative refund amount and fees come from the tool.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='returns')\n3. process_return(amount=<estimated or known amount for preview>, confirm=false, item_id, reason=<return reason>)\n4. If customer confirms, process_return(amount=<preview refund amount>, confirm=true, item_id, reason=<same reason>)\nBranches:\n- If the customer requests the preview again, repeat process_return with confirm=false and restate only the returned preview fields.\n- If preview shows return_eligible=false or other rejection, no-write outcome: explain the returned reason and stop.\n- If the confirmed call returns rejected because the item was already returned or status changed, no-write outcome: report the current state from the tool.\n- If customer changes the reason before confirmation, obtain a fresh preview for the new reason before confirming.\nAvoid:\n- Do not compute or alter the final confirmed amount without matching the preview/policy output.\n- Do not switch reasons between preview and confirm unless a new preview is generated.\n- Do not promise a free label, no restocking fee, or original-payment refund unless process_return preview states it.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_order -> get_policies -> process_return -> process_return -> get_order -> get_customer -> process_return\n- 1x: get_order -> get_policies -> get_warranty_status -> process_warranty_claim -> get_policies -> process_return -> process_return\n- 1x: get_order -> get_customer -> get_warranty_status -> get_product_details -> get_policies -> get_policies -> get_policies -> search_products -> search_products -> process_warranty_claim -> process_return -> process_return -> process_return",
+            "Workflow: File a warranty repair claim after confirming eligibility\nUse when: User wants a warranty claim started for an order item after or alongside checking eligibility, typically for a defect or hardware issue covered by warranty.\nVerify first:\n- Verify the order and identify the correct item.\n- Verify current warranty status for that item, including active status and matching warranty record if provided by the user.\n- Fetch warranty policies before mutation to confirm claim conditions and exclusions.\n- Have the user-provided issue description needed for the claim.\nProcedure:\n1. get_order(order_id)\n2. get_warranty_status(item_id)\n3. get_policies(topic='warranty')\n4. process_warranty_claim(confirm=false, issue_description='<issue>', item_id='<item_id>', warranty_id='<warranty_id>')\n5. process_warranty_claim(confirm=true, issue_description='<issue>', item_id='<item_id>', warranty_id='<warranty_id>')\nBranches:\n- If the preview shows eligible, resolution, and cost acceptable, submit the confirmed claim.\n- If the preview shows ineligible or excluded, do not confirm; explain the reason from tool output and policy.\n- If the user asks only whether it can be filed but does not authorize filing, stop after preview or earlier and do not confirm.\n- If a warranty ID is provided by the user, ensure it matches the current item's warranty status before filing; if not, do not proceed until clarified.\nAvoid:\n- Do not skip the read-only checks before submitting a claim.\n- Do not submit the confirmed claim without clear user intent to start it.\n- Do not claim no-cost repair or any resolution unless returned by process_warranty_claim.\n- Do not process claims for returned, exchanged, cancelled, or otherwise ineligible items if policy/tool output says they are not eligible.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_order -> get_policies\n- 1x: get_order -> get_warranty_status -> get_policies -> process_warranty_claim -> process_warranty_claim\n- 1x: get_order -> get_warranty_status -> get_product_details -> get_policies -> process_warranty_claim -> process_warranty_claim",
+            "Workflow: Out-of-warranty warranty claim with preview and user choice\nUse when: User says the warranty may be expired or is long expired, asks what options exist, wants confirmation of the policy-supported out-of-warranty path, and may choose discounted replacement or discounted repair after seeing a preview.\nVerify first:\n- Use get_order to locate the item and confirm it is the correct delivered item.\n- Use get_warranty_status to verify warranty record, expiry state, days past expiry, claim_count, and warranty_id.\n- Use get_policies on warranty topics to confirm what expired-warranty options are allowed.\n- Use get_product_details if product availability or price context is needed for replacement/repair explanation.\nProcedure:\n1. get_order(order_id=<order_id>)\n2. get_warranty_status(item_id=<item_id>)\n3. get_policies(topic=<expired_warranty_policy_topic>)\n4. get_product_details(product_id=<product_id>)\n5. process_warranty_claim(confirm=false, issue_description=<issue>, item_id=<item_id>, warranty_id=<warranty_id>)\n6. process_warranty_claim(confirm=true, issue_description=<issue>, item_id=<item_id>, warranty_id=<warranty_id>)\nBranches:\n- If the user is only asking for options, stop after read-only steps and explain the allowed paths without filing.\n- If the user asks for a preview first, run process_warranty_claim with confirm=false and wait for approval.\n- If the expired-warranty preview indicates discounted repair, confirm the cost and file only after explicit user approval.\n- If the preview indicates paid repair or discounted replacement, present that exact resolution and let the user choose before confirmation.\n- If the item is ineligible or no out-of-warranty path is supported, return the no-write outcome and explain the policy result.\nAvoid:\n- Do not assume a free repair/replacement when warranty is expired.\n- Do not file the claim before showing the preview if the user asked to review it first.\n- Do not invent discounts, repair costs, or replacement pricing outside tool outputs.\n- Do not use return/refund tools as substitutes for an out-of-warranty warranty flow unless current tools/policies specifically support it.\nProcess support: mean conformance=1.000\n"
+          ]
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10520",
+            "reason": "defective"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10520",
+            "return_eligible": true,
+            "reason": "defective",
+            "refund_amount": 599,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": true,
+            "shipping_refund": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please process the defective return as long as it’s the full $599 back to my original payment method, with no restocking fee and a free return label."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — the return has been processed.\n\nYou’ll receive the full $599 back to your original payment method, there was no restocking fee, and the return label has been issued.",
+      "tool_calls": [
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10520",
+            "reason": "defective",
+            "amount": 599,
+            "confirm": true
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-10520",
+            "refund_amount": 599,
+            "policy_computed_amount": 599,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "return_label_issued": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 34655,
+    "cached_input_tokens": 0,
+    "output_tokens": 416,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 35071,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 34655,
+  "cached_input_tokens": 0,
+  "output_tokens": 416,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 35071,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10520": {
+          "return_reason": {
+            "old": null,
+            "new": "defective"
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "return_label_issued": {
+            "old": false,
+            "new": true
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 599
+          }
+        }
+      },
+      "orders": {
+        "ORD-7519": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "refund_amount",
+      "expected_value": 599
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "return_label_issued",
+      "expected_value": true
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "return_reason",
+      "expected_value": "defective"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7519",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 5,
+  "ux_base_score": 3.6,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

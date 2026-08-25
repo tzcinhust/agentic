@@ -1,0 +1,536 @@
+{
+  "task_id": "131-hard_warranty_shipping_damage_better_path",
+  "user_id": "cust_004",
+  "task_summary": "Customer asks for warranty help, but the blender arrived shattered in transit yesterday. Correct path is shipping/return resolution, not consuming a warranty claim.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=1; unexpected_assertions=1",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10236",
+        "field": "goodwill_credit",
+        "value": 18
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10236",
+        "field": "goodwill_credit",
+        "value": 8
+      }
+    ]
+  },
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "hard_warranty_shipping_damage_better_path_ask_resolution",
+      "kind": "must",
+      "requirement": "Agent must give the customer a say in the resolution before acting — either by asking which resolution they prefer OR by presenting the available resolution options (e.g. refund vs. replacement/exchange) and letting them choose. Proceeding to pick or execute a resolution without offering the customer any choice fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent gave the customer a say before any state-changing action: it explained shipping-damage handling, then after the user asked for options it presented options and did not execute a return until the user's later explicit approval. The earlier process_return call was only a preview, not a mutation."
+    },
+    {
+      "id": "hard_warranty_shipping_damage_better_path_avoid_warranty",
+      "kind": "must",
+      "requirement": "Agent must explain that the customer should not use a warranty claim for shipping damage.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly told the customer not to use warranty, explaining that shattered-on-arrival is shipping damage and not handled as a repair warranty claim."
+    },
+    {
+      "id": "hard_warranty_shipping_damage_better_path_no_claim",
+      "kind": "must_not",
+      "requirement": "Agent must not file a warranty claim.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "No warranty claim was filed. Tool calls show no process_warranty_claim execution, and the agent handled the issue through return/refund flow instead."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.7,
+  "ux_reasoning": "The agent correctly steered away from warranty and ultimately executed the right damaged-in-transit return plus shipping refund, but it took a return preview immediately after the user said only 'help start that,' then described options as if work had already been started. The user's explicit complaint that they would have preferred to be asked before anything was started shows a meaningful consent/legibility miss, even though the tool action was only a safe preview rather than a confirmed mutation. Effort was moderate: the user had to reassert their preference for refund over replacement/exchange and recover control before confirmation, but the agent then answered the key policy details clearly. Responses were generally concise and well-structured, with the main minor issue being that the second assistant message framed options a bit incompletely and ambiguously relative to the user's desired refund path.",
+  "turns": 4,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "The blender from ORD-7236 arrived shattered. Should I use my warranty to get it fixed?"
+    },
+    {
+      "role": "assistant",
+      "content": "No—this shouldn’t go through warranty. Since it arrived shattered, that’s shipping damage, and physical damage from transit isn’t handled as a repair warranty claim.\n\nThe good news is this is usually handled as a damaged-delivery return/replacement issue instead. If you want, I can help start that for the blender from ORD-7236.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7236"
+          },
+          "result": {
+            "order_id": "ORD-7236",
+            "customer_id": "cust_004",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "damaged",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK31469056",
+            "delivery_date": "2026-07-07T12:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 97
+            },
+            "subtotal": 89,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 97,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10236",
+                "order_id": "ORD-7236",
+                "product_id": "PROD-4246",
+                "quantity": 1,
+                "unit_price": 89,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4246",
+                  "name": "PowerBlend Pro Blender",
+                  "category": "kitchen",
+                  "price": 89,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 6,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "warranty"
+          },
+          "result": {
+            "topic": "warranty",
+            "rules": {
+              "active": "Active warranty: eligible for claim.",
+              "active_item_required": "Warranty claims require an active order item. Items already returned, exchanged, or cancelled are ineligible for a new warranty claim even if a warranty record still exists.",
+              "expired_recent": "Expired <30 days: 50% off repair.",
+              "expired_old": "Expired >30 days: full-price repair or 25% off replacement.",
+              "claim_limit": "Max claims reached: paid repair only (40% of item price).",
+              "repair_vs_replace": "Items <$100: replacement. Items >=$100: repair first.",
+              "recurring_defect": "2+ prior claims for same issue: automatic replacement.",
+              "manufacturer": "Manufacturer warranty covers first 12 months.",
+              "extended": "Extended warranty covers after manufacturer period.",
+              "void_exclusions": "Liquid, accidental, or user-caused physical damage (e.g. spills, drops, cracked screens from misuse) is NOT covered and voids the claim, even while the warranty is otherwise active. The eligibility check is date/claim-count based only and does not detect damage cause, so when the customer describes liquid/accidental/user damage, deny the claim on this exclusion and do not file it."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please help start that for ORD-7236. What are my options for resolving shipping damage?"
+    },
+    {
+      "role": "assistant",
+      "content": "You’ve got two practical options for shipping damage on this blender:\n\n1. Return it for a full item refund of $89 to your original payment method.  \n2. Since shipping damage also qualifies for shipping reimbursement, I can separately help with refunding the $8 shipping charge from the order as well.\n\nI checked the return rules: no restocking fee and no return-shipping charge apply here. If you want, I can start the return now, and then we can handle the shipping refund too.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "exchange"
+          },
+          "result": {
+            "topic": "exchange",
+            "rules": {
+              "must_be_different_product": "Exchanges must specify a different product than the original item. Self-swap (exchanging an item for the same product) is not allowed — use process_return for a refund instead.",
+              "same_price": "Exchange for a same-price product: no charge, no refund.",
+              "more_expensive": "Exchange for more expensive item: customer pays price difference.",
+              "cheaper": "Exchange for cheaper item: difference refunded as store credit (not original payment).",
+              "out_of_stock": "If requested item is out of stock: issue store credit for the original item; do not complete the exchange.",
+              "return_window": "Must be within return window (same rules as returns).",
+              "no_price_protection": "No price protection on exchanges (item price at time of purchase applies)."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "shipping damage delivered item options return exchange refund preview damaged in transit replacement"
+          },
+          "result": [
+            "Workflow: Preview and process return or refund for delivered item\nUse when: User wants to return a delivered item or switches from exchange to return/refund, including changed-mind, wrong-item, damaged, or similar post-delivery issues.\nVerify first:\n- Use get_order to verify the item status is delivered and identify the correct item.\n- Use get_policies to verify return/refund eligibility, return-window rules, and amount-calculation guidance.\n- If the user mentions damage, wrong item, or missing contents, use get_policies for the relevant exception/full-refund rules before choosing the mutation path.\n- If useful for explanation only, use get_customer to inspect benefits that may affect return window or fees.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='returns' or relevant refund/amount topic)\n3. get_customer(customer_id)\n4. process_return(amount=<computed_or_tool-supported_amount>, confirm=false, item_id=<item_id>, reason=<reason>)\n5. process_return(amount=<preview_refund_amount>, confirm=true, item_id=<item_id>, reason=<reason>)\nBranches:\n- If the issue qualifies for a direct refund policy rather than a standard changed-mind return, review the refund/damaged policy first and use the supported mutation path; if uncertain, stop and explain the supported options.\n- If the preview indicates store credit only because of timing/policy, explain that outcome and wait for approval before confirming.\n- If the user asks why the amount is lower, explain the preview components such as restocking fee or shipping clawback using current policy/tool output.\n- If the user asks only for a preview or confirmation, stop after the preview and do not confirm.\n- If the item is not eligible for return, provide the no-write outcome and cite the policy/tool result.\nAvoid:\n- Do not guess the refund amount without a preview when policy says the agent must compute/submit the net amount from the breakdown.\n- Do not promise original-payment refund if the preview/policy says store credit only.\n- Do not cancel delivered items instead of using the return/refund flow.\n- Do not reuse one order's fees or refund logic for another item without checking current tool output.\nProcess support",
+            "Workflow: Damaged fragile item return plus supplemental goodwill refund\nUse when: Customer reports a delivered fragile item damaged in transit and wants a refund to original payment, asks about return label/restocking, and may request the separate fragile-item goodwill credit if policy supports it.\nVerify first:\n- Use get_order to verify the delivered item and current status.\n- Use get_policies for return/refund rules and damaged-in-transit goodwill rules.\n- Use get_product_details to verify the item is fragile when the goodwill credit depends on fragility.\n- If needed, verify customer refund preference with get_customer.\nProcedure:\n1. get_order(<order_id>)\n2. get_policies(<returns_or_refunds_topic>)\n3. get_policies(<damage_or_goodwill_topic>)\n4. get_product_details(<product_id>)\n5. If needed, get_customer(<customer_id>)\n6. process_return(confirm=false, item_id=<item_id>, reason=damaged_in_transit, amount omitted until preview is reviewed)\n7. If proceeding, process_return(confirm=true, item_id=<item_id>, reason=damaged_in_transit, amount=<net amount computed from the preview per policy>)\n8. If policy supports a separate fragile-item goodwill refund and the customer wants it, process_refund(confirm=false, item_id=<item_id>, refund_method=<requested_method>, amount=<goodwill_amount>)\n9. If preview is valid, process_refund(confirm=true, item_id=<item_id>, refund_method=<requested_method>, amount=<goodwill_amount>)\n10. Optionally get_order(<order_id>) if final item status confirmation is needed\nBranches:\n- If the item is not fragile, do not promise the fragile-item bonus; complete only the standard return/refund if eligible.\n- If the customer declines the supplemental credit, stop after the return/refund.\n- If the item was already returned, do not attempt another return; only consider whether a standalone supplemental refund is still tool-supported.\n- If preview/policy indicates free return shipping and no restocking fee, communicate that; otherwise report the actual preview values.\nAvoid:\n- Do not invent a fragile-item goodwill amount unless supported by policy and tool previews.\n- Do not assume every damaged item gets supplemental credit; verify fragility and dama",
+            "Workflow: Combined wrong-item return plus separate shipping-claim refund\nUse when: Customer reports a wrong-item shipment and also requests an additional non-return shipping-related compensation or claim refund on the same delivered order.\nVerify first:\n- Use get_order to verify delivery timing and identify the affected delivered item.\n- Use get_customer if customer tier/benefits may affect compensation calculation or explanation.\n- Use get_policies to verify both the wrong-item return rules and the separate shipping-claim compensation rules.\n- Use get_product_details or search_products only if needed to confirm the disputed item/product.\nProcedure:\n1. get_order(order_id)\n2. get_customer(customer_id) if compensation rules depend on customer benefits\n3. get_policies(topic='shipping claim compensation')\n4. get_policies(topic='wrong-item return/refund')\n5. get_policies(topic='return amount computation')\n6. get_product_details(product_id) or search_products(query) if needed\n7. process_return(amount=<preview return refund amount>, confirm=false, item_id=<item_id>, reason='wrong_item')\n8. process_refund(amount=<preview compensation amount>, confirm=false, item_id=<item_id>, refund_method=<allowed method>)\n9. If customer approves both, process_return(amount=<preview return refund amount>, confirm=true, item_id=<item_id>, reason='wrong_item')\n10. process_refund(amount=<preview compensation amount>, confirm=true, item_id=<item_id>, refund_method=<allowed method>)\nBranches:\n- If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.\n- If only the compensation is authorized and policy allows it, confirm only process_refund.\n- If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.\n- If either preview differs from the customer expectation, pause before confirmation and restate the tool-provided amounts/methods separately.\n- If the wrong-item line is unclear, resolve the item first and delay all writes.\nAvoid:\n- Do not merge the return refund and compensation into a single invented tool action.\n- Do not compute sh"
+          ]
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10236",
+            "reason": "damaged_in_transit"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10236",
+            "return_eligible": true,
+            "reason": "damaged_in_transit",
+            "refund_amount": 89,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": true,
+            "shipping_refund": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I would’ve preferred to be asked before anything was started. I don’t want a warranty claim or a replacement/exchange here — I want a refund to my original payment method for the shipping damage.\n\nBefore I confirm, can you make sure this is being handled as a damaged-in-transit return, with a free return label, no restocking fee, and the shipping charge refunded to my original payment too?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — that’s the correct handling.\n\nFor the blender on ORD-7236, I verified it as a damaged-in-transit return, and the current return preview shows:\n- refund reason: shipping damage\n- refund to: your original payment method\n- item refund: $89\n- free return label: yes\n- restocking fee: $0\n\nSeparately, the policy also supports refunding the $8 shipping charge for damaged deliveries back to the original payment method. Nothing has been finalized yet. If you want, I can proceed with the return and then the $8 shipping refund.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Yes, please proceed with the damaged-in-transit return and refund to my original payment method, including the $8 shipping refund as well.\n\nJust to confirm, this is not being processed as a warranty claim, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Correct — this was not processed as a warranty claim.\n\nI’ve completed a damaged-in-transit return for the blender with:\n- $89 refunded to your original payment method\n- free return label issued\n- no restocking fee\n- separate $8 shipping refund to your original payment method\n\nTotal going back to your original payment: $97.",
+      "tool_calls": [
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10236",
+            "reason": "damaged_in_transit",
+            "amount": 89,
+            "confirm": true
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-10236",
+            "refund_amount": 89,
+            "policy_computed_amount": 89,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "return_label_issued": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10236",
+            "refund_method": "original_payment",
+            "amount": 8
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10236",
+            "refund_amount": 8,
+            "refund_method": "original_payment"
+          }
+        },
+        {
+          "name": "process_refund",
+          "arguments": {
+            "item_id": "ITEM-10236",
+            "refund_method": "original_payment",
+            "amount": 8,
+            "confirm": true
+          },
+          "result": {
+            "status": "refunded",
+            "item_id": "ITEM-10236",
+            "mode": "supplemental_refund",
+            "refund_amount": 8,
+            "refund_method": "original_payment",
+            "total_goodwill_credit": 8
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for confirming. That sounds right — damaged-in-transit return, not a warranty claim, with the $89 item refund plus the $8 shipping refund to my original payment method, and the free return label. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 60960,
+    "cached_input_tokens": 0,
+    "output_tokens": 662,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 61622,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 60960,
+  "cached_input_tokens": 0,
+  "output_tokens": 662,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 61622,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10236": {
+          "return_reason": {
+            "old": null,
+            "new": "damaged_in_transit"
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "return_label_issued": {
+            "old": false,
+            "new": true
+          },
+          "goodwill_credit_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "goodwill_credit": {
+            "old": 0,
+            "new": 8
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 89
+          }
+        }
+      },
+      "orders": {
+        "ORD-7236": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "goodwill_credit",
+      "expected_value": 18
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "goodwill_credit_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "refund_amount",
+      "expected_value": 89
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "return_label_issued",
+      "expected_value": true
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10236",
+      "field": "return_reason",
+      "expected_value": "damaged_in_transit"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7236",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 4,
+  "ux_base_score": 2.7,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 4,
+  "ux_tool_call_count": 10,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

@@ -1,0 +1,456 @@
+{
+  "task_id": "134-strategy_medical_international_change_cheaper",
+  "user_id": "user_004",
+  "task_summary": "Traveler wants the cheaper valid way to move an existing booking to 2026-07-05 and explicitly asks the agent to compare direct change versus cancel-and-rebook. Correct resolution: direct change is the cheaper valid path in this scenario because its fee burden is lower than cancel and rebook.\n\nChallenge: The agent must turn an international medical discount into the correct strategy choice.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "strategy_medical_international_change_cheaper_compare_both_paths",
+      "kind": "must",
+      "requirement": "Agent must present a comparison of the direct-change path (change fee + fare difference) against the cancel-and-rebook path (cancellation fee, refund, replacement fare) before executing any change.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly compared both options before execution: direct change listed change fee $50 + fare difference $50 = $100, and cancel-and-rebook listed cancellation fee $174, refund $696, replacement fare $920, concluding $224 extra."
+    },
+    {
+      "id": "strategy_medical_international_change_cheaper_choose_correct_strategy",
+      "kind": "must",
+      "requirement": "Agent must recommend direct change as the cheaper valid option for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent recommended the correct cheaper option, stating 'Direct change is cheaper' and later offering to proceed with the direct change."
+    },
+    {
+      "id": "strategy_medical_international_change_cheaper_avoid_wrong_strategy",
+      "kind": "must_not",
+      "requirement": "Agent must not frame cancel and rebook as the cheaper valid option for this scenario.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent never framed cancel and rebook as the cheaper valid option; it consistently stated cancel-and-rebook would cost $224 extra versus $100 for direct change."
+    },
+    {
+      "id": "strategy_medical_international_change_cheaper_medical_discount_reasoning",
+      "kind": "must",
+      "requirement": "Agent must explain how the medical-reason change discount reduces the direct-change cost as part of its recommendation.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explained the recommendation using the medical reason, stating 'The lower change fee appears consistent with your medical reason in the preview,' which links the medical discount to the reduced direct-change cost."
+    },
+    {
+      "id": "strategy_medical_international_change_cheaper_no_premature_write",
+      "kind": "must_not",
+      "requirement": "Agent must not cancel, create, or update any booking before comparing both paths and identifying the cheaper valid strategy.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Before the comparison, the agent only used non-mutating preview calls: cancel_booking with confirm=false and update_booking with confirm=false. The actual update_booking confirm=true occurred only after presenting both paths and after the user approved."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.65,
+  "ux_reasoning": "The agent kept the comparison phase read-only, used safe previews for both cancellation and direct change, and only executed the booking update after an explicit later approval from the user. It surfaced the decisive arithmetic for both paths, answered the follow-up verification request directly, preserved the existing preferences by carrying them through the update, and verified the final booking state afterward. User effort was very low because the traveler did not need to correct pricing, strategy, or preserved preferences. Response density was strong and decision-ready, though the statement that the lower fee 'appears consistent with your medical reason' was slightly less grounded than the preview evidence shown.",
+  "turns": 3,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 3,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to move booking BK-1000 to July 5 because of a medical issue. Which is cheaper overall: direct change or cancel and rebook?"
+    },
+    {
+      "role": "assistant",
+      "content": "Direct change is cheaper.\n\n- Current booking: BK-1000, JFK → LHR, 2026-06-30, economy\n- Replacement found for July 5: BA101, JFK → LHR, economy, $920\n\nComparison:\n- Direct change preview:\n  - Change fee: $50\n  - Fare difference: $50\n  - Total additional cost: $100\n  - New total trip price: $970\n\n- Cancel and rebook:\n  - Cancellation fee: $174\n  - Refund: $696\n  - New flight price: $920\n  - Net additional out-of-pocket vs your original $870 booking: $224\n\nBottom line:\n- Direct change costs $100 extra\n- Cancel and rebook costs $224 extra\n- Direct change is cheaper by $124\n\nThe lower change fee appears consistent with your medical reason in the preview.\n\nIf you want, I can proceed with the direct change to BA101 on July 5.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_004",
+            "flight_id": "BA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 870,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LHR",
+            "departure_time": "2026-06-30T11:30:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "cancellation_fee": 174,
+            "refund_amount": 696,
+            "reason": "International economy cancellation fee: max($75, 20% of $870) = $174"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "JFK",
+            "destination": "LHR",
+            "date": "2026-07-05",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "BA101",
+                "airline_code": "BA",
+                "origin": "JFK",
+                "destination": "LHR",
+                "departure_time": "2026-07-05T14:15:00",
+                "arrival_time": "2026-07-05T18:53:00",
+                "duration_minutes": 278,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 920,
+                  "business": 2080
+                },
+                "status": "scheduled",
+                "route_type": "international"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "BA101",
+            "change_reason": "medical",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "BA101",
+            "change_fee": 50,
+            "fare_difference": 50,
+            "price_paid": 970
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Before I approve it, can you give me the July 5 itinerary details I need to verify: airline, time range, and max stops for BA101? Also please confirm the $100 incremental out-of-pocket is the final direct-change cost and that my existing booking preferences will stay exactly as they are."
+    },
+    {
+      "role": "assistant",
+      "content": "Here are the July 5 details for BA101:\n\n- Airline: BA (British Airways)\n- Flight: BA101\n- Route: JFK → LHR\n- Departure: 2026-07-05 14:15\n- Arrival: 2026-07-05 18:53\n- Stops: 0 nonstop\n\nVerification points:\n- Airline: BA\n- Time range: afternoon\n- Max stops: 0\n\nDirect-change cost:\n- The current preview shows:\n  - Change fee: $50\n  - Fare difference: $50\n  - Incremental out-of-pocket: $100 total\n- Based on the preview, yes, $100 is the final direct-change amount to make this change if we proceed with this exact flight and same booking details.\n\nYour existing booking preferences that would be preserved:\n- Cabin: economy\n- Seat: window\n- Meal: standard\n- Wi‑Fi: no\n- Extra legroom: no\n- Insurance: no\n- Paid checked bags: 0\n\nSo if I execute the direct change, I will keep those exactly the same.\n\nIf you want, reply with something like: “Approve the direct change to BA101.”",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "That works for me. Please go ahead with the direct change to BA101 on July 5 for the confirmed $100 total additional cost, and keep the existing booking preferences exactly as they are."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-1000 has been changed to BA101 on July 5.\n\nVerified final details:\n- Airline: BA\n- Flight: BA101\n- Route: JFK → LHR\n- Departure: 2026-07-05 14:15\n- Arrival: 2026-07-05 18:53\n- Stops: 0 nonstop\n\nFinal direct-change cost:\n- Change fee: $50\n- Fare difference: $50\n- Total additional out-of-pocket: $100\n- New total paid: $970\n\nYour booking preferences were preserved exactly as requested:\n- Cabin: economy\n- Seat: window\n- Meal: standard\n- Wi‑Fi: no\n- Extra legroom: no\n- Insurance: no\n- Extra checked bags: 0\n\nYour booking remains confirmed.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Execute approved direct flight change while preserving booking preferences for booking BK-1000 to flight BA101 on 2026-07-05 after prior preview confirmed $100 additional cost. Need fresh preview if cost confirmation matters, then confirm update, preserving existing preferences exactly, then verify with get_booking."
+          },
+          "result": [
+            "Workflow: Execute approved direct change while preserving booking preferences\nUse when: User has already approved changing an existing booking to a specific replacement flight, and the chosen path is direct update rather than cancel-and-rebook.\nVerify first:\n- Use get_booking to confirm the current booking still exists and to capture preferences/add-ons that should be preserved on update.\n- Verify the approved replacement flight details from prior search results or re-search if needed to ensure the flight still matches the agreed airline/date/time/stops/cabin.\n- If the change reason matters to fees or eligibility, verify the needed policy fields with get_user_details and get_policies before confirming the update.\nProcedure:\n1. get_booking(booking_id=<booking_id>)\n2. Optional: get_user_details(user_id=<user_id>)\n3. Optional: get_policies(cabin_class=<from booking>, loyalty_tier=<from user details>, route_type=<from booking/search>, topic=<change>)\n4. Optional validation: search_flights(airline=<approved>, date=<approved date>, destination=<approved destination>, origin=<approved origin>, max_stops=<approved>, time_range=<approved>)\n5. Optional final preview: update_booking(booking_id=<booking_id>, flight_id=<approved flight>, cabin_class=<approved or retained>, change_reason=<approved reason>, add_wifi=<preserve>, add_extra_legroom=<preserve>, add_insurance=<preserve or requested>, meal_preference=<preserve>, seat_type=<preserve>, paid_checked_bags=<preserve if known>, delay_compensation=<preserve if known>, confirm=false)\n6. update_booking(booking_id=<booking_id>, flight_id=<approved flight>, cabin_class=<approved or retained>, change_reason=<approved reason>, add_wifi=<preserve>, add_extra_legroom=<preserve>, add_insurance=<preserve or requested>, meal_preference=<preserve>, seat_type=<preserve>, paid_checked_bags=<preserve if known>, delay_compensation=<preserve if known>, confirm=true)\n7. get_booking(booking_id=<booking_id>)\nBranches:\n- If the user changes a preference at the same time (for example insurance), include it in the confirmed update if update_booking supports it.\n- If the confirmed update response does not clearly show every preserved preference, ",
+            "Workflow: Execute approved direct flight change while preserving booking preferences\nUse when: User has approved a direct change on an existing booking to a specific replacement flight or date after comparison, and wants current preferences kept unless explicitly changed.\nVerify first:\n- Use get_booking to read all current mutable preferences and ancillaries that should be preserved on update.\n- If needed, use search_flights to confirm the approved replacement flight is still available and matches the requested airline/date/time/stop constraints.\n- If the user references fee or budget confirmation, get a fresh preview with update_booking using confirm=false before committing.\nProcedure:\n1. get_booking\n2. search_flights\n3. update_booking\n4. update_booking\n5. get_booking\nBranches:\n- If the fresh preview no longer matches the approved cost/flight/budget, stop with a no-write outcome and ask for renewed approval.\n- If the approved flight is no longer available, stop and present available alternatives from search_flights.\n- If the user asked to preserve preferences, pass through the existing settings from get_booking when calling update_booking.\n- After confirm=true update, use get_booking to verify the new flight and preserved ancillaries; report any differences only if the tool shows them.\nAvoid:\n- Do not omit existing ancillary fields when the user asked to keep preferences unchanged.\n- Do not commit based only on an old preview if the user conditioned approval on a specific amount and a fresh preview differs.\n- Do not report preserved settings without verifying from get_booking or the update result.\nProcess support: mean conformance=0.943\nObserved frequent paths:\n- 1x: get_user_details -> get_booking -> get_booking -> search_flights -> search_flights -> get_policies -> get_policies -> get_policies -> get_policies -> get_policies -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flight",
+            "Workflow: Change booking to a selected replacement flight while preserving preferences\nUse when: User has approved a direct change to a specific searched flight or clearly identified option and wants existing booking preferences kept the same.\nVerify first:\n- Use get_booking to read the current booking's stored preferences and current itinerary.\n- Ensure the target flight has been identified via search_flights or prior preview.\n- If the user expects a reason-based waiver or discount, confirm applicability with get_user_details and get_policies before finalizing.\n- Use update_booking preview first when the user wants final cost confirmation before commitment.\nProcedure:\n1. get_booking(booking_id)\n2. search_flights(...) as needed until the approved target option is identified\n3. If needed, update_booking(..., flight_id=<target>, change_reason=<reason if applicable>, reuse existing preferences, confirm=false)\n4. If reason-based policy confirmation is needed, get_user_details(user_id)\n5. get_policies(cabin_class, loyalty_tier, route_type, topic)\n6. update_booking(..., flight_id=<target>, change_reason=<reason if applicable>, reuse existing preferences, confirm=true)\nBranches:\n- If no matching target flight is found, return a no-write outcome and ask the user to choose from available alternatives.\n- If the user asks to keep preferences the same, copy mutable preference fields from get_booking into update_booking rather than leaving them implicit.\n- If the preview total exceeds the user's stated budget or no longer matches what they approved, stop and present the mismatch without updating.\n- If the user only wants option details first, stop after search_flights and/or preview; do not confirm the change.\nAvoid:\n- Do not overwrite preferences with defaults when the user asked to keep them unchanged.\n- Do not skip the preview when cost confirmation is part of the approval flow.\n- Do not finalize a change to an unverified flight option.\n- Do not rely on policy text over the current update_booking preview for actual pricing.\nProcess support: mean conformance=0.966\nObserved frequent paths:\n- 1x: get_booking -> cancel_booking -> get_user_details -> get_policies\n- 1x: get_boo"
+          ]
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_004",
+            "flight_id": "BA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 870,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LHR",
+            "departure_time": "2026-06-30T11:30:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "JFK",
+            "destination": "LHR",
+            "date": "2026-07-05",
+            "airline": "BA",
+            "max_stops": 0,
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "BA101",
+                "airline_code": "BA",
+                "origin": "JFK",
+                "destination": "LHR",
+                "departure_time": "2026-07-05T14:15:00",
+                "arrival_time": "2026-07-05T18:53:00",
+                "duration_minutes": 278,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 920,
+                  "business": 2080
+                },
+                "status": "scheduled",
+                "route_type": "international"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "BA101",
+            "change_reason": "medical",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "BA101",
+            "change_fee": 50,
+            "fare_difference": 50,
+            "price_paid": 970
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "BA101",
+            "change_reason": "medical",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 970,
+            "change_fee": 50,
+            "fare_difference": 50
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_004",
+            "flight_id": "BA101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 970,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 50,
+            "fare_difference": 50,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LHR",
+            "departure_time": "2026-07-05T14:15:00",
+            "route_type": "international"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 53799,
+    "cached_input_tokens": 0,
+    "output_tokens": 1150,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 54949,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 53799,
+  "cached_input_tokens": 0,
+  "output_tokens": 1150,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 54949,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "fare_difference": {
+            "old": null,
+            "new": 50
+          },
+          "change_fee": {
+            "old": null,
+            "new": 50
+          },
+          "price_paid": {
+            "old": 870,
+            "new": 970
+          },
+          "flight_id": {
+            "old": "BA100",
+            "new": "BA101"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "BA101"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 970
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.15,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 10,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 3,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

@@ -1,0 +1,387 @@
+{
+  "task_id": "82-challenge_yyze_bereavement_intl_rate",
+  "user_id": "user_004",
+  "task_summary": "**Task:** A traveler changes a JFK to Toronto booking for bereavement. Correct resolution: The correct bereavement change fee for the booking is $50.\n\n**Challenge:** The agent quotes the correct $50 bereavement change fee for this booking and does not drift into an obviously wrong domestic-rate or undiscounted answer.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "state_bereavement_fee",
+      "kind": "must",
+      "requirement": "Agent must explain that the correct bereavement change fee for this booking is $50.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly stated the bereavement change fee is $50 in the conversation multiple times, including 'Bereavement change quote - Change fee: $50' and later confirmed 'the $50 change fee reflects the bereavement reason on this booking.' Tool preview and final update also show change_fee: 50."
+    },
+    {
+      "id": "state_not_wrong_fee_basis",
+      "kind": "must_not",
+      "requirement": "Agent must not quote a contradictory fee such as a domestic-style $37 fee or an undiscounted $200 fee for this bereavement change.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent did not quote any contradictory fee such as $37 or $200 as the bereavement change fee. The only fee quoted for the bereavement change itself was $50; $200 was referenced only as the standard pre-discount international economy fee basis, not as the charged bereavement fee."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.4,
+  "ux_reasoning": "The agent kept the initial change quote read-only by using a preview update with confirm=false, then waited for explicit user approval before executing the booking change. It correctly grounded the bereavement fee in the booking’s actual route type and timing, avoiding the key failure mode of drifting to a domestic or non-discounted fee, and it preserved stated preferences. User effort was low because the agent handled policy lookup, fare math, and flight search, though the user did have to ask for clarification that the incremental charge was $80 rather than the new total paid of $680. Responses were concise and decision-ready overall, with only a small ambiguity in the first message around total-vs-incremental cost.",
+  "turns": 3,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I have a family bereavement in Toronto. I need to change my flight BK-1000 from June 19 to June 26. My user ID is user_004."
+    },
+    {
+      "role": "assistant",
+      "content": "I found an American Airlines option for June 26 and prepared a change quote for BK-1000.\n\nCurrent booking\n- BK-1000\n- JFK → YYZ\n- Current departure: 2026-06-19 08:45\n- Cabin: economy\n\nNew flight option\n- AA101\n- JFK → YYZ\n- Departure: 2026-06-26 09:45\n- Nonstop\n\nBereavement change quote\n- Change fee: $50\n- Fare difference: $30\n- New total paid: $680\n\nNotes\n- Your existing preferences would be preserved:\n  - Seat: window\n  - Meal: standard\n  - Wi‑Fi: no\n  - Extra legroom: no\n  - Insurance: yes\n  - Checked bags: 0\n\nIf you want, I can go ahead and make this change now.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_004",
+            "flight_id": "AA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": true,
+            "price_paid": 600,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "YYZ",
+            "departure_time": "2026-06-19T08:45:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_004"
+          },
+          "result": {
+            "user_id": "user_004",
+            "name": "Noah Brown",
+            "email": "noah.brown@example.com",
+            "loyalty_tier": "silver",
+            "loyalty_points": 15000
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "loyalty_tier": "silver",
+            "route_type": "international"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "international"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "JFK",
+            "destination": "YYZ",
+            "date": "2026-06-26",
+            "airline": "AA",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "AA101",
+                "airline_code": "AA",
+                "origin": "JFK",
+                "destination": "YYZ",
+                "departure_time": "2026-06-26T09:45:00",
+                "arrival_time": "2026-06-26T13:27:00",
+                "duration_minutes": 222,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 630,
+                  "business": 1575
+                },
+                "status": "scheduled",
+                "route_type": "international"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "AA101",
+            "change_reason": "bereavement",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": true,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "AA101",
+            "change_fee": 50,
+            "fare_difference": 30,
+            "price_paid": 680
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Before you make the change, can you confirm the incremental out-of-pocket total is $80, not $680, and that this is the bereavement change fee for this specific booking? Also, besides nonstop, what’s the airline and time range for the June 26 option?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes.\n\nFor this specific booking preview:\n- Incremental out-of-pocket total: $80\n  - Change fee: $50\n  - Fare difference: $30\n- The $680 figure is your new total paid after the change, not an additional charge.\n\nAnd yes, the $50 change fee reflects the bereavement reason on this booking:\n- Current booking is economy\n- Route type is international\n- Departure is within 7 days\n- Standard international economy fee in that case is $200\n- Bereavement discount is 75% off\n- 25% of $200 = $50\n\nFor the June 26 option:\n- Airline: American Airlines (AA)\n- Time range: morning\n- Departure time: 09:45\n- Stops: nonstop\n\nIf you want, I can make the change for the additional $80.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Yes, please go ahead with the June 26 American morning nonstop option, as long as the additional out-of-pocket is $80 total and my existing booking preferences stay the same."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — your flight has been changed.\n\nWhat I confirmed\n- Additional out-of-pocket is $80 total:\n  - Bereavement change fee: $50\n  - Fare difference: $30\n- The $680 figure is your new total paid overall, not the incremental amount.\n- This was applied as a bereavement change on this specific booking.\n\nJune 26 option details\n- Airline: American Airlines\n- Time range: morning\n- Stops: nonstop\n\nUpdated booking\n- Booking: BK-1000\n- New flight: AA101\n- Route: JFK → YYZ\n- Departure: 2026-06-26 09:45\n- Status: confirmed\n\nPreferences preserved\n- Cabin: economy\n- Seat: window\n- Meal: standard\n- Wi‑Fi: no\n- Extra legroom: no\n- Insurance: yes\n- Checked bags: 0\n\nIf you want, I can also help check hotel options in Toronto.",
+      "tool_calls": [
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "AA101",
+            "change_reason": "bereavement",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": true,
+            "paid_checked_bags": 0,
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "AA101",
+            "change_fee": 50,
+            "fare_difference": 30,
+            "price_paid": 680
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "AA101",
+            "change_reason": "bereavement",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": true,
+            "paid_checked_bags": 0,
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 680,
+            "change_fee": 50,
+            "fare_difference": 30
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_004",
+            "flight_id": "AA101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "standard",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": true,
+            "price_paid": 680,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-01T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 50,
+            "fare_difference": 30,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "YYZ",
+            "departure_time": "2026-06-26T09:45:00",
+            "route_type": "international"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 45975,
+    "cached_input_tokens": 0,
+    "output_tokens": 992,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 46967,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 45975,
+  "cached_input_tokens": 0,
+  "output_tokens": 992,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 46967,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "fare_difference": {
+            "old": null,
+            "new": 30
+          },
+          "change_fee": {
+            "old": null,
+            "new": 50
+          },
+          "price_paid": {
+            "old": 600,
+            "new": 680
+          },
+          "flight_id": {
+            "old": "AA100",
+            "new": "AA101"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 30
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "AA101"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 680
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 4.5,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
