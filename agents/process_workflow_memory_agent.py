@@ -10,9 +10,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from state_bench.agents.base import AgentTurnResponse
-
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
+from state_bench.agents.base import AgentTurnResponse
 
 WRITE_TOOL_NAMES = {
     "create_booking",
@@ -186,10 +185,6 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         memory_prompt = (
             "Process-conformant workflow memory follows. Treat it as procedural guidance, not current-task facts. "
             "Verify identifiers, state, prices, eligibility, and policy with current domain tools. "
-            "The live tool schemas are authoritative for argument names; never copy an argument signature from "
-            "workflow prose when it conflicts with the provided schema. An explicit imperative request or an "
-            "affirmative answer to a confirmation question already counts as approval; do not ask for redundant "
-            "confirmation unless a material choice remains ambiguous. "
             "Before any state-changing call, gather required facts and obtain explicit user approval when the "
             "workflow requires a preview or choice. A valid branch may require no state change.\n\n"
             + "\n\n---\n\n".join(learnings)
@@ -352,9 +347,6 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         return "\n".join(lines)
 
     def _policy_payload(self) -> list[dict[str, Any]]:
-        def compact(values: Any, limit: int = 5) -> list[str]:
-            return [str(value)[:360] for value in list(values or [])[:limit]]
-
         payload = [
             {
                 "workflow": "runtime:tool_grounding",
@@ -366,9 +358,7 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
                 "avoid": [
                     (
                         "When a tool reports an error or failure reason, repeat only the observed reason. "
-                        "Do not add possible, likely, or usual causes that the tool did not report. "
-                        "Do not enumerate hypothetical causes even inside an uncertainty disclaimer such as "
-                        "'I cannot tell whether X or Y'; say only that no further reason is available."
+                        "Do not add possible, likely, or usual causes that the tool did not report."
                     )
                 ],
                 "mandatory_disclosures": [],
@@ -381,20 +371,20 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             }
         ]
         for card in self._active_cards:
-            fields = {key: compact(card.get(key, [])) for key in POLICY_FIELDS}
+            fields = {key: list(map(str, card.get(key, []))) for key in POLICY_FIELDS}
             runtime_rules = [
                 rule for rule in card.get("runtime_rules", []) if isinstance(rule, dict)
-            ][:6]
+            ]
             if any(fields.values()) or runtime_rules:
                 payload.append(
                     {
                         "workflow": card.get("id", card.get("family", "")),
                         "applies_when": card.get("applies_when", card.get("search_text", ""))[:700],
                         "support": card.get("support", 0),
-                        "preconditions": compact(card.get("preconditions", [])),
-                        "steps": compact(card.get("steps", []), limit=6),
-                        "branches": compact(card.get("branches", [])),
-                        "avoid": compact(card.get("avoid", [])),
+                        "preconditions": list(map(str, card.get("preconditions", []))),
+                        "steps": list(map(str, card.get("steps", []))),
+                        "branches": list(map(str, card.get("branches", []))),
+                        "avoid": list(map(str, card.get("avoid", []))),
                         **fields,
                         "runtime_rules": runtime_rules,
                     }
@@ -411,163 +401,12 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
                 events.append((index, str(call.get("name", "")), call.get("arguments", {})))
         return events
 
-    @staticmethod
-    def _unsupported_error_speculation(
-        response: AgentTurnResponse, conversation: list[dict[str, Any]]
-    ) -> bool:
-        failed_entities: set[str] = set()
-        has_failure = False
-        for item in conversation:
-            if item.get("role") != "assistant":
-                continue
-            for call in item.get("tool_calls") or []:
-                result_text = json.dumps(
-                    call.get("result"), ensure_ascii=True, default=str
-                ).lower()
-                if not any(
-                    marker in result_text
-                    for marker in ('"valid": false', '"error"', "failed", "not found")
-                ):
-                    continue
-                has_failure = True
-                for value in (call.get("arguments") or {}).values():
-                    if isinstance(value, str) and len(value.strip()) >= 3:
-                        failed_entities.add(value.strip().lower())
-        if not has_failure or not response.text:
-            return False
-
-        speculation = re.compile(
-            r"\b(could|likely|like|maybe|might|perhaps|possibly|usually|whether|versus|vs)\b"
-            r"|\b(such as|for example|e\.g\.)\b",
-            flags=re.IGNORECASE,
-        )
-        failure_terms = ("error", "fail", "not found", "reason", "validator")
-        for sentence in re.split(r"(?<=[.!?])\s+|\n+", response.text.lower()):
-            if not speculation.search(sentence):
-                continue
-            if any(entity in sentence for entity in failed_entities) or any(
-                term in sentence for term in failure_terms
-            ):
-                return True
-        return False
-
-    @staticmethod
-    def _has_explicit_write_authorization(conversation: list[dict[str, Any]]) -> bool:
-        latest_user = next(
-            (
-                str(item.get("content", "")).lower()
-                for item in reversed(conversation)
-                if item.get("role") == "user" and "[task_done]" not in str(item.get("content", "")).lower()
-            ),
-            "",
-        )
-        if not latest_user or re.search(
-            r"\b(do not|don't|dont|not yet|wait|hold on|stop|just asking)\b", latest_user
-        ):
-            return False
-        if re.search(r"\b(yes|confirm|confirmed|go ahead|proceed|do it|please try again)\b", latest_user):
-            return True
-        return bool(
-            re.search(
-                r"\b(please\s+)?(add|apply|book|cancel|change|create|delete|increase|"
-                r"move|purchase|redeem|reduce|remove|replace|return|set|update)\b",
-                latest_user,
-            )
-        )
-
-    @staticmethod
-    def _schema_feedback(
-        response: AgentTurnResponse, tools: list[dict[str, Any]]
-    ) -> str | None:
-        schemas: dict[str, dict[str, Any]] = {}
-        for tool in tools:
-            function = tool.get("function", {}) if isinstance(tool, dict) else {}
-            name = str(tool.get("name") or function.get("name", ""))
-            parameters = tool.get("parameters") or function.get("parameters") or {}
-            if name:
-                schemas[name] = parameters
-
-        for name, arguments in ProcessWorkflowMemoryAgent._tool_calls(response):
-            schema = schemas.get(name)
-            if not schema:
-                continue
-            properties = set((schema.get("properties") or {}).keys())
-            required = set(map(str, schema.get("required") or []))
-            supplied = set(arguments)
-            missing = sorted(required - supplied)
-            unexpected = sorted(supplied - properties) if properties else []
-            if missing or (unexpected and schema.get("additionalProperties") is False):
-                parts = []
-                if missing:
-                    parts.append(f"missing required arguments: {', '.join(missing)}")
-                if unexpected and schema.get("additionalProperties") is False:
-                    parts.append(f"unsupported arguments: {', '.join(unexpected)}")
-                return (
-                    f"The proposed {name} call does not match the live tool schema ({'; '.join(parts)}). "
-                    "Regenerate the call using only the authoritative live schema."
-                )
-        return None
-
-    @staticmethod
-    def _compatibility_evidence_feedback(
-        response: AgentTurnResponse,
-        conversation: list[dict[str, Any]],
-        phase: str,
-    ) -> str | None:
-        if phase != "pre_final":
-            return None
-        product_compatibility: dict[str, list[str]] = {}
-        unknown_checks: list[str] = []
-        for item in conversation:
-            if item.get("role") != "assistant":
-                continue
-            for call in item.get("tool_calls") or []:
-                name = str(call.get("name", ""))
-                arguments = call.get("arguments") or {}
-                product_id = str(arguments.get("product_id", ""))
-                if name == "get_product_details" and product_id:
-                    result = call.get("result") or {}
-                    compatible_with = result.get("compatible_with", []) if isinstance(result, dict) else []
-                    product_compatibility[product_id] = [str(value) for value in compatible_with]
-                if name != "check_compatibility" or not product_id:
-                    continue
-                result = call.get("result")
-                result_text = json.dumps(result, ensure_ascii=True, default=str).lower()
-                if "unknown device" in result_text or "not recognized" in result_text:
-                    unknown_checks.append(product_id)
-        missing = [product_id for product_id in unknown_checks if product_id not in product_compatibility]
-        if not missing:
-            candidate = (response.text or "").lower()
-            for product_id in unknown_checks:
-                supported = product_compatibility.get(product_id, [])
-                if not supported:
-                    continue
-                cites_product_list = (
-                    ("compatible_with" in candidate or "compatible with" in candidate)
-                    and ("not listed" in candidate or "does not include" in candidate)
-                )
-                if not cites_product_list:
-                    return (
-                        f"Do not base the conclusion only on the unknown-device checker error. Use the "
-                        f"get_product_details evidence for {product_id}: compatible_with is "
-                        f"{json.dumps(supported, ensure_ascii=True)}. Explicitly state that the requested "
-                        "device is not listed there and therefore the actual product is incompatible based "
-                        "on the product catalog."
-                    )
-            return None
-        return (
-            "The compatibility checker returned an unknown/unrecognized device rather than product-level "
-            f"compatibility evidence. Call get_product_details for {missing[-1]} and inspect its "
-            "compatible_with field before making the final compatibility conclusion."
-        )
-
     def _deterministic_feedback(
         self,
         *,
         phase: str,
         response: AgentTurnResponse,
         conversation: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
     ) -> str | None:
         calls = self._tool_calls(response)
         events = self._seen_tool_events(conversation)
@@ -576,29 +415,6 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             default=-1,
         )
         recent_events = [event for event in events if event[0] > last_user_index]
-        last_write_index = max(
-            (index for index, name, _ in events if name in WRITE_TOOL_NAMES),
-            default=-1,
-        )
-        state_events = [event for event in events if event[0] > last_write_index]
-
-        schema_feedback = self._schema_feedback(response, tools)
-        if schema_feedback:
-            return schema_feedback
-
-        compatibility_feedback = self._compatibility_evidence_feedback(
-            response, conversation, phase
-        )
-        if compatibility_feedback:
-            return compatibility_feedback
-
-        if phase == "pre_final" and self._unsupported_error_speculation(
-            response, conversation
-        ):
-            return (
-                "State only the exact observed tool failure reason. Do not enumerate or "
-                "suggest unobserved possible causes, even inside an uncertainty disclaimer."
-            )
 
         for name, arguments in calls:
             if name not in WRITE_TOOL_NAMES:
@@ -617,7 +433,7 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         if int(card.get("support", 0)) < 3 or float(card.get("mean_fitness", 0.0)) < 0.8:
             return None
         rules = [rule for rule in card.get("runtime_rules", []) if isinstance(rule, dict)]
-        seen_names = [name for _, name, _ in state_events]
+        seen_names = [name for _, name, _ in recent_events]
         candidate_names = {name for name, _ in calls}
         for rule in rules:
             rule_phase = rule.get("phase")
@@ -634,11 +450,15 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
                 missing = ", ".join(sorted(required - set(seen_names)))
                 return str(rule.get("feedback") or f"Call the required read tools first: {missing}.")
             if phase == "pre_final" and rule.get("kind") == "refresh" and required:
-                write_positions = [index for index, name, _ in events if name in WRITE_TOOL_NAMES]
+                write_positions = [
+                    index for index, name, _ in recent_events if name in WRITE_TOOL_NAMES
+                ]
                 if not write_positions:
                     continue
                 after_write = {
-                    name for index, name, _ in events if index > max(write_positions)
+                    name
+                    for index, name, _ in recent_events
+                    if index > max(write_positions)
                 }
                 if required - after_write:
                     missing = ", ".join(sorted(required - after_write))
@@ -697,7 +517,6 @@ Use revise only for a clear violation supported by the supplied policy and trace
                 system_prompt="You are a conservative runtime process verifier. Return JSON only.",
                 conversation=[{"role": "user", "content": prompt}],
                 tools=[],
-                max_tokens=500,
             )
         except Exception:  # noqa: BLE001 - auxiliary verifier failures must not abort the benchmark
             return True, ""
@@ -707,7 +526,7 @@ Use revise only for a clear violation supported by the supplied policy and trace
             output_tokens=getattr(usage, "completion_tokens", None),
             category="other_llm",
         )
-        match = re.search(r"\{.*\}", str(getattr(result, "text", "")), flags=re.DOTALL)
+        match = re.search(r"\{.*\}", str(getattr(result, "text", "")), flags=re.S)
         if not match:
             return True, ""
         try:
@@ -727,19 +546,6 @@ Use revise only for a clear violation supported by the supplied policy and trace
         feedback = str(verdict.get("feedback", "")).strip()
         if not feedback:
             feedback = "; ".join(map(str, verdict.get("violations", [])))
-        issues = [str(value) for value in verdict.get("violations", []) if str(value).strip()]
-        if feedback and feedback not in issues:
-            issues.append(feedback)
-        confirmation_terms = re.compile(
-            r"\b(confirm|confirmation|approval|approve|authorization|authorize|consent|permission)\b",
-            flags=re.IGNORECASE,
-        )
-        if (
-            issues
-            and all(confirmation_terms.search(issue) for issue in issues)
-            and self._has_explicit_write_authorization(conversation)
-        ):
-            return True, ""
         return False, feedback or "Revise the step to satisfy the applicable workflow policy."
 
     def generate_next_turn(
@@ -771,7 +577,6 @@ Use revise only for a clear violation supported by the supplied policy and trace
                 phase=phase,
                 response=response,
                 conversation=conversation,
-                tools=tools,
             )
             allowed = feedback is None
             if allowed:

@@ -1,0 +1,264 @@
+{
+  "task_id": "107-hard_variant_jacket_size_quantity_scope",
+  "user_id": "shop_001",
+  "task_summary": "**Task:** Customer shop_001 opens with: \"I need two Summit Rain Jackets in Large Green. If fewer than two are in stock, do not add a partial quantity; just tell me the exact stock situation.\" Relevant catalog/policy surface: Summit Rain Jacket (SP-H126). Final cart/account state should remain unchanged.\n\n**Challenge:** Variant quantity sufficiency must be checked at variant level, with no silent partial add. Primary pitfall: Adds one silently, checks only product-level stock, or suggests a different size without saying the exact stock issue. Correct behavior: Explain only one Large Green jacket is available and leave cart unchanged. Novelty: Variant stock sufficiency, not out-of-stock alternative. Family: compatibility_variant.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "checked_large_green_quantity",
+      "kind": "must",
+      "requirement": "Agent checked exact Large Green variant quantity and stated fewer than two are available.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Agent checked the specific Large Green variant via get_variants/get_product_details, which showed stock_quantity 1 for Large Green, and told the user 'Large Green ... has exactly 1 unit in stock' and that fewer than 2 were available."
+    },
+    {
+      "id": "no_partial_jacket_add",
+      "kind": "must_not",
+      "requirement": "Agent did not add one jacket or another variant as a partial substitute.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no add_to_cart or other cart mutation tool calls, and the assistant explicitly said it did not add anything to the cart. No partial quantity or substitute variant was added."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.7,
+  "ux_reasoning": "The agent respected the user’s explicit boundary not to add a partial quantity and made no cart changes, then clearly stated the exact variant-level stock and that the cart was left unchanged. The final user-visible response was concise and directly answered the request with the needed detail. There was some hidden inefficiency in the repeated failed product searches with overly restrictive filters before finding the product, but this did not spill into the conversation or force the user to re-steer. Overall, the interaction cleanly satisfied the task with strong control and crisp communication.",
+  "turns": 1,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need two Summit Rain Jackets in Large Green. If fewer than two are in stock, do not add a partial quantity; just tell me the exact stock situation."
+    },
+    {
+      "role": "assistant",
+      "content": "Large Green for the Summit Rain Jacket has exactly 1 unit in stock.\n\nSince you asked for 2 and do not want a partial quantity, I did not add anything to your cart.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Check stock for a specific variant before adding, avoid partial add, require explicit quantity/variant verification and report exact stock if insufficient"
+          },
+          "result": [
+            "Workflow: Checkout-readiness or quantity-limit audit with policy-based constraints\nUse when: User asks whether the current cart can proceed unchanged, asks to finalize while leaving it as is, or asks what a real quantity cap allows without workarounds.\nVerify first:\n- For checkout-readiness, read get_cart first to identify items under review.\n- For each cart item whose stock status matters, read get_product_details before confirming readiness; get_cart is insufficient for in_stock.\n- If an out-of-stock item is found, read get_policies(topic=<backorder or relevant fulfillment topic>) before proposing options when such a policy exists.\n- For quantity-cap questions, identify the product with search_products and read get_policies(topic=quantity_limit).\nProcedure:\n1. XOR: get_cart(customer_id=<customer>) OR search_products(query=<product keywords>)\n2. If auditing a cart item: get_product_details(product_id=<each relevant cart product>)\n3. If policy-constrained checkout issue is found: get_policies(topic=<relevant topic>)\n4. If quantity-limit request: get_policies(topic=quantity_limit)\nBranches:\n- If a cart item is out of stock, explicitly name that product and say it is out of stock; do not claim checkout is ready.\n- If backorder is available per get_product_details and a policy supplies required terms, disclose the backorder terms before asking what the user wants to do.\n- If the user later chooses removal, then and only then remove_from_cart; otherwise leave the cart unchanged.\n- If the user asks only for the cap, state the exact limit and that no exceptions/workarounds apply when policy says so; no write tools.\n- If the user forbids workarounds, do not suggest split orders, VIP overrides, other accounts, or mixed-model substitutions.\nAvoid:\n- Do not confirm checkout readiness from stale cart contents without item-level stock checks.\n- Do not silently leave an out-of-stock item in a 'ready to checkout' summary without disclosure.\n- Do not remove an out-of-stock item unless the user explicitly chooses removal.\n- Do not suggest policy-bypassing workarounds for quantity limits.\n- Do not use set_shipping_option or redeem_loyalty_points in these audits unless the user e",
+            "Workflow: History-aware add to cart for a known product\nUse when: User asks to add a specific product to cart and the product identity can be resolved from catalog search, especially when prior ownership or purchase history could materially affect whether adding a duplicate is appropriate.\nVerify first:\n- Resolve the requested product with search_products.\n- Check customer account or purchase history with get_customer_account before any cart mutation when duplicate ownership matters.\n- Inspect product options with get_variants to determine whether a variant_id is required.\nProcedure:\n1. search_products(query=<requested product>, ...filters from user if any)\n2. get_customer_account(customer_id=<current customer>)\n3. get_variants(product_id=<resolved product_id>)\n4. add_to_cart(customer_id=<current customer>, product_id=<resolved product_id>, variant_id=<selected variant or null>, quantity=<confirmed or default 1>, gift_wrap=<user preference>)\nBranches:\n- If search_products does not return a clear single match, do not write; ask the user to choose among matches.\n- If get_customer_account shows the customer already purchased or owns the same product, disclose that fact and obtain explicit confirmation before any add_to_cart.\n- If the user does not confirm after duplicate ownership is disclosed, do not write to the cart.\n- If get_variants reports no variants, use variant_id=null.\n- If get_variants returns required options, do not write until the user selects the needed variant.\n- If the user specified gift wrap preferences, pass them through exactly; otherwise do not assume unsupported options.\nAvoid:\n- Adding the item immediately based only on the initial request when prior purchase history may make it a duplicate.\n- Treating a gifting statement or mention of spouse as confirmation to duplicate an already-owned product.\n- Skipping get_variants and guessing a variant_id.\n- Using concrete product IDs, prices, or cart item IDs as reusable rules.\nMandatory disclosures before writes:\n- If account history shows the same product was already purchased or owned, tell the customer before any cart write.\nConfirmation gates:\n- Require explicit user confirmation before add_to_c",
+            "Workflow: Advise on cart quantity cap and stock without changing cart\nUse when: User asks to check current quantity, stock, limit/cap, or whether they can increase an item already in the cart, and does not explicitly confirm a new final quantity.\nVerify first:\n- Read the current cart to identify the relevant cart item, current quantity, and product_id.\n- Read product details to verify current stock/in_stock status.\n- Read policies for quantity limits when the user asks about caps/limits or when any quantity advice depends on cart limits.\n- Read variants only if variant requirements could affect a future quantity change or to confirm there are no variants.\nProcedure:\n1. get_cart(customer_id)\n2. get_product_details(product_id)\n3. get_policies(topic=quantity_limit)\n4. get_variants(product_id)\nBranches:\n- If the item is not in the cart, report that current cart quantity is 0 and avoid proposing a write unless the user asks to add it.\n- If stock is low or unavailable, explain the stock status and do not imply availability beyond reported stock/backorder details.\n- If policy defines a per-cart cap, explain the cap and compare it against current cart quantity.\n- If variants exist, explain that the exact variant may matter for any future update; if no variants exist, state that no variant selection is needed.\n- If the user has not explicitly confirmed a new final quantity, end with a no-write status update only.\nAvoid:\n- Do not add to cart or update quantity while merely checking cap/stock.\n- Do not ask for confirmation after already making a change.\n- Do not rely on old cart state without re-reading the cart first.\n- Do not invent quantity limits beyond what get_policies returns.\nMandatory disclosures before writes:\n- Current cart quantity for the item.\n- Current stock or availability from product details.\n- Applicable quantity-cap policy when advising on possible increases.\n- Whether a variant is required for future updates, if relevant.\nConfirmation gates:\n- Any add_to_cart or update_cart_item action requires explicit user confirmation of the desired final quantity.\nRefresh after mutation:\nForbidden actions:\n- Changing cart quantity before explicit confirmation.\n- Sk"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Summit Rain Jacket",
+            "category": "clothing",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Summit Rain Jacket",
+            "category": "clothing",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Summit jacket green",
+            "category": "clothing",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "rain jacket",
+            "category": "clothing",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [],
+            "total_found": 0,
+            "note": "No products match the hard filters (category / price / rating / stock). Try relaxing them and search again."
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Summit Rain Jacket",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H126",
+                "name": "Summit Rain Jacket",
+                "brand": "TrailPack",
+                "category": "outdoor",
+                "subcategory": "jacket",
+                "price": 139,
+                "rating": 4.4,
+                "review_count": 450,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-H126"
+          },
+          "result": {
+            "product_id": "SP-H126",
+            "product_name": "Summit Rain Jacket",
+            "base_price": 139,
+            "variants": [
+              {
+                "variant_id": "m_green",
+                "label": "Medium Green",
+                "effective_price": 139,
+                "in_stock": true,
+                "stock_quantity": 3
+              },
+              {
+                "variant_id": "l_green",
+                "label": "Large Green",
+                "effective_price": 139,
+                "in_stock": true,
+                "stock_quantity": 1
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H126"
+          },
+          "result": {
+            "product_id": "SP-H126",
+            "name": "Summit Rain Jacket",
+            "category": "outdoor",
+            "subcategory": "jacket",
+            "brand": "TrailPack",
+            "price": 139,
+            "rating": 4.4,
+            "review_count": 450,
+            "description": "Summit Rain Jacket from TrailPack.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": [
+              {
+                "variant_id": "m_green",
+                "label": "Medium Green",
+                "price_delta": 0,
+                "in_stock": true,
+                "stock_quantity": 3
+              },
+              {
+                "variant_id": "l_green",
+                "label": "Large Green",
+                "price_delta": 0,
+                "in_stock": true,
+                "stock_quantity": 1
+              }
+            ],
+            "shipping_estimate": "3 business days (standard)"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for checking. Since there’s only 1 in Large Green, please leave the cart unchanged. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 44922,
+    "cached_input_tokens": 0,
+    "output_tokens": 353,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 45275,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 44922,
+  "cached_input_tokens": 0,
+  "output_tokens": 353,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 45275,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 5,
+  "ux_base_score": 4.7,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

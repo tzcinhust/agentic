@@ -1,0 +1,190 @@
+{
+  "task_id": "88-multiline_cart_readback_accuracy",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A Standard-tier returning customer (shop_004, Taylor Kim) has a complex seeded cart: SlimBook Air 13 ($849 × 1), SoundMax Headphones ($149 × 1, gift-wrapped), PixelShot Webcam ($79 × 2 = $158). Gift-wrap fee $5, SAVE50 applied for $50 off. Subtotal $1,156, total $1,111. Customer asks for an item-by-item readback including gift wrap and discount. Agent must accurately enumerate every line AND surface the fee / discount / subtotal / total. Read-only turn; no mutations. Final state: cart unchanged.\n\n**Challenge:** Readback completeness and accuracy on a dense cart. Failure modes: skipping an item (3-line readback becomes 2), omitting the gift-wrap fee, omitting the promo discount, misquoting subtotal or total, or silently mutating (re-applying the promo, auto-adding shipping, etc.). Tests whether the agent can faithfully serialize a complex cart state back to the customer without losing information.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "listed_all_three_items",
+      "kind": "must",
+      "requirement": "Agent listed all three cart lines with correct quantities: the SlimBook laptop (qty 1), the SoundMax headphones line (qty 1), and the PixelShot webcam line (qty 2). Judge on item identity and quantity, not exact name strings; accept the catalog names returned by get_cart (e.g. 'SoundMax Wireless Headphones', 'PixelShot Webcam 1080p'). Missing any of the three lines, or a wrong quantity, fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant listed all three cart lines with correct quantities: SlimBook Air 13 qty 1, SoundMax Wireless Headphones qty 1, and PixelShot Webcam 1080p qty 2."
+    },
+    {
+      "id": "surfaced_gift_wrap_fee",
+      "kind": "must",
+      "requirement": "Agent mentioned the gift-wrapped headphones and the $5 gift-wrap fee. Missing the wrap status or the $5 fee fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly marked the headphones as gift wrapped ('Gift wrap: Yes') and separately included 'Gift wrap fee: $5'."
+    },
+    {
+      "id": "surfaced_promo_discount",
+      "kind": "must",
+      "requirement": "Agent mentioned SAVE50 and the $50 discount. Missing either fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly mentioned 'Promo code: SAVE50' and 'Promo discount: -$50'."
+    },
+    {
+      "id": "correct_totals",
+      "kind": "must",
+      "requirement": "Agent quoted subtotal $1,156 AND total $1,111. Either missing or wrong fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant quoted both required amounts correctly: 'Subtotal: $1,156' and final total '$1,111'."
+    },
+    {
+      "id": "no_cart_mutation",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call add_to_cart, update_cart_item, remove_from_cart, apply_promo, or cancel_promo. This is a pure readback; any mutation violates the customer's explicit 'just verifying' intent.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "The only tool call was get_cart. There were no add_to_cart, update_cart_item, remove_from_cart, apply_promo, or cancel_promo calls."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points calls; only get_cart was used."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent performed only a read-only cart lookup and made no mutations, which fully respected the user's request and kept state changes legible by summarizing the cart clearly. It accurately enumerated all three items, including quantities, unit prices, gift-wrap status, line totals, the gift-wrap fee, promo code and discount, subtotal, and final total. The interaction was one-turn efficient with no need for user correction or re-steering. The response was well-structured and concise while still complete enough for the user to verify the math.",
+  "turns": 1,
+  "tool_calls": 1,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hey — can you read back my cart for me, item by item? Include the gift wrap and the promo discount so I can double-check the math."
+    },
+    {
+      "role": "assistant",
+      "content": "Here’s your cart, item by item:\n\n- SlimBook Air 13\n  - Qty: 1\n  - Unit price: $849\n  - Gift wrap: No\n  - Line total: $849\n\n- SoundMax Wireless Headphones\n  - Qty: 1\n  - Unit price: $149\n  - Gift wrap: Yes\n  - Item total: $149\n\n- PixelShot Webcam 1080p\n  - Qty: 2\n  - Unit price: $79\n  - Gift wrap: No\n  - Line total: $158\n\nMath summary:\n- Subtotal: $1,156\n- Promo code: SAVE50\n- Promo discount: -$50\n- Gift wrap fee: $5\n- Shipping: $0\n- Loyalty discount: $0\n\nFinal total:\n- $1,111\n\nCheck:\n- $1,156\n- minus $50 promo\n- plus $5 gift wrap\n- equals $1,111\n\nIf you want, I can also break the $50 discount down proportionally across items for a “per-item effective total” view.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-A1",
+                "product_id": "SP-1001",
+                "product_name": "SlimBook Air 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 849,
+                "line_total": 849
+              },
+              {
+                "cart_item_id": "CI-A2",
+                "product_id": "SP-2003",
+                "product_name": "SoundMax Wireless Headphones",
+                "quantity": 1,
+                "gift_wrap": true,
+                "unit_price": 149,
+                "line_total": 149
+              },
+              {
+                "cart_item_id": "CI-A3",
+                "product_id": "SP-2005",
+                "product_name": "PixelShot Webcam 1080p",
+                "quantity": 2,
+                "gift_wrap": false,
+                "unit_price": 79,
+                "line_total": 158
+              }
+            ],
+            "subtotal": 1156,
+            "discount_amount": 50,
+            "gift_wrap_fee": 5,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 1111,
+            "applied_promo_codes": [
+              "SAVE50"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That looks right — thanks for the clear readback. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 10728,
+    "cached_input_tokens": 0,
+    "output_tokens": 329,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 11057,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 10728,
+  "cached_input_tokens": 0,
+  "output_tokens": 329,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 11057,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 1,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

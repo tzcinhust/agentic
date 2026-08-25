@@ -8,6 +8,17 @@ and final responses before they are returned to the benchmark harness.
 
 ## Status
 
+This branch is an archive of the best development snapshot that produced the
+11/20 result. It is intentionally separate from later Shopping fixes. The
+runtime agent and client were behaviorally reconstructed from the Python 3.10
+bytecode left by that run; the bytecode evidence is stored under
+`artifacts/statebench_best_055/evidence/`.
+
+For the closest faithful replay of the archived run, use the prebuilt memory artifact at
+`artifacts/statebench_best_055/memory/process_workflows.json`. Do not rebuild
+it with the current workflow builder and call the result the archived run:
+the builder was changed after the run. Remote model output may still vary.
+
 The current code targets STATE-Bench 0.8.1 and was compatibility-checked against
 upstream commit `5644b1838d96bc4483da29642d058ecaa6f80f7f`.
 
@@ -21,8 +32,12 @@ official held-out test result or a leaderboard claim.
 | Executable verifier, run 1 | 11/20 | 19/20 | 11/20 | 4.242 |
 
 The 20-task split was subsequently used for error analysis, so it must now be
-treated as a development set. The latest fixes and deterministic rule compiler
-have unit coverage but still require a fresh end-to-end benchmark run.
+treated as a development set. This archive intentionally excludes fixes made
+after the run; those changes require a fresh end-to-end benchmark evaluation.
+
+The archived logs and all 20 trajectories are under
+`artifacts/statebench_best_055/`. The score is a one-run local analysis only;
+the protocol warning says that five runs are required for a compliant result.
 
 ## Method
 
@@ -37,9 +52,9 @@ have unit coverage but still require a fresh end-to-end benchmark run.
    `refresh`, and `forbid` runtime rules.
 6. Retrieve up to three diverse cards with lexical, character, process-support,
    and intent-specific scoring.
-7. Check live tool schemas, deterministic invariants, and semantic workflow
-   compliance before writes and final responses. Rejected candidates receive
-   concrete feedback and are regenerated up to a configured limit.
+7. Check deterministic invariants and semantic workflow compliance before
+   writes and final responses. Rejected candidates receive concrete feedback
+   and are regenerated up to a configured limit.
 
 The agent does not read `runtime_context.task_summary`, hidden test
 requirements, or test environment state during retrieval.
@@ -66,8 +81,8 @@ export WORKFLOW_LLM_MODEL="your-model"
 export STATE_BENCH_AGENT_BASE_URL="https://your-openai-compatible-endpoint/v1"
 export STATE_BENCH_AGENT_API_KEY="..."
 export STATE_BENCH_AGENT_MODEL="your-model"
-export STATE_BENCH_AGENT_TIMEOUT_SECONDS=300
-export STATE_BENCH_AGENT_MAX_RETRIES=2
+export STATE_BENCH_AGENT_TIMEOUT_SECONDS=120
+export STATE_BENCH_AGENT_MAX_RETRIES=6
 ```
 
 Simulator and judge credentials must be configured according to STATE-Bench's
@@ -133,3 +148,7 @@ uv run pytest \
   tests/test_process_workflow_memory.py \
   tests/test_opencode_client.py -q
 ```
+
+The runnable values for the archived `.55` snapshot are also listed in
+`configs/statebench_best_055.env.example`. Provider URL and API key are left
+blank by design.

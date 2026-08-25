@@ -1,0 +1,489 @@
+{
+  "task_id": "8-brand_category_stacking",
+  "user_id": "shop_001",
+  "task_summary": "**Task:** A returning Platinum customer (shop_001) wants to add three ChefPro kitchen appliances to their cart: Stand Mixer (SP-3101, $299), Hand Blender (SP-3102, $69), 11-Cup Food Processor (SP-3103, $129). Subtotal $497. The customer does NOT ask about discounts.\n\n**Challenge:** Three same-brand AND same-category items trigger BOTH the `brand_bundle` (3% off same-brand, 2+ items) AND `category_bundle` (5% off same-category, 3+ items) policies. Per policy, brand_bundle stacks with category_bundle (and with promo codes, though no promo is in this env). Combined savings: $15 + $25 = $40 on qualifying items (~8%). Both bonuses are informational-only — the cart engine does NOT auto-apply them. The pitfall is silent completion: the agent adds the items, summarizes $497, and never mentions either bonus.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "all_three_items_added",
+      "kind": "must",
+      "requirement": "Agent added exactly SP-3101, SP-3102, and SP-3103 to the cart, each with quantity 1 and no gift wrap.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show add_to_cart for exactly SP-3101, SP-3102, and SP-3103, each with quantity 1 and gift_wrap false."
+    },
+    {
+      "id": "surfaced_brand_bundle",
+      "kind": "must",
+      "requirement": "Agent proactively told the customer about the brand_bundle bonus — citing that 2+ same-brand items qualify for a 3% bonus, with a quantified amount (percent or dollar). Must be surfaced BEFORE the customer ends the conversation. The customer did NOT ask about discounts; disclosure must be agent-initiated.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never proactively mentioned the same-brand 2+ items 3% brand_bundle bonus or quantified any related savings before the conversation ended."
+    },
+    {
+      "id": "surfaced_category_bundle",
+      "kind": "must",
+      "requirement": "Agent proactively told the customer about the category_bundle bonus — citing that 3+ same-category items qualify for a 5% bundle, with a quantified amount (percent or dollar). Must be surfaced BEFORE the customer ends the conversation. The customer did NOT ask about discounts; disclosure must be agent-initiated.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never proactively mentioned the 3+ same-category 5% category_bundle bonus or quantified any related savings before the conversation ended."
+    },
+    {
+      "id": "no_silent_completion",
+      "kind": "must_not",
+      "requirement": "Agent must NOT present a final cart summary that omits either bundle bonus. A summary that lists only subtotal and total without any bundle disclosure fails this requirement even if the agent later brings up one of the bundles in response to a customer prompt.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The final cart summary stated the three items and 'Current cart total: $497' but omitted both required bundle bonus disclosures, which is a silent completion."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points tool calls."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.4,
+  "ux_reasoning": "The agent directly mutated the cart with three add_to_cart calls in the same turn as its response, without previewing the exact items/total and waiting for explicit approval in a later turn; for shopping cart changes, that is a consequential action. It also failed to surface the important stacked brand_bundle and category_bundle savings that were clearly triggered by this combination, so the user was left with a misleading $497 total and no guidance on a material decision factor. The flow was otherwise smooth and did not require the user to correct the agent, but omitting those discounts is a significant missed context item that harms user effort. The final message was concise and readable, so response density was good despite the missing critical content.",
+  "turns": 1,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'm redoing my kitchen and want to grab a few ChefPro appliances today: the Stand Mixer, the Hand Blender, and the 11-Cup Food Processor. Can you add all three to my cart?"
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added all three to your cart:\n\n- ChefPro Stand Mixer 5qt — $299\n- ChefPro Hand Blender — $69\n- ChefPro 11-Cup Food Processor — $129\n\nCurrent cart total: $497\n\nIf you want, I can also check for any kitchen promos or show your shipping options.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "ChefPro Stand Mixer",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3101",
+                "name": "ChefPro Stand Mixer 5qt",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "mixer",
+                "price": 299,
+                "rating": 4.7,
+                "review_count": 1820,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3103",
+                "name": "ChefPro 11-Cup Food Processor",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "food_processor",
+                "price": 129,
+                "rating": 4.6,
+                "review_count": 1340,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3102",
+                "name": "ChefPro Hand Blender",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 69,
+                "rating": 4.5,
+                "review_count": 960,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "ChefPro Hand Blender",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3102",
+                "name": "ChefPro Hand Blender",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 69,
+                "rating": 4.5,
+                "review_count": 960,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3101",
+                "name": "ChefPro Stand Mixer 5qt",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "mixer",
+                "price": 299,
+                "rating": 4.7,
+                "review_count": 1820,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3103",
+                "name": "ChefPro 11-Cup Food Processor",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "food_processor",
+                "price": 129,
+                "rating": 4.6,
+                "review_count": 1340,
+                "in_stock": true
+              }
+            ],
+            "total_found": 4
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "ChefPro 11-Cup Food Processor",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3103",
+                "name": "ChefPro 11-Cup Food Processor",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "food_processor",
+                "price": 129,
+                "rating": 4.6,
+                "review_count": 1340,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3101",
+                "name": "ChefPro Stand Mixer 5qt",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "mixer",
+                "price": 299,
+                "rating": 4.7,
+                "review_count": 1820,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-3102",
+                "name": "ChefPro Hand Blender",
+                "brand": "ChefPro",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 69,
+                "rating": 4.5,
+                "review_count": 960,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_001"
+          },
+          "result": {
+            "customer_id": "shop_001",
+            "name": "Alex Rivera",
+            "email": "alex.rivera@example.com",
+            "tier": "platinum",
+            "is_first_time": false,
+            "loyalty_points": 52000,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3101"
+          },
+          "result": {
+            "product_id": "SP-3101",
+            "product_name": "ChefPro Stand Mixer 5qt",
+            "base_price": 299,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3102"
+          },
+          "result": {
+            "product_id": "SP-3102",
+            "product_name": "ChefPro Hand Blender",
+            "base_price": 69,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3103"
+          },
+          "result": {
+            "product_id": "SP-3103",
+            "product_name": "ChefPro 11-Cup Food Processor",
+            "base_price": 129,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_001",
+            "product_id": "SP-3101",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3101",
+            "product_name": "ChefPro Stand Mixer 5qt",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 299,
+            "cart_subtotal": 299,
+            "cart_total": 299
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_001",
+            "product_id": "SP-3102",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-3102",
+            "product_name": "ChefPro Hand Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 69,
+            "cart_subtotal": 368,
+            "cart_total": 368
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_001",
+            "product_id": "SP-3103",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-3103",
+            "product_name": "ChefPro 11-Cup Food Processor",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 129,
+            "cart_subtotal": 497,
+            "cart_total": 497
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 33477,
+    "cached_input_tokens": 0,
+    "output_tokens": 720,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 34197,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 33477,
+  "cached_input_tokens": 0,
+  "output_tokens": 720,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 34197,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_001",
+          "product_id": "SP-3101",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_001",
+          "product_id": "SP-3102",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_001",
+          "product_id": "SP-3103",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_001": {
+          "subtotal": {
+            "old": 0,
+            "new": 497
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001",
+              "CI-0002",
+              "CI-0003"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 497
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_001",
+      "field": "subtotal",
+      "expected_value": 497
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_001",
+      "field": "total",
+      "expected_value": 497
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_001",
+        "product_id": "SP-3101",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_001",
+        "product_id": "SP-3102",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_001",
+        "product_id": "SP-3103",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 2.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 10,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

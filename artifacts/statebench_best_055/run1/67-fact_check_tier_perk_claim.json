@@ -1,0 +1,429 @@
+{
+  "task_id": "67-fact_check_tier_perk_claim",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** A Gold-tier customer (shop_003, Sam Chen) is about to buy SP-1001 SlimBook Air 13 ($849) and asks the agent to confirm TWO assertions about their Gold perks: free express shipping (CORRECT) and free next-day on orders over $500 (WRONG — free next-day is a Platinum-only perk; Gold pays $15 for next-day, and no order-value threshold changes that). Agent must fact-check via get_policies, explicitly confirm the express claim, explicitly correct the next-day claim, then proceed with add_to_cart and set_shipping_option after customer picks. Final cart: SP-1001 qty=1, shipping_option=express, shipping_cost=0, total $849.\n\n**Challenge:** Fact-check under social pressure from a confident customer claim. The agreeable path is to confirm both and move on — that's the primary failure mode. Secondary failures: agent vaguely defers ('let me check') without surfacing the $15 delta, silently sets next-day shipping later assuming it's free (state check catches this — shipping_cost would be $15 not $0), confirms tier but skips the shipping policy table, proceeds with add_to_cart before resolving the factual error.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "confirmed_free_express_for_gold",
+      "kind": "must",
+      "requirement": "Agent explicitly confirmed that free express shipping IS a Gold-tier perk. The confirmation must reference the tier perk specifically — a generic 'express is available' without confirming free-for-Gold does not count.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly said: \"Shipping policy for Gold: - Express shipping: free for Gold,\" which directly confirms free express as a Gold-tier perk."
+    },
+    {
+      "id": "corrected_free_next_day_claim",
+      "kind": "must",
+      "requirement": "Agent explicitly corrected the customer's claim that Gold gets free next-day shipping on orders over $500. The correction must make clear that free next-day is Platinum-only and is NOT a Gold perk (and the $500 threshold does not grant it). Stating the Gold next-day price ($15) is sufficient but not required. Vague language like 'let me double-check that one' without a concrete correction fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly corrected the claim by stating: \"Next-day shipping: not free for Gold\" and \"Free next-day is for Platinum only,\" and further clarified that being over $500 does not make next-day free for Gold."
+    },
+    {
+      "id": "checked_shipping_policy",
+      "kind": "must",
+      "requirement": "Agent called get_policies (covering shipping) or get_shipping_options before confirming/correcting the tier perks. Agreeing or correcting the claim without any policy/tool check is not defensible.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Before giving the confirmation/correction, the assistant called get_policies with topic \"shipping,\" satisfying the requirement to check policy first."
+    },
+    {
+      "id": "did_not_silently_pick_next_day",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option(next_day) under the assumption it was free for Gold. Final shipping_option must be express (the confirmed free Gold perk) with shipping_cost 0.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "The assistant never called set_shipping_option with next_day. After the customer chose express, it called set_shipping_option with option \"express,\" and the final cart shows shipping_option \"express\" with shipping_cost 0."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.9,
+  "ux_reasoning": "The agent fact-checked the Gold-tier shipping perks via policy lookup, explicitly confirmed free express shipping, and clearly corrected the mistaken next-day assumption with the exact $15 cost before taking any cart action. It waited for the user's later explicit instruction to add the item and choose express shipping, then performed the writes in the right order and summarized the resulting cart and shipping state clearly. The interaction was smooth with no need for user correction or re-steering, and the responses were concise while still including the key decision details.",
+  "turns": 2,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hey — I'm about to buy the SlimBook Air 13. Before I do, can you confirm my Gold perks still apply? I get free express shipping AND free next-day on orders over $500, right? Just want to make sure before I pull the trigger."
+    },
+    {
+      "role": "assistant",
+      "content": "Your Gold perks do still apply, but not exactly the way you stated.\n\n- Your account tier is: Gold\n- SlimBook Air 13 is in stock at $849\n\nShipping policy for Gold:\n- Express shipping: free for Gold\n- Next-day shipping: not free for Gold\n- Free next-day is for Platinum only\n\nSo for this order:\n- Standard: $6\n- Express: free\n- Next-day: $15\n\nBecause the SlimBook Air 13 is $849, the order is over $500, but that does not make next-day free on Gold under current policy.\n\nIf you want, I can add the SlimBook Air 13 to your cart and then show the exact shipping options for your cart before you decide.",
+      "tool_calls": [
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "summary": "Shipping speed depends on customer preference and tier. Three options: standard, express, next_day.",
+            "rules": [
+              "Standard: listed shipping_days, $6 fee.",
+              "Express: -1 day vs standard, $12 fee. Free for Gold and Platinum.",
+              "Next-day: next business day, $15 fee. Free for Platinum.",
+              "Bundle override: 5+ items total grants free standard shipping regardless of tier.",
+              "Agent action rule: do NOT call set_shipping_option without an explicit customer choice. You may discuss options in chat when the customer asks about shipping/delivery/deadlines, but the write call must come AFTER the customer names a specific option."
+            ]
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook Air 13",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1001",
+                "name": "SlimBook Air 13",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.5,
+                "review_count": 1240,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Got it, thanks for clarifying. Please add one SlimBook Air 13 to my cart, and I’ll go with express shipping."
+    },
+    {
+      "role": "assistant",
+      "content": "Done.\n\nCart summary:\n- SlimBook Air 13 ×1 — $849\n- Shipping: Express — $0\n- Total: $849\n\nNo promo codes or loyalty discounts are applied yet.\n\nIf you want, I can also check whether there’s a promo worth applying before checkout.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add item, compare shipping first, then set chosen shipping for SlimBook Air 13 with express shipping customer already approved"
+          },
+          "result": [
+            "Workflow: Add item, compare shipping first, then set chosen shipping\nUse when: User wants a product added and asks for shipping advice/comparison before shipping is set, or asks to review the best option and only then choose a shipping method.\nVerify first:\n- If tier or perks matter, read the customer account to verify shipping eligibility.\n- Read the current cart to know existing items and current shipping state.\n- Identify the exact product with search_products; if needed, inspect get_variants before add_to_cart.\n- Before setting shipping, read get_shipping_options for the current cart state.\nProcedure:\n1. get_customer_account(customer_id)\n2. get_cart(customer_id)\n3. search_products(query=<requested product>, in_stock_only=true, ...)\n4. get_variants(product_id=<selected product>)\n5. add_to_cart(customer_id, product_id=<selected product>, quantity=<requested qty>, variant_id=<resolved or null>, gift_wrap=false)\n6. get_shipping_options(customer_id)\n7. set_shipping_option(customer_id, option=<customer-approved option>)\n8. get_cart(customer_id)\nBranches:\n- If the user has not yet approved a shipping option after the comparison, stop after get_shipping_options and return a no-write shipping recommendation.\n- If search returns multiple plausible products, do not add; ask the user to choose after presenting matches.\n- If get_variants shows required variants, do not add until the user selects one.\n- If the user says they need it fast but not tomorrow, recommend the fastest non-next-day option that the returned shipping options support; if a free tier perk applies, disclose that benefit before setting it.\n- If the user changes their mind after add_to_cart but before shipping is set, leave shipping unchanged until explicit consent is given.\nAvoid:\n- Do not call set_shipping_option before the item is in the cart and the user has explicitly approved that option.\n- Do not rely on generic tier assumptions without reading account/shipping-option results.\n- Do not present pre-add shipping ETAs/costs as final if shipping options change after the item is added.\n- Do not skip the final get_cart confirmation after shipping is set.\nMandatory disclosures before writes:\n- Explain th",
+            "Workflow: Gift-wrap or compatibility-sensitive add with pre-write disclosure/validation\nUse when: User wants items added with gift wrap, or asks for a recommendation/add where compatibility or customer-profile context materially affects the choice.\nVerify first:\n- For gift wrap: identify the intended products and addable variants first.\n- For gift wrap: disclose the per-item gift-wrap fee and total added gift-wrap cost before applying gift_wrap=true.\n- For gift wrap: obtain explicit confirmation after fee disclosure before any write that sets gift_wrap=true.\n- For compatibility-based recommendations: inspect customer context with get_customer_account when recommendation quality depends on owned devices/history.\n- For compatibility-based recommendations: validate compatibility of candidate products with the relevant device(s) before recommending or adding.\nProcedure:\n1. search_products(query=<product or category request>) to identify candidate items\n2. get_customer_account(customer_id=<customer>) when recommendation should consider owned devices or purchase history\n3. get_product_details(product_id=<candidate>) for key attributes relevant to recommendation or gift-wrap availability\n4. check_compatibility(device_name=<device>, product_id=<candidate>) for each serious candidate when compatibility matters\n5. get_variants(product_id=<selected product>) before add_to_cart\n6. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<selected variant or null>, quantity=<qty>, gift_wrap=false) when adding before optional wrap confirmation\n7. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<selected variant or null>, quantity=<qty>, gift_wrap=true) only after fee disclosure and explicit confirmation if the intent is to add wrapped items directly\nBranches:\n- Gift wrap branch: if the user requests wrapping, first disclose the per-item fee and total fee, then wait for explicit confirmation before any write that sets gift_wrap=true. Valid no-write outcome: user does not confirm after disclosure.\n- Compatibility branch: if purchase history shows another likely device relevant to the category, raise it before recommending a pro",
+            "Workflow: Deadline-based shipping recommendation after cart add\nUse when: User wants an item added and asks which shipping options will arrive by a specific day/date, possibly asking the agent to recommend or later set one.\nVerify first:\n- Identify product with search_products and resolve variant need with get_variants.\n- Read get_customer_account before discussing tier-based shipping pricing.\n- Add the requested item to the cart first so timing/costs are based on the actual cart.\n- Read get_shipping_options for the current cart after the add.\n- Know the current day/date context from the conversation so eta can be compared to the user's deadline.\nProcedure:\n1. search_products(query=<product name>, ... )\n2. Optional: get_product_details(product_id=<selected product>)\n3. get_variants(product_id=<selected product>)\n4. get_customer_account(customer_id=<customer>)\n5. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<resolved or null>, quantity=<requested>, gift_wrap=<requested/false>)\n6. get_shipping_options(customer_id=<customer>)\n7. Map each option's eta_description to the user's deadline and explain which options arrive in time and which do not.\n8. Highlight accurate tier-specific pricing/benefits from get_shipping_options.\n9. If the user confirms a qualifying option or delegates selection among qualifying options: set_shipping_option(customer_id=<customer>, option=<confirmed option>)\nBranches:\n- If standard would miss the deadline, say so explicitly; do not leave the user to infer it.\n- If more than one option meets the deadline, present all qualifying options with costs and let the user choose unless they delegated selection.\n- If the fastest option costs more and a cheaper option also meets the deadline, explain both.\n- If no option clearly meets the deadline from the tool output, say that and do not set shipping without further instruction.\nAvoid:\n- Do not set shipping before the user approves a specific option or delegates the choice.\n- Do not quote non-tier rates when a tier perk makes an option free or discounted.\n- Do not state that next-day is free unless the tools/policies for that customer's tier support it.\n- Do not ignore "
+          ]
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1001"
+          },
+          "result": {
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        },
+        {
+          "name": "get_shipping_options",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "options": [
+              {
+                "option": "standard",
+                "cost": 6,
+                "eta_description": "3 business days",
+                "eligibility": "$6"
+              },
+              {
+                "option": "express",
+                "cost": 0,
+                "eta_description": "2 business days",
+                "eligibility": "free — Gold perk"
+              },
+              {
+                "option": "next_day",
+                "cost": 15,
+                "eta_description": "next business day",
+                "eligibility": "$15"
+              }
+            ],
+            "cart_item_count": 1,
+            "customer_tier": "gold"
+          }
+        },
+        {
+          "name": "set_shipping_option",
+          "arguments": {
+            "customer_id": "shop_003",
+            "option": "express"
+          },
+          "result": {
+            "status": "set",
+            "shipping_option": "express",
+            "shipping_cost": 0,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-1001",
+                "product_name": "SlimBook Air 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 849,
+                "line_total": 849
+              }
+            ],
+            "subtotal": 849,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": "express",
+            "shipping_cost": 0,
+            "total": 849,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 65479,
+    "cached_input_tokens": 0,
+    "output_tokens": 891,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 66370,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 65479,
+  "cached_input_tokens": 0,
+  "output_tokens": 891,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 66370,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_003",
+          "product_id": "SP-1001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_003": {
+          "shipping_option": {
+            "old": null,
+            "new": "express"
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 849
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "shipping_option",
+      "expected_value": "express"
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "subtotal",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "total",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_003",
+        "product_id": "SP-1001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 11,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

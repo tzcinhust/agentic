@@ -1,0 +1,370 @@
+{
+  "task_id": "10-loyalty_points_on_discount",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** A returning Gold-tier customer (shop_003) buys SP-1001 SlimBook Air 13 ($849) and applies SAVE10 (10% off). Cart ends with subtotal $849, discount $84, total $765. The customer does NOT ask about loyalty points.\n\n**Challenge:** Per `loyalty_points` policy: Gold earns 2 pts/$, points are calculated on the final total after discounts, and 'agents should mention points earned after any cart completion.' Correct: 2 × $765 = 1,530 points, disclosed proactively at cart summary. Two pitfalls: (a) agent skips loyalty-points disclosure entirely (silent completion — no one asked, no one tells), or (b) agent discloses points but computes on the pre-discount subtotal (2 × $849 = 1,698) rather than the post-discount total, violating the policy's explicit 'after all discounts' rule.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "correct_cart_built",
+      "kind": "must",
+      "requirement": "Agent added SP-1001 (qty 1, no gift wrap) and applied SAVE10. Cart ends with subtotal $849, discount $84, total $765.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show add_to_cart for SP-1001 quantity 1 with gift_wrap false, then apply_promo SAVE10. Final get_cart shows subtotal $849, discount $84, total $765."
+    },
+    {
+      "id": "disclosed_loyalty_points",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned the loyalty points earned from this purchase at or before cart summary — without the customer asking. Silent completion fails this requirement even if points are mentioned later in response to a direct question (which does not happen in this task).",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Assistant's cart summary did not mention loyalty points at all, despite the requirement to proactively disclose points earned at or before cart summary."
+    },
+    {
+      "id": "used_correct_tier_rate",
+      "kind": "must",
+      "requirement": "Agent used the Gold tier rate of 2 points per dollar spent. Quoting a different rate (1 pts/$ for Standard, 3 pts/$ for Platinum) fails this requirement.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "No loyalty points disclosure or calculation was given, so there is no evidence the Gold rate of 2 points per dollar was used."
+    },
+    {
+      "id": "computed_on_post_discount_total",
+      "kind": "must",
+      "requirement": "Agent computed loyalty points on the POST-discount total ($765), not the pre-discount subtotal ($849). Correct points: 2 × $765 = 1,530. Quoting 1,698 (2 × $849), 2,547 (3 × $849), or any other number derived from the pre-discount base fails this requirement. Showing the math ('2 × $765 = 1,530') is a strong pass signal but not required — just the final number must match.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "No loyalty points total was provided, so there is no evidence the agent computed points on the post-discount total of $765 to reach 1,530."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no tool calls to set_shipping_option or redeem_loyalty_points."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.65,
+  "ux_reasoning": "The agent directly mutated the cart by adding the laptop and applying the promo in the same turn without an explicit confirmation step, which is a consequential shopping action under the stated rubric. However, it did clearly report what was changed and gave an accurate cart summary afterward, so the control issue is significant but not maximally severe. Effort was otherwise low because the user did not need to restate or correct the core request, but the agent missed an important proactive disclosure: the Gold-tier loyalty points earned after discount, which policy says should be mentioned after cart completion. The response was concise and well-structured, though incomplete because it omitted that material loyalty detail.",
+  "turns": 1,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'd like to buy the SlimBook Air 13, and I have a promo code SAVE10. Can you add it and apply the code?"
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added the SlimBook Air 13 to your cart and applied SAVE10.\n\nCart summary:\n- SlimBook Air 13: $849\n- Promo SAVE10: -$84\n- Total: $765\n\nNo gift wrap or shipping has been added yet.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook Air 13",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1001",
+                "name": "SlimBook Air 13",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.5,
+                "review_count": 1240,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1001"
+          },
+          "result": {
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: Site-wide 10% off, any category, any purchase size.",
+            "estimated_discount": 0
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "SAVE10",
+            "applied_promo_codes": [
+              "SAVE10"
+            ],
+            "discount_amount": 84,
+            "cart_subtotal": 849,
+            "cart_total": 765
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-1001",
+                "product_name": "SlimBook Air 13",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 849,
+                "line_total": 849
+              }
+            ],
+            "subtotal": 849,
+            "discount_amount": 84,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 765,
+            "applied_promo_codes": [
+              "SAVE10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 28199,
+    "cached_input_tokens": 0,
+    "output_tokens": 421,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 28620,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 28199,
+  "cached_input_tokens": 0,
+  "output_tokens": 421,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 28620,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_003",
+          "product_id": "SP-1001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_003": {
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 765
+          },
+          "applied_promo_codes": {
+            "old": [],
+            "new": [
+              "SAVE10"
+            ]
+          },
+          "discount_amount": {
+            "old": 0,
+            "new": 84
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "applied_promo_codes",
+      "expected_value": [
+        "SAVE10"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "discount_amount",
+      "expected_value": 84
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "subtotal",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "total",
+      "expected_value": 765
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_003",
+        "product_id": "SP-1001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 4,
+  "ux_base_score": 2.7,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

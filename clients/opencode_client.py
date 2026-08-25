@@ -139,7 +139,7 @@ class OpenCodeLLMClient(BaseLLMClient):
         )
 
     @classmethod
-    def from_env(cls) -> OpenCodeLLMClient:
+    def from_env(cls) -> "OpenCodeLLMClient":
         return cls(
             base_url=os.environ["STATE_BENCH_AGENT_BASE_URL"],
             api_key=os.environ["STATE_BENCH_AGENT_API_KEY"],
@@ -163,17 +163,14 @@ class OpenCodeLLMClient(BaseLLMClient):
         system_prompt: str,
         conversation: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        max_tokens: int | None = None,
     ) -> AgentCompletion:
-        request: dict[str, Any] = {
-            "model": self.model,
-            "messages": _chat_messages(system_prompt, conversation),
-            "temperature": 0,
-            "max_tokens": max_tokens or self.max_tokens,
-        }
-        if tools:
-            request["tools"] = _chat_tools(tools)
-        response = self._client.chat.completions.create(**request)
+        response = self._client.chat.completions.create(
+            model=self.model,
+            messages=_chat_messages(system_prompt, conversation),
+            tools=_chat_tools(tools),
+            temperature=0,
+            max_tokens=self.max_tokens,
+        )
         message = response.choices[0].message
         tool_calls = []
         for call in message.tool_calls or []:

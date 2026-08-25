@@ -1,0 +1,353 @@
+{
+  "task_id": "25-existing_cart_qty_cap_delta",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning Standard customer (shop_004) has 2× SP-2006 ProBook USB-C Dock already in their cart (subtotal $258). Customer asks 'add 3 more USB-C docks'. The quantity_limit policy caps at 3/product, so only +1 can be added. Customer doesn't remember the existing 2 and doesn't know the cap.\n\n**Challenge:** Existing-cart state awareness + quantity-cap delta disclosure. Pitfall: agent doesn't call get_cart first, tries qty=3 and trips the env error; or silently adds qty=1 without naming the existing 2 in cart; or omits the cap. Correct: agent (1) checks get_cart, (2) names the existing 2 units, (3) names the 3-unit cap, (4) tells customer only +1 is possible, (5) gets confirmation, (6) adds qty=1 → final qty=3. Confusing-user theme (cart state is stale from customer's POV).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "checked_existing_cart",
+      "kind": "must",
+      "requirement": "Agent called get_cart BEFORE any add_to_cart to see the pre-existing state (2× SP-2006). Acting on the customer's 'add 3 more' without first checking what's already there fails.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed. The agent called get_cart before any cart write; get_cart appears before update_cart_item and revealed the existing quantity of 2."
+    },
+    {
+      "id": "disclosed_existing_plus_cap",
+      "kind": "must",
+      "requirement": "Agent explicitly told the customer they already have 2 USB-C Docks in cart AND cited the 3-unit per-product cap. Mentioning only one (existing qty OR cap) without the other fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Passed. The assistant explicitly said, 'You currently have 2 of that dock in your cart' and 'the cart limit is 3 total per product.'"
+    },
+    {
+      "id": "disclosed_delta_shortfall",
+      "kind": "must",
+      "requirement": "Agent told the customer that only 1 more could be added (the gap between the requested 3 and the actual add of 1). Silently adding 1 without contrasting with the requested 3 fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Passed. The assistant clearly contrasted the request with the allowed add: 'So I can only add 1 more, not 3.'"
+    },
+    {
+      "id": "got_consent_before_add",
+      "kind": "must",
+      "requirement": "Agent waited for the customer's explicit 'yes, proceed with 1 more' / 'ok just the 1' consent BEFORE calling add_to_cart. Unilaterally adding qty=1 after surfacing the cap fails.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed. After explaining the limit, the agent asked for confirmation and waited until the user replied 'add 1' before calling update_cart_item."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Passed. There were no set_shipping_option or redeem_loyalty_points calls in the tool history."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 4,
+  "ux_score": 3.95,
+  "ux_reasoning": "The agent handled the key control requirement well: it checked the existing cart, surfaced that 2 docks were already present, explained the 3-unit cap, and waited for explicit confirmation before updating the cart. The final write matched the confirmed outcome and the cart was refreshed afterward, though the closing \"Done.\" was too terse and did not summarize the final cart state change. User effort was low because the agent proactively resolved the stale-cart confusion and translated the user's impossible request into a simple next step, but it did ask for a follow-up confirmation despite the user's urgency. Response density was mostly good—brief and direct—but the final response omitted a useful minimal confirmation like the new total quantity.",
+  "turns": 2,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Add 3 more of those USB-C docks to my cart please — quickly, I'm juggling things. Don't need a breakdown, just add them."
+    },
+    {
+      "role": "assistant",
+      "content": "You currently have 2 of that dock in your cart, and the cart limit is 3 total per product.\n\nSo I can only add 1 more, not 3.\n\nReply with:\n- “add 1” to do that, or\n- tell me if you want something else instead.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add quantity to existing cart item USB-C dock preserving standard cart update fast existing item"
+          },
+          "result": [
+            "Workflow: Prepare a quantity update for an existing cart item\nUse when: User wants to change the quantity of an item already in the cart, or asks what final quantity is possible before confirming the change.\nVerify first:\n- Read the current cart to locate the cart item and current quantity.\n- Read product details to verify availability/stock and any backorder signal.\n- Read policies for quantity-limit rules affecting the total quantity in cart.\n- Read variants if the product may require a variant for cart updates or to confirm no variant is needed.\n- Obtain explicit user confirmation of the desired final quantity before any write.\nProcedure:\n1. get_cart(customer_id)\n2. get_product_details(product_id)\n3. get_policies(topic=quantity_limit)\n4. get_variants(product_id)\n5. update_cart_item(cart_item_id, quantity=<confirmed_final_quantity>)\n6. get_cart(customer_id)\nBranches:\n- If the requested final quantity exceeds the policy cap, do not write; explain the maximum allowed final quantity and ask for a corrected final quantity.\n- If requested quantity exceeds available stock and no backorder path is supported by current product details, do not write; explain the highest feasible quantity or unavailability.\n- If the product has variants and the cart item/target variant is ambiguous, pause and ask the user to specify the exact variant before any write.\n- If the user says only 'increase' or 'add one' without a clear final quantity, treat that as insufficient confirmation and ask for the desired final quantity.\n- If the user declines or does not confirm, do not write and return the checked constraints only.\nAvoid:\n- Do not update based only on a delta request when final quantity has not been explicitly confirmed.\n- Do not use stale cart quantity when computing the final allowed quantity.\n- Do not ignore per-cart cap rules that apply to total quantity in cart.\n- Do not mutate the cart without refreshing the cart afterward.\nMandatory disclosures before writes:\n- Current quantity before the change.\n- Any applicable per-cart quantity cap and how it constrains the final quantity.\n- Current availability/stock relevant to the requested final quantity.\n- Whether a variant selectio",
+            "Workflow: Add or update cart items while preserving or refreshing shipping\nUse when: User asks to add one or more products and may later change quantities, while wanting shipping kept as-is or kept on a named option such as standard.\nVerify first:\n- Read the current cart before edits if shipping preservation or existing item counts matter.\n- Locate each requested product with search_products and resolve variants with get_variants when needed.\n- If the request depends on shipping cost or threshold behavior, read applicable policies and/or get_shipping_options before or after edits as needed.\nProcedure:\n1. get_cart(customer_id)\n2. search_products(query=<product A>, in_stock_only=true, ...)\n3. get_variants(product_id=<product A>)\n4. add_to_cart(customer_id, product_id=<product A>, quantity=<initial qty>, variant_id=<resolved or null>, gift_wrap=false)\n5. search_products(query=<product B>, in_stock_only=true, ...)\n6. get_variants(product_id=<product B>)\n7. add_to_cart(customer_id, product_id=<product B>, quantity=<initial qty>, variant_id=<resolved or null>, gift_wrap=false)\n8. set_shipping_option(customer_id, option=<requested shipping option>)\n9. get_cart(customer_id)\n10. update_cart_item(customer_id, product_id=<product A>, quantity=<new total qty>, variant_id=<resolved or null>, gift_wrap=false)\n11. update_cart_item(customer_id, product_id=<product B>, quantity=<new total qty>, variant_id=<resolved or null>, gift_wrap=false)\n12. get_shipping_options(customer_id)\n13. set_shipping_option(customer_id, option=<same requested shipping option>)\n14. get_cart(customer_id)\nBranches:\n- If the user adds an item to an existing cart that already has the requested shipping option selected, still refresh shipping after the add when item-count thresholds may affect cost.\n- If the cart crosses a threshold that changes shipping price for the same option, disclose the new price/benefit and re-apply or refresh that option so the cart state is not stale.\n- If a requested product is already in the cart, update_cart_item may be used instead of adding a duplicate line when supported by the task.\n- If the user only wants the updated totals after quantity changes, the valid end state sti",
+            "Workflow: Switch cart item to a replacement product\nUse when: User first added or requested one product, then says to switch, replace, or use another product instead, and wants the cart to reflect only the replacement item.\nVerify first:\n- Confirm which existing cart item is being replaced from the conversation context.\n- Verify the replacement product identity if only named text is given.\n- Check get_variants for the replacement product before adding it.\n- Ensure the original product is removed or quantity zeroed after the switch request.\n- If the user asks for current cart/total after the switch, refresh cart state after mutations.\nProcedure:\n1. search_products(query=<replacement name>) if replacement product_id is not already certain\n2. get_variants(product_id=<replacement product>)\n3. add_to_cart(customer_id=<customer>, product_id=<replacement product>, variant_id=<selected variant or null>, quantity=1, gift_wrap=<requested setting>)\n4. remove_from_cart(customer_id=<customer>, product_id=<original product>, variant_id=<original variant or null>)\n5. get_cart(customer_id=<customer>) when the user asks to see the current cart or total\nBranches:\n- If the user says 'instead', 'switch', or equivalent, ensure the original item is removed; do not leave both items unless the user explicitly wants both.\n- If replacement identity is ambiguous, do not mutate; ask the user to choose among named options.\n- If add_to_cart succeeds but remove_from_cart fails, disclose that the cart may still contain both and refresh with get_cart before summarizing.\n- Valid no-write outcome: if the replacement item cannot be identified with confidence.\nAvoid:\n- Do not leave the original item in the cart after a switch request.\n- Do not summarize the final cart from memory when get_cart was requested.\n- Do not use shipping or loyalty write tools for a simple switch request.\nMandatory disclosures before writes:\n- Final summary must reflect the actual post-switch cart state and total.\n- If the switch could not be completed cleanly, explain which item remains in the cart.\nConfirmation gates:\n- If the replacement reference is ambiguous, obtain clarification before add/remove writes.\nRefresh afte"
+          ]
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-2006",
+                "product_name": "ProBook USB-C Dock",
+                "quantity": 2,
+                "gift_wrap": false,
+                "unit_price": 129,
+                "line_total": 258
+              }
+            ],
+            "subtotal": 258,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 258,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "USB-C dock",
+            "category": "electronics",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-2006",
+                "name": "ProBook USB-C Dock",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "accessory",
+                "price": 129,
+                "rating": 4.3,
+                "review_count": 920,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-2006"
+          },
+          "result": {
+            "product_id": "SP-2006",
+            "name": "ProBook USB-C Dock",
+            "category": "electronics",
+            "subcategory": "accessory",
+            "brand": "ProBook",
+            "price": 129,
+            "rating": 4.3,
+            "review_count": 920,
+            "description": "USB-C docking station with HDMI and Ethernet.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-2006"
+          },
+          "result": {
+            "product_id": "SP-2006",
+            "product_name": "ProBook USB-C Dock",
+            "base_price": 129,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "quantity_limit"
+          },
+          "result": {
+            "topic": "quantity_limit",
+            "summary": "Anti-hoarding: maximum 3 units of the same product per cart.",
+            "rules": [
+              "Limit: 3 units of the same product per cart.",
+              "Enforcement: applies to total quantity in cart (existing + new).",
+              "No exceptions regardless of tier, promo, or reason."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "add 1"
+    },
+    {
+      "role": "assistant",
+      "content": "Done.",
+      "tool_calls": [
+        {
+          "name": "update_cart_item",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-2006",
+            "quantity": 3,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "updated",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-2006",
+            "variant_id": null,
+            "product_name": "ProBook USB-C Dock",
+            "quantity": 3,
+            "gift_wrap": false,
+            "cart_subtotal": 387,
+            "cart_total": 387
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-2006",
+                "product_name": "ProBook USB-C Dock",
+                "quantity": 3,
+                "gift_wrap": false,
+                "unit_price": 129,
+                "line_total": 387
+              }
+            ],
+            "subtotal": 387,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 387,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 47808,
+    "cached_input_tokens": 0,
+    "output_tokens": 505,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 48313,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 47808,
+  "cached_input_tokens": 0,
+  "output_tokens": 505,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 48313,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "subtotal": {
+            "old": 258,
+            "new": 387
+          },
+          "total": {
+            "old": 258,
+            "new": 387
+          }
+        }
+      },
+      "cart_items": {
+        "CI-0001": {
+          "quantity": {
+            "old": 2,
+            "new": 3
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "cart_items",
+      "record_key": "CI-0001",
+      "field": "quantity",
+      "expected_value": 3
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 387
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 387
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 4.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
