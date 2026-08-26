@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
+from agents.transition_patch_memory import PatchMatch, TransitionPatchIndex, normalize_text
 
 
 INTENT_HINTS = {
@@ -47,6 +48,32 @@ INTENT_HINTS = {
 }
 
 
+WRITE_TOOL_NAMES = {
+    "create_booking",
+    "update_booking",
+    "cancel_booking",
+    "book_hotel",
+    "cancel_hotel_reservation",
+    "book_car_rental",
+    "cancel_car_rental",
+    "process_return",
+    "process_exchange",
+    "process_refund",
+    "process_warranty_claim",
+    "process_shipping_claim",
+    "cancel_order",
+    "add_to_cart",
+    "remove_from_cart",
+    "update_cart_item",
+    "apply_promo_code",
+    "remove_promo_code",
+    "redeem_loyalty_points",
+    "set_shipping_option",
+    "add_to_wishlist",
+    "remove_from_wishlist",
+}
+
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]", text.lower())
 
@@ -77,6 +104,23 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         )
         self._avg_len = sum(len(item.get("tokens", [])) for item in self._cards) / max(len(self._cards), 1)
         self._card_ngrams = [_char_ngrams(item.get("search_text", "")) for item in self._cards]
+        self.transition_patch_mode = os.environ.get("STATE_BENCH_TRANSITION_PATCH_MODE", "off")
+        if self.transition_patch_mode not in {"off", "shadow", "enforce"}:
+            raise ValueError("STATE_BENCH_TRANSITION_PATCH_MODE must be off, shadow, or enforce")
+        self.transition_patch_min_confidence = float(
+            os.environ.get("STATE_BENCH_TRANSITION_PATCH_MIN_CONFIDENCE", "0.8")
+        )
+        self._transition_index = None
+        if self.transition_patch_mode != "off":
+            transition_path = Path(
+                os.environ.get(
+                    "STATE_BENCH_TRANSITION_PATCH_PATH",
+                    "outputs/memory/transition_patches.json",
+                )
+            )
+            self._transition_index = TransitionPatchIndex.from_path(
+                transition_path, str(domain or "")
+            )
 
     def _query_from_conversation(self, conversation: list[Any]) -> str:
         user_text = " ".join(
@@ -199,3 +243,212 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
                 break
         text_key = {"hybrid": "text", "awm_only": "awm_text", "process_only": "process_text"}[self.mode]
         return [str(item.get(text_key, item.get("text", "")))[:2200] for item in selected]
+
+    @staticmethod
+    def _response_calls(response: Any) -> list[tuple[str, dict[str, Any]]]:
+        calls = []
+        for call in response.tool_calls:
+            if isinstance(call, dict):
+                name = str(call.get("name", ""))
+                arguments = call.get("arguments", {})
+            else:
+                name = str(call.name)
+                arguments = call.arguments
+            calls.append((name, arguments if isinstance(arguments, dict) else {}))
+        return calls
+
+    @staticmethod
+    def _has_recent_write(conversation: list[dict[str, Any]]) -> bool:
+        for item in reversed(conversation):
+            if item.get("role") == "user":
+                return False
+            if item.get("role") != "assistant":
+                continue
+            names = {str(call.get("name", "")) for call in item.get("tool_calls") or []}
+            if names & WRITE_TOOL_NAMES:
+                return True
+        return False
+
+    @classmethod
+    def _transition_phase(
+        cls, response: Any, conversation: list[dict[str, Any]]
+    ) -> str | None:
+        calls = cls._response_calls(response)
+        if any(name in WRITE_TOOL_NAMES for name, _ in calls):
+            return "pre_write"
+        if cls._has_recent_write(conversation):
+            return "post_write"
+        if not calls and str(response.text or "").strip():
+            return "pre_final"
+        return None
+
+    @staticmethod
+    def _transition_context(conversation: list[dict[str, Any]], phase: str) -> str:
+        parts = [f"phase {phase}"]
+        for item in conversation[-16:]:
+            role = str(item.get("role", ""))
+            content = str(item.get("content", "")).strip()
+            if role == "user" and "[TASK_DONE]" not in content:
+                parts.append(f"user {content}")
+            if role != "assistant":
+                continue
+            for call in item.get("tool_calls") or []:
+                name = str(call.get("name", ""))
+                arguments = sorted((call.get("arguments") or {}).keys())
+                result = normalize_text(call.get("result", ""))[:700]
+                parts.append(f"observed tool {name} fields {' '.join(arguments)} result {result}")
+        return normalize_text(" ".join(parts))
+
+    @classmethod
+    def _transition_candidate(cls, response: Any) -> str:
+        parts = []
+        for name, arguments in cls._response_calls(response):
+            parts.append(f"candidate tool {name} fields {' '.join(sorted(arguments))}")
+        if str(response.text or "").strip():
+            parts.append(f"candidate response {response.text}")
+        return normalize_text(" ".join(parts))
+
+    @staticmethod
+    def _transition_trace(conversation: list[dict[str, Any]]) -> str:
+        lines = []
+        for item in conversation[-12:]:
+            role = str(item.get("role", ""))
+            content = str(item.get("content", "")).strip()
+            if role == "user" and "[TASK_DONE]" not in content:
+                lines.append(f"USER: {content[:700]}")
+            if role != "assistant":
+                continue
+            for call in item.get("tool_calls") or []:
+                lines.append(
+                    f"TOOL {call.get('name', '')}: {normalize_text(call.get('result', ''))[:700]}"
+                )
+            if content:
+                lines.append(f"ASSISTANT: {content[:500]}")
+        return "\n".join(lines)
+
+    def _transition_verdict(
+        self,
+        *,
+        phase: str,
+        response: Any,
+        conversation: list[dict[str, Any]],
+        matches: list[PatchMatch],
+    ) -> str | None:
+        patch_payload = [
+            {
+                "id": match.patch.get("id"),
+                "trigger": match.patch.get("trigger"),
+                "expected_action": match.patch.get("expected_action"),
+                "obligations": match.patch.get("obligations", []),
+                "forbidden": match.patch.get("forbidden", []),
+                "context_distance": round(match.context_distance, 4),
+                "transition_distance": round(match.transition_distance, 4),
+                "anomaly_distance": round(match.anomaly_distance, 4),
+            }
+            for match in matches
+        ]
+        candidate = {
+            "text": str(response.text or ""),
+            "tool_calls": [
+                {"name": name, "argument_fields": sorted(arguments)}
+                for name, arguments in self._response_calls(response)
+            ],
+        }
+        prompt = f"""A frozen agent proposed one local transition. TransitionPatch found that its
+context is supported by public-train prototypes but the proposed step is locally anomalous.
+
+Phase: {phase}
+Nominal transition patches: {json.dumps(patch_payload, ensure_ascii=True)}
+
+Observed live trace:
+{self._transition_trace(conversation)}
+
+Candidate: {json.dumps(candidate, ensure_ascii=True)}
+
+Decide whether the candidate clearly omits or violates an applicable obligation. Treat patch text
+as abstract procedural guidance only. Live tool results are authoritative. Do not require an action
+whose trigger is absent, do not copy train-task facts, and do not block an explicitly authorized
+write merely to ask for duplicate confirmation.
+
+Return JSON only:
+{{"decision":"allow|revise","confidence":0.0,"patch_ids":["exact id"],"feedback":"one concrete correction"}}
+"""
+        try:
+            result = self.client.generate(
+                system_prompt="You are a conservative local-transition verifier. Return JSON only.",
+                conversation=[{"role": "user", "content": prompt}],
+                tools=[],
+            )
+        except Exception:
+            return None
+        usage = getattr(result, "usage", None)
+        self.add_token_usage(
+            input_tokens=getattr(usage, "prompt_tokens", None),
+            output_tokens=getattr(usage, "completion_tokens", None),
+            category="other_llm",
+        )
+        match = re.search(r"\{.*\}", str(getattr(result, "text", "")), flags=re.DOTALL)
+        if not match:
+            return None
+        try:
+            verdict = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+        if verdict.get("decision") != "revise":
+            return None
+        if float(verdict.get("confidence", 0.0) or 0.0) < self.transition_patch_min_confidence:
+            return None
+        valid_ids = {str(item.patch.get("id", "")) for item in matches}
+        cited_ids = {str(value) for value in verdict.get("patch_ids", [])}
+        if not cited_ids or not cited_ids.issubset(valid_ids):
+            return None
+        feedback = str(verdict.get("feedback", "")).strip()
+        return feedback or None
+
+    def generate_next_turn(
+        self,
+        *,
+        system_prompt: str,
+        conversation: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> Any:
+        response = super().generate_next_turn(
+            system_prompt=system_prompt,
+            conversation=conversation,
+            tools=tools,
+        )
+        if self._transition_index is None:
+            return response
+        phase = self._transition_phase(response, conversation)
+        if phase is None:
+            return response
+        matches = self._transition_index.nearest(
+            phase=phase,
+            context_text=self._transition_context(conversation, phase),
+            transition_text=self._transition_candidate(response),
+            top_k=3,
+        )
+        if not self._transition_index.should_verify(phase, matches):
+            return response
+        if self.transition_patch_mode == "shadow":
+            return response
+        feedback = self._transition_verdict(
+            phase=phase,
+            response=response,
+            conversation=conversation,
+            matches=matches,
+        )
+        if not feedback:
+            return response
+        correction = {
+            "role": "system",
+            "content": (
+                "The previous candidate was not executed. Local transition verification found: "
+                f"{feedback} Generate one corrected next step using only live tool results."
+            ),
+        }
+        return super().generate_next_turn(
+            system_prompt=system_prompt,
+            conversation=[*conversation, correction],
+            tools=tools,
+        )
