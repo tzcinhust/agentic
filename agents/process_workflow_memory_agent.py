@@ -414,7 +414,7 @@ Return JSON only:
         return feedback or None
 
     def _log_transition_gate(
-        self, *, phase: str, matches: list[PatchMatch], triggered: bool
+        self, *, phase: str, matches: list[PatchMatch], triggered: bool, outcome: str
     ) -> None:
         if self._transition_log_path is None:
             return
@@ -423,6 +423,7 @@ Return JSON only:
             "domain": self._transition_domain,
             "phase": phase,
             "triggered": triggered,
+            "outcome": outcome,
             "matches": [
                 {
                     "patch_id": str(match.patch.get("id", "")),
@@ -461,10 +462,15 @@ Return JSON only:
             top_k=3,
         )
         triggered = self._transition_index.should_verify(phase, matches)
-        self._log_transition_gate(phase=phase, matches=matches, triggered=triggered)
         if not triggered:
+            self._log_transition_gate(
+                phase=phase, matches=matches, triggered=False, outcome="bypass"
+            )
             return response
         if self.transition_patch_mode == "shadow":
+            self._log_transition_gate(
+                phase=phase, matches=matches, triggered=True, outcome="shadow"
+            )
             return response
         feedback = self._transition_verdict(
             phase=phase,
@@ -473,7 +479,13 @@ Return JSON only:
             matches=matches,
         )
         if not feedback:
+            self._log_transition_gate(
+                phase=phase, matches=matches, triggered=True, outcome="allow"
+            )
             return response
+        self._log_transition_gate(
+            phase=phase, matches=matches, triggered=True, outcome="revise"
+        )
         correction = {
             "role": "system",
             "content": (

@@ -275,4 +275,5 @@ def test_shadow_mode_never_changes_candidate(tmp_path: Path, monkeypatch) -> Non
     assert record["domain"] == "shopping_assistant"
     assert record["phase"] == "post_write"
     assert record["triggered"] is True
+    assert record["outcome"] == "shadow"
     assert "text" not in record
