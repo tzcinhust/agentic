@@ -115,6 +115,7 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             os.environ.get("STATE_BENCH_TRANSITION_PATCH_MIN_CONFIDENCE", "0.8")
         )
         self._transition_domain = str(domain or "")
+        self._transition_task_id = str(getattr(runtime_context, "task_id", "") or "")
         log_path = os.environ.get("STATE_BENCH_TRANSITION_PATCH_LOG_PATH", "").strip()
         self._transition_log_path = Path(log_path) if log_path else None
         self._transition_index = None
@@ -418,6 +419,7 @@ Return JSON only:
         if self._transition_log_path is None:
             return
         record = {
+            "task_id": self._transition_task_id,
             "domain": self._transition_domain,
             "phase": phase,
             "triggered": triggered,
