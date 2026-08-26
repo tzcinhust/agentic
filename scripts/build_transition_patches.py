@@ -254,7 +254,6 @@ def _validate_patch(raw: dict[str, Any], case_ids: set[str], domain: str) -> dic
         [
             f"expected {expected_action}",
             f"obligations {' '.join(obligations)}",
-            f"forbidden {' '.join(forbidden)}",
         ]
     ))
     digest = hashlib.sha1(normalize_text(transition_text).encode("utf-8")).hexdigest()[:10]

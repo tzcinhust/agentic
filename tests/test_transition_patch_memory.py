@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from agents.process_workflow_memory_agent import ProcessWorkflowMemoryAgent
-from agents.transition_patch_memory import TransitionPatchIndex, build_transition_artifact
+from agents.transition_patch_memory import TransitionPatchIndex, build_transition_artifact, tokens
 from scripts.build_transition_patches import _fallback_patches, _load_case, _validate_patch
 
 
@@ -149,7 +149,12 @@ def test_public_train_trajectory_builds_fallback_transition_patch(tmp_path: Path
     assert validated is not None
     assert validated["phase"] == "post_write"
     assert "final cart total" in validated["transition_text"]
+    assert "copy task-specific values" not in validated["transition_text"]
     assert "500" not in validated["transition_text"]
+
+
+def test_tool_identifiers_share_natural_language_tokens() -> None:
+    assert tokens("process_return") == ["process_return", "process", "return"]
 
 
 class ScriptedClient:

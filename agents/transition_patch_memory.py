@@ -25,7 +25,12 @@ def normalize_text(value: Any) -> str:
 
 
 def tokens(value: Any) -> list[str]:
-    return TOKEN_RE.findall(normalize_text(value))
+    result = []
+    for token in TOKEN_RE.findall(normalize_text(value)):
+        result.append(token)
+        if "_" in token:
+            result.extend(part for part in token.split("_") if part)
+    return result
 
 
 def fit_idf(texts: list[str]) -> dict[str, float]:
