@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import threading
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -74,6 +75,9 @@ WRITE_TOOL_NAMES = {
 }
 
 
+_TRANSITION_LOG_LOCK = threading.Lock()
+
+
 def _tokens(text: str) -> list[str]:
     return re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]", text.lower())
 
@@ -110,6 +114,9 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         self.transition_patch_min_confidence = float(
             os.environ.get("STATE_BENCH_TRANSITION_PATCH_MIN_CONFIDENCE", "0.8")
         )
+        self._transition_domain = str(domain or "")
+        log_path = os.environ.get("STATE_BENCH_TRANSITION_PATCH_LOG_PATH", "").strip()
+        self._transition_log_path = Path(log_path) if log_path else None
         self._transition_index = None
         if self.transition_patch_mode != "off":
             transition_path = Path(
@@ -405,6 +412,29 @@ Return JSON only:
         feedback = str(verdict.get("feedback", "")).strip()
         return feedback or None
 
+    def _log_transition_gate(
+        self, *, phase: str, matches: list[PatchMatch], triggered: bool
+    ) -> None:
+        if self._transition_log_path is None:
+            return
+        record = {
+            "domain": self._transition_domain,
+            "phase": phase,
+            "triggered": triggered,
+            "matches": [
+                {
+                    "patch_id": str(match.patch.get("id", "")),
+                    "context_distance": round(match.context_distance, 6),
+                    "transition_distance": round(match.transition_distance, 6),
+                }
+                for match in matches
+            ],
+        }
+        self._transition_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with _TRANSITION_LOG_LOCK:
+            with self._transition_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=True) + "\n")
+
     def generate_next_turn(
         self,
         *,
@@ -428,7 +458,9 @@ Return JSON only:
             transition_text=self._transition_candidate(response),
             top_k=3,
         )
-        if not self._transition_index.should_verify(phase, matches):
+        triggered = self._transition_index.should_verify(phase, matches)
+        self._log_transition_gate(phase=phase, matches=matches, triggered=triggered)
+        if not triggered:
             return response
         if self.transition_patch_mode == "shadow":
             return response

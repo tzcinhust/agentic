@@ -255,6 +255,8 @@ def test_anomalous_transition_is_verified_and_revised(tmp_path: Path, monkeypatc
 
 
 def test_shadow_mode_never_changes_candidate(tmp_path: Path, monkeypatch) -> None:
+    log_path = tmp_path / "shadow.jsonl"
+    monkeypatch.setenv("STATE_BENCH_TRANSITION_PATCH_LOG_PATH", str(log_path))
     client = ScriptedClient([completion(text="Done.")])
     agent = build_agent(tmp_path, monkeypatch, client, mode="shadow")
 
@@ -264,3 +266,8 @@ def test_shadow_mode_never_changes_candidate(tmp_path: Path, monkeypatch) -> Non
 
     assert response.text == "Done."
     assert len(client.calls) == 1
+    record = json.loads(log_path.read_text(encoding="utf-8"))
+    assert record["domain"] == "shopping_assistant"
+    assert record["phase"] == "post_write"
+    assert record["triggered"] is True
+    assert "text" not in record
