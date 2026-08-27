@@ -1,0 +1,508 @@
+{
+  "task_id": "41-hard_two_lost_shipments_threshold_split",
+  "user_id": "cust_003",
+  "task_summary": "**Task:** A customer has two lost-in-transit shipments: a low-value coffee maker and a high-value tablet. Correct handling is to offer refund versus reship for the coffee maker, process the chosen $149 original-payment refund, and leave the tablet order unchanged while explaining that high-value lost shipments require carrier investigation before refund or replacement.\n\n**Challenge:** This reuses the proven high-value lost-shipment failure pattern from tasks 20 and 54 in a threshold-contrast setup. Weak agents overgeneralize the immediate low-value refund path to the expensive item, or cancel/refund both lost orders to be helpful.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=2; unexpected_assertions=3",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "original_payment"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10452",
+        "field": "refund_amount",
+        "value": 0
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "item_status",
+        "value": "cancelled"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "credit_card"
+      },
+      {
+        "entity_type": "orders",
+        "record_key": "ORD-7451",
+        "field": "status",
+        "value": "cancelled"
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "156_coffee_maker_refund_choice",
+      "kind": "must",
+      "requirement": "Agent must ask whether the customer wants a refund or a reship for the lost coffee maker before processing one.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Agent told the customer the coffee maker qualified for immediate refund or reshipment and effectively asked for their preference: 'If you want, I can move forward right now with the coffee maker refund...' The customer then chose refund."
+    },
+    {
+      "id": "156_coffee_maker_direct_refund",
+      "kind": "must",
+      "requirement": "Agent must process only a $149 original-payment refund for the lost coffee maker from ORD-7451, without cancelling or returning the order/item.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Requirement says to process only a $149 original-payment refund for ORD-7451 without cancelling or returning the order/item. Instead, the agent used cancel_order preview and then executed cancel_order(confirm=true), and told the customer the order 'has been canceled'."
+    },
+    {
+      "id": "156_tablet_investigation_required",
+      "kind": "must",
+      "requirement": "Agent must explain that ORD-7452 is a high-value lost shipment requiring carrier investigation before any refund, reship, or replacement.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Agent explicitly explained that the tablet/order ORD-7452 is $599 and, as a high-value lost shipment, requires a carrier investigation first before any refund or replacement/cancellation."
+    },
+    {
+      "id": "156_no_tablet_immediate_action",
+      "kind": "must_not",
+      "requirement": "Agent must not offer as available, confirm, refund, reship, replace, cancel, return, credit, escalate for credit, or otherwise mutate ORD-7452 or ITEM-10452 before investigation. A non-mutating internal preview alone is not a failure unless the agent presents the tablet resolution as available or done.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Agent did not mutate ORD-7452 and consistently said it must remain unchanged pending carrier investigation. No tablet refund/reship/replace/cancel tool call was made."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled the two orders distinctly and correctly: it surfaced the under-$500 vs. $500+ lost-in-transit policy difference up front, offered the coffee maker options, and explicitly left the tablet unchanged pending investigation. It previewed the coffee maker refund terms before execution and waited for the user's explicit confirmation before making the consequential cancellation/refund. The interaction was smooth with no need for user correction or re-steering, and the responses were concise while still covering the key amount, method, and policy rationale. The only minor imperfection is that it mentioned starting the tablet investigation path as an option without doing so, but it did not create confusion or an unwanted state change.",
+  "turns": 3,
+  "tool_calls": 9,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked both orders. I can resolve the coffee maker order today, but the tablet order can’t be immediately refunded or canceled yet under the current policy.\n\n- **ORD-7451 — BrewPerfect Coffee Maker ($149):** marked **lost in transit**, and because it’s under $500, it qualifies for **immediate refund or reshipment**.\n- **ORD-7452 — SlateTab Pro 11-inch ($599):** also marked **lost in transit**, but because it’s **$500+**, it requires a **carrier investigation first** before I can process a refund or cancellation.\n\nIf you want, I can move forward right now with the coffee maker refund to your **original payment method**, and I can also start the required investigation path for the tablet.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7451"
+          },
+          "result": {
+            "order_id": "ORD-7451",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK18318188",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 149
+            },
+            "subtotal": 149,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 149,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10451",
+                "order_id": "ORD-7451",
+                "product_id": "PROD-4451",
+                "quantity": 1,
+                "unit_price": 149,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4451",
+                  "name": "BrewPerfect Coffee Maker",
+                  "category": "kitchen",
+                  "price": 149,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7452"
+          },
+          "result": {
+            "order_id": "ORD-7452",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK30864714",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10452",
+                "order_id": "ORD-7452",
+                "product_id": "PROD-4452",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4452",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_003"
+          },
+          "result": {
+            "customer_id": "cust_003",
+            "name": "Sarah Williams",
+            "email": "sarah.w@example.com",
+            "membership_tier": "gold",
+            "account_created": "2021-11-20",
+            "total_orders": 53,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 45,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "1.5x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "rules": {
+              "not_received": {
+                "under_500": "Delivered but not received (<$500): reship or refund.",
+                "over_500": "Delivered but not received (>=$500): mandatory investigation (3-5 business days).",
+                "signature_on_file": "Delivery with signature on file: claim denied."
+              },
+              "lost_in_transit": {
+                "under_500": "Lost in transit (<$500): immediate reship or refund.",
+                "over_500": "Lost in transit (>=$500): carrier claim required first.",
+                "stuck_7_days": "No tracking update for 7+ days: treat as lost."
+              },
+              "damaged": {
+                "rule": "Damaged in transit: full refund or replacement.",
+                "fragile_bonus": "Fragile items damaged in transit qualify for a separate $10 goodwill credit, issued as a refund in addition to the return refund."
+              },
+              "late_delivery_compensation": {
+                "tiers": {
+                  "1_to_2_days_late": "$5 credit",
+                  "3_to_5_days_late": "$15 credit",
+                  "6_plus_days_late": "Full shipping refund + $15 credit"
+                },
+                "shipping_refund_basis": "When refunding shipping, refund the actual shipping cost the customer was charged on the order — read order.shipping_cost. Standard policy charges $0 on free-shipping orders (subtotal >= $100) and $8 otherwise.",
+                "tier_multipliers": {
+                  "gold": "1.5x multiplier on the base late-delivery credit only (NOT on shipping refund or goodwill). Rounded down (e.g., int(15*1.5) = 22).",
+                  "platinum": "2x multiplier on the base late-delivery credit only. Rounded down."
+                },
+                "repeated_issues": "3+ PRIOR issues in 6 months (not counting current incident): additional $25 goodwill credit.",
+                "loyalty_bonus": "Platinum members with 50+ total orders: one-time $50 loyalty bonus on next compensation claim. Confirm with customer if already redeemed.",
+                "max_cap": "Maximum compensation: 50% of order total (rounded down).",
+                "calculation_order": "1) Compute base credit by days-late tier. 2) Apply tier multiplier to base credit only. 3) Add shipping refund (if 6+ days late) using order.shipping_cost. 4) Add goodwill (if 3+ prior issues or fragile damage). 5) Apply loyalty bonus if eligible. 6) Apply 50%-of-order cap on the sum."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancellation"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "pre_shipment": "Free cancellation before shipment (pending/processing status).",
+              "in_transit": "$10 intercept fee per item for in-transit orders.",
+              "delivered": "Cannot cancel delivered orders — must use the return process instead.",
+              "partial": "Partial cancellation allowed if items not yet delivered.",
+              "split_payment": "Refund distributed proportionally to original payment methods.",
+              "already_cancelled": "Already cancelled orders cannot be cancelled again."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "lost in transit orders refund/cancellation for two orders, handle both today"
+          },
+          "result": [
+            "Workflow: Lost in transit resolution via cancellation/refund, with optional accessory cancellation\nUse when: Customer says an order is lost in transit or shipped but not delivered and wants resolution now, usually refund rather than replacement; may also want a separate pending accessory canceled only if the main issue is resolved.\nVerify first:\n- Use get_order on the affected order to verify item status is shipped/in transit and not delivered.\n- If another order may be canceled, use get_order on that order and identify which pending item should be canceled and which should remain pending.\n- Use get_policies for shipment-loss/cancellation rules before mutating.\n- If benefits or compensation could matter, verify with get_customer.\nProcedure:\n1. get_order(<lost_order_id>)\n2. If conditional accessory handling is requested, get_order(<related_order_id>)\n3. If needed, get_customer(<customer_id>)\n4. get_policies(<shipping_loss_or_damage_topic>)\n5. get_policies(<cancellation_topic>)\n6. If needed, process_refund(confirm=false, item_id=<lost_item_id>, refund_method=<requested_or_preferred_method>) to inspect any available direct refund path\n7. cancel_order(confirm=false, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n8. If preview authorizes and customer wants refund now, cancel_order(confirm=true, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n9. If the customer wanted the related pending item canceled only after the main issue was resolved, cancel_order(confirm=false, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n10. If acceptable, cancel_order(confirm=true, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n11. Optionally get_order(<related_order_id>) to confirm unaffected items remain pending\nBranches:\n- If policy says claim review/investigation is required first, do not mutate; give a no-write explanation of the required review path.\n- If the item is actually delivered, do not use lost-in-transit cancellation; switch to return/damage workflow.\n- If the customer wants replacement instead of refund, do not force cancellation; explain the available policy path.\n- If accessory cancellation is conditional and the main order cannot yet be ",
+            "Workflow: No-write cancellation check for already cancelled or non-cancellable orders\nUse when: User asks to cancel an order, but the order may already be cancelled or fully non-cancellable based on status.\nVerify first:\n- Use get_order to inspect current order and item statuses.\n- Use get_policies with the cancellation topic to confirm the handling of already-cancelled and delivered orders.\nProcedure:\n1. get_order(order_id=<order_id>)\n2. get_policies(topic=\"cancel\")\nBranches:\n- If the order/items are already cancelled, do not call cancel_order; inform the user nothing further needs to be done.\n- If the order/items are delivered, do not call cancel_order; explain cancellation is unavailable and suggest return flow if appropriate.\n- If status is unclear from the order alone and customer context is needed for user-facing guidance, optionally call get_customer(customer_id=<customer_id>).\nAvoid:\n- Do not call cancel_order for already cancelled items.\n- Do not call cancel_order for delivered items.\n- Do not promise exceptions to policy that are not returned by tools.\n- Do not treat a single delivered item as proof that other items cannot be cancelled; check item-level status first.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_order -> get_policies -> cancel_order -> cancel_order\n- 1x: get_order -> get_policies\n- 1x: get_order -> get_policies -> get_customer",
+            "Workflow: Handle mixed exchange/return/cancel requests across multiple orders\nUse when: User asks to resolve several items in one message, potentially mixing cancellation before shipment, returns for delivered items, exchanges for replacements, and refund questions.\nVerify first:\n- Use get_customer if needed to anchor the account and benefits across requests.\n- Use get_order for each referenced order to verify ownership, item status, and item details separately.\n- Use get_policies for each action family involved: cancellation, exchange, return/refund, and any special damage/missing-item rules.\n- For any requested replacement product, use search_products and optionally get_product_details before attempting an exchange.\nProcedure:\n1. get_customer(customer_id)\n2. get_order(order_id=<order_A>)\n3. get_order(order_id=<order_B>)\n4. get_order(order_id=<order_C>)\n5. get_policies(topic='cancellation')\n6. get_policies(topic='returns/refunds')\n7. get_policies(topic='exchange')\n8. search_products(query for requested replacement)\n9. get_product_details(product_id)\n10. cancel_order(confirm=false, order_id=<cancel_order_id>, item_ids=[<item_ids>])\n11. process_return(amount=<computed_or_preview_amount>, confirm=false, item_id=<return_item_id>, reason=<reason>)\n12. process_exchange(confirm=false, item_id=<exchange_item_id>, new_product_id=<replacement_product_id>)\n13. cancel_order(confirm=true, order_id=<cancel_order_id>, item_ids=[<item_ids>])\n14. process_return(amount=<preview_refund_amount>, confirm=true, item_id=<return_item_id>, reason=<reason>)\n15. process_exchange(confirm=true, item_id=<exchange_item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- Treat each order/item independently based on status: pre-shipment can be cancelled, delivered items generally require return/exchange flows.\n- If a requested exchange target is out of stock, report the preview outcome and leave that line item unresolved or switch to return only with user approval.\n- If one subtask fails or is unsupported, continue evaluating the others rather than abandoning the whole request.\n- If a missing/damaged/wrong-item claim qualifies for special refund handling, use the relevant policy branch f"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I do want the coffee maker refunded to my original payment method. But why can the coffee maker be refunded now while the tablet can’t, if both shipments were lost in transit?"
+    },
+    {
+      "role": "assistant",
+      "content": "Because the policy treats **lost-in-transit orders under $500** differently from those **$500 and over**. Your coffee maker is **$149**, so it qualifies for an **immediate full refund**; your tablet is **$599**, so it has to go through a **carrier investigation first** before a refund can be issued.\n\nI also checked the coffee maker refund preview, and it’s eligible for a **full $149 refund** with **no fee**. If you want, reply **“confirm”** and I’ll submit that refund to your original payment method.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ]
+          },
+          "result": {
+            "status": "preview",
+            "order_id": "ORD-7451",
+            "items_to_cancel": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "reason": "Package lost — free cancellation with full refund"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Confirm the **$149 refund to my original payment method** for **ORD-7451**.\n\nFor **ORD-7452**, I understand it has to stay **unchanged** and go through the **carrier investigation first** before any refund or replacement."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — **ORD-7451** has been canceled and a **$149 refund** was issued back to your **original payment method**.\n\nAnd confirmed on **ORD-7452**: I’ve left it **unchanged**, so it can continue through the **carrier investigation** before any refund or replacement is considered.",
+      "tool_calls": [
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "confirm": true,
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ]
+          },
+          "result": {
+            "status": "cancelled",
+            "order_id": "ORD-7451",
+            "items_cancelled": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "refund_method": "credit_card"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 41584,
+    "cached_input_tokens": 0,
+    "output_tokens": 571,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 42155,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 41584,
+  "cached_input_tokens": 0,
+  "output_tokens": 571,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 42155,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "orders": {
+        "ORD-7451": {
+          "status": {
+            "old": "shipped",
+            "new": "cancelled"
+          }
+        }
+      },
+      "order_items": {
+        "ITEM-10451": {
+          "item_status": {
+            "old": "shipped",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 149
+          },
+          "refund_method": {
+            "old": null,
+            "new": "credit_card"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_amount",
+      "expected_value": 149
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "item_status",
+      "expected_value": "shipped"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "refund_amount",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7452",
+      "field": "status",
+      "expected_value": "shipped"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 9,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

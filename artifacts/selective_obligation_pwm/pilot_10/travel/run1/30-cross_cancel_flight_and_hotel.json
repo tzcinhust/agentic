@@ -1,0 +1,403 @@
+{
+  "task_id": "30-cross_cancel_flight_and_hotel",
+  "user_id": "user_005",
+  "task_summary": "**Task:** User wants both a domestic flight and a linked Miami hotel canceled, but the two products fall under different fee rules and the hotel is close to crossing into a worse fee tier. Correct resolution: The flight and hotel have different cancellation fee amounts because they follow different cancellation rules.\n\n**Challenge:** The agent explains the separate flight and hotel cancellation fees correctly, makes clear why the hotel is currently in the 24-48 hour tier, and warns that cancelling within 24 hours before check-in would raise the hotel fee to a full first night.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "state_separate_flight_hotel_fee_explanation",
+      "kind": "must",
+      "requirement": "Agent must make clear that the flight and hotel have different cancellation fee amounts because they follow different cancellation rules.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly said the flight fee followed the domestic economy flight cancellation rule and the hotel fee followed the hotel 24–48 hour cancellation tier, making clear the amounts differed because the products use different rules."
+    },
+    {
+      "id": "state_hotel_24_48h_tier_explained",
+      "kind": "must",
+      "requirement": "Agent must explain that the hotel cancellation fee is the 24-48 hour tier, specifically a 50% first-night charge of $90, rather than a booking-age-based fee or a free cancellation.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent stated the hotel fee matched the 24–48 hour tier and specifically explained it as 50% of the first night, with first night rate $180 and applied fee $90, not a booking-age-based fee or free cancellation."
+    },
+    {
+      "id": "state_deadline_warning_given",
+      "kind": "must",
+      "requirement": "Agent must warn that cancelling within 24 hours before check-in would move the hotel into the under-24-hour tier and raise the fee to a full first night charge of $180.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent did not warn that cancelling within 24 hours before check-in would move the hotel into the under-24-hour tier and increase the fee to a full first night charge of $180. The policy tier was listed, but no explicit forward-looking warning was given."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 4.25,
+  "ux_reasoning": "The agent preserved control well by previewing both cancellation fees before confirming, then only executed after the user had already asked to cancel. It also verified ownership and correctly separated the flight and hotel rules, including the hotel’s 24–48 hour tier and the implication that under 24 hours would trigger a full first-night charge. User effort was low because the user didn’t need to correct anything; the agent answered the follow-up clearly and then summarized the final totals cleanly. Response density was good and decision-ready, though slightly repetitive across the clarification and final summary.",
+  "turns": 3,
+  "tool_calls": 11,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to cancel my whole Miami trip — both my flight (booking BK-MS05) and my hotel reservation (HR-0100)."
+    },
+    {
+      "role": "assistant",
+      "content": "Your Miami trip has been canceled.\n\n- Flight BK-MS05: canceled\n  - Refund: $240\n  - Cancellation fee: $50\n\n- Hotel HR-0100: canceled\n  - Refund: $450\n  - Cancellation fee: $90\n\nTotal expected refund: $690\n\nI verified both reservations belonged to your account before canceling.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Cancel a flight booking and a hotel reservation for user_005, including required verification, preview before cancellation, and confirmation steps. User explicitly wants to cancel both BK-MS05 and HR-0100."
+          },
+          "result": [
+            "Workflow: Preview and cancel hotel reservation\nUse when: User wants to cancel a hotel stay or a specific hotel night, often asking first for fees/refund and sometimes mentioning related trip reservations.\nVerify first:\n- Verify the hotel reservation exists with get_hotel_reservation(reservation_id).\n- Confirm the reservation belongs to the user when a user_id is available via get_user_reservations(user_id).\n- Check current hotel status from tool output before attempting cancellation.\n- If the user asks about other tied reservations, inspect get_user_reservations(user_id) first.\nProcedure:\n1. get_hotel_reservation(reservation_id=<HOTEL_ID>)\n2. get_user_reservations(user_id=<USER_ID>)\n3. cancel_hotel_reservation(confirm=false, reservation_id=<HOTEL_ID>)\n4. cancel_hotel_reservation(confirm=true, reservation_id=<HOTEL_ID>)\nBranches:\n- If the user only wants terms or is undecided, stop after cancel_hotel_reservation(confirm=false) and report preview only.\n- If the user already gave clear cancellation authorization, you may proceed from verification to preview and then confirmation.\n- If the hotel should remain unchanged while other trip parts are canceled, do not call cancel_hotel_reservation after verification; report that it remains active.\n- If reservation lookup shows mismatch, missing reservation, or already-cancelled status, do not mutate; explain the authoritative tool result.\n- If the user asks to review related reservations too, use get_user_reservations and summarize flight/car/hotel items without canceling them unless explicitly requested.\nAvoid:\n- Do not assume a hotel is tied to a flight without checking user reservations.\n- Do not cancel when the user asked only for preview, review, or recommendation.\n- Do not invent partial-night modification flows; only use cancellation tools actually available.\n- Do not repeat cancellation calls after a successful cancelled result unless the tool output indicates it is needed.\nProcess support: mean conformance=0.968\nObserved frequent paths:\n- 1x: get_booking -> get_user_details -> get_flight_status -> get_policies -> get_user_reservations -> get_booking -> get_hotel_reservation -> get_policies -> get_policies -> get_",
+            "Workflow: Compare change vs cancel-and-rebook before approval\nUse when: User wants to move an existing flight and explicitly asks for a side-by-side comparison before any cancellation, change, or new booking.\nVerify first:\n- Use get_booking to confirm the current itinerary, cabin, route, and existing booking preferences.\n- If rules or fees are unclear, use get_policies for change/cancel constraints relevant to the booking.\n- If schedule context matters, use get_flight_status on the current flight.\n- Identify candidate replacement flights with search_flights using the user's date, route, airline, stop, time, and budget preferences.\n- Obtain a cancel preview with cancel_booking(confirm=false/preview behavior) and, if evaluating direct change, obtain an update preview with update_booking(confirm=false/preview behavior) for a specific candidate flight.\nProcedure:\n1. get_booking\n2. get_policies\n3. get_flight_status\n4. search_flights\n5. update_booking\n6. cancel_booking\nBranches:\n- If the user has not approved a specific option, stop after previews and report both paths with totals and tradeoffs; do not mutate anything.\n- If no replacement flights match the stated constraints, return a no-write outcome and ask whether to relax airline, time, stops, or budget filters.\n- If a direct-change preview shows a negative fare difference, explain it using the tool output rather than assuming cash is refunded; compare with cancel-and-rebook using the previewed totals.\n- If multiple valid replacement flights exist, summarize the best candidates and ask the user to choose before any write action.\nAvoid:\n- Do not cancel or create a booking before the user approves a specific option when they asked for comparison first.\n- Do not claim a direct change is completed based on a preview response.\n- Do not infer refundability, credits, or policy behavior beyond current tool outputs.\n- Do not present a booked/cancelled outcome unless the corresponding write call returned a confirmed/cancelled status.\nProcess support: mean conformance=0.962\nObserved frequent paths:\n- 1x: get_booking -> cancel_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights ->",
+            "Workflow: cancel hotel reservation\nUse when: The request matches the cancel hotel reservation workflow family.\nVerify first:\n- Verify current facts needed by get_hotel_reservation.\nProcedure:\n1. Use get_hotel_reservation with current-task identifiers and verified arguments.\n2. Use cancel_hotel_reservation with current-task identifiers and verified arguments.\nBranches:\n- If a required condition is not verified, explain the valid alternative and do not mutate state.\nAvoid:\n- Do not copy identifiers, prices, dates, or policy outcomes from training examples.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_hotel_reservation -> cancel_hotel_reservation"
+          ]
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS05"
+          },
+          "result": {
+            "booking_id": "BK-MS05",
+            "user_id": "user_005",
+            "flight_id": "B6100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "vegan",
+            "add_wifi": true,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 290,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-10T13:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "MIA",
+            "departure_time": "2026-06-16T14:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "reservation_id": "HR-0100",
+            "user_id": "user_005",
+            "hotel_name": "MIA Inn",
+            "city": "MIA",
+            "check_in": "2026-06-16",
+            "check_out": "2026-06-19",
+            "room_type": "standard",
+            "nightly_rate": 180,
+            "total_price": 540,
+            "hotel_id": null,
+            "status": "confirmed",
+            "booked_at": "2026-06-10T13:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "get_user_reservations",
+          "arguments": {
+            "user_id": "user_005"
+          },
+          "result": {
+            "user_id": "user_005",
+            "booking_ids": [
+              "BK-MS05"
+            ],
+            "hotel_ids": [
+              "HR-0100"
+            ],
+            "car_rental_ids": []
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-MS05"
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-MS05",
+            "cancellation_fee": 50,
+            "refund_amount": 240,
+            "reason": "Economy cancellation fee: max($50, 15% of $290) = $50"
+          }
+        },
+        {
+          "name": "cancel_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "status": "preview",
+            "reservation_id": "HR-0100",
+            "cancellation_fee": 90,
+            "refund_amount": 450,
+            "reason": "50% of first night charge (24-48h before check-in): $90."
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-MS05",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "booking_id": "BK-MS05",
+            "refund_amount": 240,
+            "cancellation_fee": 50,
+            "reason": "Economy cancellation fee: max($50, 15% of $290) = $50"
+          }
+        },
+        {
+          "name": "cancel_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "reservation_id": "HR-0100",
+            "cancellation_fee": 90,
+            "refund_amount": 450,
+            "reason": "50% of first night charge (24-48h before check-in): $90."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — can you confirm the flight fee was under the flight rule, and for the hotel that it was in the 24-48 hour tier with the 50% first-night fee? Also, why was there a hotel charge if I booked it 5 days ago?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes.\n\n- Flight fee: yes, it matched the flight cancellation rule for a domestic economy ticket.\n  - Policy: cancellation fee is max($50, 15% of ticket price)\n  - Your ticket price: $290\n  - 15% of $290 = $43.50\n  - Applied fee: $50\n  - So the $50 fee was correct under the rule.\n\n- Hotel fee: yes, it matched the 24–48 hour hotel tier.\n  - Policy for a standard room:\n    - 48+ hours before check-in: free\n    - 24–48 hours before check-in: 50% of first night\n    - under 24 hours: full first night\n  - Your first night rate: $180\n  - 50% of first night: $90\n  - Applied fee: $90\n  - So the hotel fee was correct for the 24–48 hour window.\n\nWhy there was a hotel charge even though you booked 5 days ago:\n- Hotel cancellation is based on how close you are to check-in, not how long ago you made the reservation.\n- You booked on 2026-06-10 at 13:00.\n- Check-in was 2026-06-16.\n- The cancellation happened on 2026-06-15, which put it within 24–48 hours of check-in.\n- Because of that timing, the free-cancellation window no longer applied, even though the booking itself was only 5 days old.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancel",
+            "cabin_class": "economy",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "free_cancellation_window": "Full refund within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not cancellable after free window (unless insured)",
+              "economy_domestic": "Cancellation fee: max($50, 15% of ticket price)",
+              "economy_international": "Cancellation fee: max($75, 20% of ticket price)",
+              "business_domestic": "Cancellation fee: 5% of ticket price",
+              "business_international": "Cancellation fee: 8% of ticket price",
+              "first": "Free cancellation",
+              "insurance": "Travel insurance covers cancellation regardless of cabin class",
+              "route_type_matters": "Fees differ by route type (domestic vs international). Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "hotel_cancel",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "hotel_cancellation",
+            "rules": {
+              "standard_room_48h_plus": "Free cancellation if 48+ hours before check-in",
+              "standard_room_24_48h": "50% of first night charge if 24-48 hours before check-in",
+              "standard_room_under_24h": "Full first night charge if <24 hours before check-in",
+              "suite": "Suite bookings are non-refundable (full charge regardless of timing)"
+            }
+          }
+        },
+        {
+          "name": "get_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "reservation_id": "HR-0100",
+            "user_id": "user_005",
+            "hotel_name": "MIA Inn",
+            "city": "MIA",
+            "check_in": "2026-06-16",
+            "check_out": "2026-06-19",
+            "room_type": "standard",
+            "nightly_rate": 180,
+            "total_price": 540,
+            "hotel_id": null,
+            "status": "cancelled",
+            "booked_at": "2026-06-10T13:00:00",
+            "cancellation_fee": 90,
+            "refund_amount": 450
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Got it, thanks for clarifying. Can you give me one final summary with the separate flight fee/refund and hotel fee/refund totals together, just so I have the full breakdown in one place?"
+    },
+    {
+      "role": "assistant",
+      "content": "Of course — here’s the full breakdown in one place:\n\n- Flight BK-MS05\n  - Cancellation fee: $50\n  - Refund: $240\n\n- Hotel HR-0100\n  - Cancellation fee: $90\n  - Refund: $450\n\nTotals\n- Total cancellation fees: $140\n- Total refund amount: $690\n\nBasis\n- Flight: domestic economy cancellation rule, max($50, 15% of $290) = $50\n- Hotel: 24–48 hour standard-room policy, 50% of first night ($180) = $90",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 43778,
+    "cached_input_tokens": 0,
+    "output_tokens": 873,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 44651,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 43778,
+  "cached_input_tokens": 0,
+  "output_tokens": 873,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 44651,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "hotels": {
+        "HR-0100": {
+          "cancellation_fee": {
+            "old": null,
+            "new": 90
+          },
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 450
+          }
+        }
+      },
+      "bookings": {
+        "BK-MS05": {
+          "refund_amount": {
+            "old": null,
+            "new": 240
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 50
+          },
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS05",
+      "field": "cancellation_fee",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS05",
+      "field": "refund_amount",
+      "expected_value": 240
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS05",
+      "field": "status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "cancellation_fee",
+      "expected_value": 90
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "refund_amount",
+      "expected_value": 450
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "status",
+      "expected_value": "cancelled"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.3,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 11,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
