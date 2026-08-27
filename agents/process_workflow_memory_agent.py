@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -11,6 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
+from agents.selective_obligation_guard import (
+    build_obligation_prompt,
+    compact_audit_record,
+    guard_feedback,
+)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 INTENT_HINTS = {
@@ -69,6 +78,15 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         self.mode = os.environ.get("STATE_BENCH_MEMORY_MODE", "hybrid")
         if self.mode not in {"hybrid", "awm_only", "process_only"}:
             raise ValueError("STATE_BENCH_MEMORY_MODE must be hybrid, awm_only, or process_only")
+        self.obligation_mode = os.environ.get("STATE_BENCH_OBLIGATION_MODE", "on")
+        if self.obligation_mode not in {"off", "on"}:
+            raise ValueError("STATE_BENCH_OBLIGATION_MODE must be off or on")
+        self.guard_mode = os.environ.get("STATE_BENCH_SELECTIVE_GUARD_MODE", "enforce")
+        if self.guard_mode not in {"off", "monitor", "enforce"}:
+            raise ValueError(
+                "STATE_BENCH_SELECTIVE_GUARD_MODE must be off, monitor, or enforce"
+            )
+        self.guard_audit: list[dict[str, Any]] = []
         artifact = json.loads(self.memory_path.read_text(encoding="utf-8"))
         domain = getattr(runtime_context, "domain", None)
         self._cards = [item for item in artifact.get("cards", []) if item.get("domain") == domain]
@@ -104,7 +122,58 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             "workflow requires a preview or choice. A valid branch may require no state change.\n\n"
             + "\n\n---\n\n".join(learnings)
         )
+        if self.obligation_mode == "on":
+            obligation_prompt = build_obligation_prompt(learnings, conversation)
+            if obligation_prompt:
+                memory_prompt = f"{memory_prompt}\n\n---\n\n{obligation_prompt}"
         return self.inject_system_message(conversation, memory_prompt)
+
+    def generate_next_turn(
+        self,
+        *,
+        system_prompt: str,
+        conversation: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ):
+        """Preserve PWM generation and revise at most once for a precise violation."""
+
+        response = super().generate_next_turn(
+            system_prompt=system_prompt,
+            conversation=conversation,
+            tools=tools,
+        )
+        if self.guard_mode == "off":
+            return response
+        feedback = guard_feedback(response, conversation)
+        if not feedback:
+            return response
+        record = {"feedback": feedback, "corrected": False}
+        self.guard_audit.append(record)
+        if self.guard_mode == "monitor":
+            LOGGER.warning(compact_audit_record(feedback, corrected=False))
+            return response
+
+        correction = {
+            "role": "system",
+            "content": (
+                "The previous candidate was not executed. A high-confidence mechanical check found: "
+                f"{feedback} Produce the minimal corrective next step while preserving every other "
+                "correct part of the plan and every explicit user constraint."
+            ),
+        }
+        revised = super().generate_next_turn(
+            system_prompt=system_prompt,
+            conversation=[*conversation, correction],
+            tools=tools,
+        )
+        if guard_feedback(revised, conversation):
+            # A failed correction must not replace the archived PWM candidate with
+            # a generic dead end or start an unbounded repair loop.
+            LOGGER.warning(compact_audit_record(feedback, corrected=False))
+            return response
+        record["corrected"] = True
+        LOGGER.warning(compact_audit_record(feedback, corrected=True))
+        return revised
 
     def memory_tool_schemas(self) -> list[dict[str, Any]]:
         return [
