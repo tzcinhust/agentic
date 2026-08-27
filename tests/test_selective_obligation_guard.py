@@ -54,6 +54,26 @@ def test_obligation_prompt_marks_failed_tools_without_calling_them_successful() 
     assert "Successful evidence tools: none yet" in prompt
 
 
+def test_obligation_prompt_enforces_bounded_final_response() -> None:
+    prompt = build_obligation_prompt(
+        [],
+        [
+            {
+                "role": "user",
+                "content": (
+                    "If the exchange only supports store credit, explain why it cannot go "
+                    "back to my card."
+                ),
+            }
+        ],
+    )
+    assert "directly answer the latest user request" in prompt
+    assert "Do not add unrelated account-wide totals or balances" in prompt
+    assert "Do not introduce alternative workflows, refund paths" in prompt
+    assert "do not volunteer a workaround" in prompt
+    assert "answer every explicit user ask" not in prompt
+
+
 def test_guard_leaves_ordinary_pwm_action_unchanged() -> None:
     candidate = response(
         calls=[

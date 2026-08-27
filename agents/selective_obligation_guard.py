@@ -309,8 +309,15 @@ def build_obligation_prompt(
         lines.extend(f"  * {item[:360]}" for item in communication)
     lines.extend(
         [
-            "- Before finalizing, answer every explicit user ask and preserve every stated boundary.",
-            "- Prefer one complete, tool-grounded answer over extra confirmation or speculative actions.",
+            "- Final coverage: directly answer the latest user request with the exact tool-grounded "
+            "result, necessary rationale, and any requested comparison or time/amount warning.",
+            "- Bounded closure: report only the requested outcome, necessary policy basis, and "
+            "tool-confirmed changes. Do not add unrelated account-wide totals or balances.",
+            "- Do not introduce alternative workflows, refund paths, conversions, future services, "
+            "or speculative options unless the user explicitly requested that exact information "
+            "and authoritative tools confirm it is available.",
+            "- When a requested action is unsupported, clearly state the limitation and supported "
+            "outcome; do not volunteer a workaround unless the user asks for alternatives.",
             "Do not perform an action merely because it appears in this ledger.",
         ]
     )
