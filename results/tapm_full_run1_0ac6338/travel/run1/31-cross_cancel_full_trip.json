@@ -1,0 +1,549 @@
+{
+  "task_id": "31-cross_cancel_full_trip",
+  "user_id": "user_001",
+  "task_summary": "**Task:** A traveler asks to cancel a delayed flight and an LA hotel, but a linked luxury car rental also exists and must be proactively discovered. Correct resolution: Agent must proactively discover and bring up the linked luxury car rental CR-0101 rather than ending after only the flight and hotel.\n\n**Challenge:** The agent recognizes the severe-delay free-cancellation path for the flight, clearly explains that the suite hotel is non-refundable, and proactively surfaces and resolves the hidden luxury-car cancellation with its surcharge instead of ignoring it.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "state_hidden_car_discovered",
+      "kind": "must",
+      "requirement": "Agent must proactively discover and bring up the linked luxury car rental CR-0101 rather than ending after only the flight and hotel.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent discovered CR-0101 via get_user_reservations early, but did not proactively bring it up before completing the flight and hotel cancellation flow. It only asked about the car after canceling both: 'Would you like me to also check your car rental CR-0101?' The requirement explicitly says to proactively discover and bring up the linked car rental rather than ending after only the flight and hotel."
+    },
+    {
+      "id": "state_delay_cancel_and_nonrefundable_hotel_explained",
+      "kind": "must",
+      "requirement": "Agent must explain that the delayed flight can be canceled with no fee because of the severe airline delay, while the suite hotel is still non-refundable.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explained that the flight could be canceled for $0 due to the airline delay/full refund path and that the suite hotel was non-refundable: 'Flight BK-MS06: $0 fee and $1,000 refund. Reason: Airline-initiated cancellation: full refund' and 'Hotel HR-0100: $1,400 fee and $0 refund. Reason: Suite bookings are non-refundable.'"
+    },
+    {
+      "id": "state_luxury_car_surcharge_explained",
+      "kind": "must",
+      "requirement": "Agent must explain that canceling the linked luxury car rental carries a $50 surcharge and quote that fee before or when confirming the cancellation.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Before canceling the car, the agent provided the cancellation preview including the exact $50 surcharge and refund: 'Cancellation fee: $50' and 'Reason: Free cancellation 24+ hours before pickup, plus a $50 luxury car surcharge.' This satisfies quoting the fee before confirming cancellation."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 1.97,
+  "ux_reasoning": "The agent did keep explicit approval boundaries for each actual cancellation, but it failed a key travel-control requirement by discovering the linked car rental in the first turn and not surfacing it before executing the flight and hotel cancellations. That meant the user's approval to \"cancel both\" was taken without complete trip-level consequences, and the user then had to ask to shut down the whole LA trip cleanly and request the missing car details. User effort was therefore elevated by the avoidable omission and extra turn sequence, though the later car-rental preview/cancel flow itself was handled correctly. Response density was adequate but not strong: the summaries were clear and the final math was correct, yet the initial response materially omitted the linked reservation that should have been part of the decision-ready answer.",
+  "turns": 5,
+  "tool_calls": 15,
+  "tool_errors": 0,
+  "redundant_calls": 4,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My flight DL100 to LA is delayed over 5 hours. I want to cancel my flight (BK-MS06) and hotel (HR-0100)."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked both cancellations.\n\n- Flight BK-MS06: $0 fee and $1,000 refund. Reason: Airline-initiated cancellation: full refund.\n- Hotel HR-0100: $1,400 fee and $0 refund. Reason: Suite bookings are non-refundable.\n\nIf you want, I can cancel both now.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS06"
+          },
+          "result": {
+            "booking_id": "BK-MS06",
+            "user_id": "user_001",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "business",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 1000,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_time": "2026-06-18T10:00:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "reservation_id": "HR-0100",
+            "user_id": "user_001",
+            "hotel_name": "LAX Grand Suite",
+            "city": "LAX",
+            "check_in": "2026-06-18",
+            "check_out": "2026-06-22",
+            "room_type": "suite",
+            "nightly_rate": 350,
+            "total_price": 1400,
+            "hotel_id": null,
+            "status": "confirmed",
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "get_user_reservations",
+          "arguments": {
+            "user_id": "user_001"
+          },
+          "result": {
+            "user_id": "user_001",
+            "booking_ids": [
+              "BK-MS06"
+            ],
+            "hotel_ids": [
+              "HR-0100"
+            ],
+            "car_rental_ids": [
+              "CR-0101"
+            ]
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-MS06",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-MS06",
+            "cancellation_fee": 0,
+            "refund_amount": 1000,
+            "reason": "Airline-initiated cancellation: full refund"
+          }
+        },
+        {
+          "name": "cancel_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "reservation_id": "HR-0100",
+            "cancellation_fee": 1400,
+            "refund_amount": 0,
+            "reason": "Suite bookings are non-refundable."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That’s really frustrating about the hotel, but yes, please go ahead and cancel both since the flight is fully refundable."
+    },
+    {
+      "role": "assistant",
+      "content": "Both are now canceled.\n\n- Flight BK-MS06: canceled, $1,000 refund, $0 fee\n- Hotel HR-0100: canceled, $0 refund, $1,400 fee\n\nWould you like me to also check your car rental CR-0101?",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS06"
+          },
+          "result": {
+            "booking_id": "BK-MS06",
+            "user_id": "user_001",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "business",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 1000,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_time": "2026-06-18T10:00:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "reservation_id": "HR-0100",
+            "user_id": "user_001",
+            "hotel_name": "LAX Grand Suite",
+            "city": "LAX",
+            "check_in": "2026-06-18",
+            "check_out": "2026-06-22",
+            "room_type": "suite",
+            "nightly_rate": 350,
+            "total_price": 1400,
+            "hotel_id": null,
+            "status": "confirmed",
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-MS06",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "booking_id": "BK-MS06",
+            "refund_amount": 1000,
+            "cancellation_fee": 0,
+            "reason": "Airline-initiated cancellation: full refund"
+          }
+        },
+        {
+          "name": "cancel_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "reservation_id": "HR-0100",
+            "cancellation_fee": 1400,
+            "refund_amount": 0,
+            "reason": "Suite bookings are non-refundable."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please check that too — I want the whole LA trip shut down cleanly, and I don’t remember every component that might be linked. If CR-0101 is part of it, please tell me the cancellation fee and refund before canceling."
+    },
+    {
+      "role": "assistant",
+      "content": "CR-0101 is part of your reservations and it’s still confirmed.\n\nI can confirm the booking exists, but the current lookup doesn’t show the cancellation fee or refund amount. If you want, I can check the car rental cancellation policy details next, then proceed with cancellation if you approve.",
+      "tool_calls": [
+        {
+          "name": "get_car_rental",
+          "arguments": {
+            "rental_id": "CR-0101"
+          },
+          "result": {
+            "rental_id": "CR-0101",
+            "user_id": "user_001",
+            "company": "Avis",
+            "pickup_location": "LAX",
+            "dropoff_location": "LAX",
+            "pickup_date": "2026-06-18",
+            "dropoff_date": "2026-06-22",
+            "car_class": "luxury",
+            "daily_rate": 120,
+            "total_price": 480,
+            "car_id": null,
+            "status": "confirmed",
+            "insurance_included": false,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "get_user_reservations",
+          "arguments": {
+            "user_id": "user_001"
+          },
+          "result": {
+            "user_id": "user_001",
+            "booking_ids": [
+              "BK-MS06"
+            ],
+            "hotel_ids": [
+              "HR-0100"
+            ],
+            "car_rental_ids": [
+              "CR-0101"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please check the cancellation policy details for CR-0101 first. I want to know the fee and refund amount before you cancel it."
+    },
+    {
+      "role": "assistant",
+      "content": "For car rental CR-0101, the cancellation preview is:\n\n- Cancellation fee: $50\n- Refund amount: $430\n- Reason: Free cancellation 24+ hours before pickup, plus a $50 luxury car surcharge\n\nIf you want, I can cancel CR-0101 now.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "User wants cancellation fee and refund amount for car rental CR-0101 before canceling. Need process-conformant preview path for car rental cancellation terms only, no final cancellation unless later approved."
+          },
+          "result": [
+            "Workflow: cancel+car rental\nUse when: The request matches the cancel+car rental workflow family.\nVerify first:\n- Verify current facts needed by search_flights.\n- Verify current facts needed by get_booking.\n- Verify current facts needed by get_car_rental.\n- Verify current facts needed by get_flight_status.\n- Verify current facts needed by get_user_details.\nProcedure:\n1. Use get_booking with current-task identifiers and verified arguments.\n2. Use get_booking with current-task identifiers and verified arguments.\n3. Use get_car_rental with current-task identifiers and verified arguments.\n4. Use get_flight_status with current-task identifiers and verified arguments.\n5. Use get_flight_status with current-task identifiers and verified arguments.\n6. Use get_user_details with current-task identifiers and verified arguments.\n7. Use search_flights with current-task identifiers and verified arguments.\n8. Use search_flights with current-task identifiers and verified arguments.\n9. Use search_flights with current-task identifiers and verified arguments.\n10. Use search_flights with current-task identifiers and verified arguments.\n11. Use search_flights with current-task identifiers and verified arguments.\n12. Use search_flights with current-task identifiers and verified arguments.\n13. Use search_flights with current-task identifiers and verified arguments.\n14. Use search_flights with current-task identifiers and verified arguments.\n15. Use update_booking with current-task identifiers and verified arguments.\n16. Use update_booking with current-task identifiers and verified arguments.\n17. Use cancel_car_rental with current-task identifiers and verified arguments.\n18. Use update_booking with current-task identifiers and verified arguments.\n19. Use update_booking with current-task identifiers and verified arguments.\n20. Use cancel_car_rental with current-task identifiers and verified arguments.\n21. Use update_booking with current-task identifiers and verified arguments.\n22. Use update_booking with current-task identifiers and verified arguments.\n23. Use get_booking with current-task identifiers and verified arguments.\n24. Use get_booking with current-task identifiers and verified a",
+            "Workflow: Search and validate hotel+car trip package before booking\nUse when: User wants a trip bundle including flights, hotel, and rental car, often with a total budget and preferences, and asks to confirm package details before any booking.\nVerify first:\n- Verify trip dates, origin, destination, and total budget from the request.\n- Use search_flights for outbound and return directions and confirm results are nonstop/economy if requested.\n- Use search_hotels for the stay dates and destination city.\n- Use search_car_rentals for pickup/dropoff dates and destination airport/city.\n- Ensure the selected combination fits the stated budget and matches requested package quality constraints, not just the absolute cheapest if user says otherwise.\nProcedure:\n1. search_flights(outbound criteria with origin, destination, date, max_stops, price/time filters)\n2. search_flights(return criteria with origin, destination, date, max_stops, price/time filters)\n3. search_hotels(check_in, check_out, city, max_price, room_type)\n4. search_car_rentals(car_class, pickup_date, dropoff_date, pickup_location, max_daily_rate)\n5. search_flights(retry/refine outbound search if needed to confirm airline, time range, or cheaper nonstop economy options)\n6. search_flights(retry/refine return search if needed to confirm airline, time range, or cheaper nonstop economy options)\n7. search_hotels(refine if needed to match package budget or room constraints)\n8. search_car_rentals(refine if needed to match class or budget)\nBranches:\n- If any search returns no results, report that no matching option was found and stop without booking.\n- If multiple valid bundles exist, present the matching package options and total prices; do not book until the user selects one.\n- If the user asks whether chosen flights are the cheapest nonstop economy options, verify by additional search_flights queries before any write.\n- If the package total exceeds budget, offer lower-cost valid alternatives or stop without booking.\n- If hotel or car options differ from the quoted package, do not substitute silently; ask the user to choose.\nAvoid:\n- Do not create bookings before the user confirms the exact package.\n- Do not assume a ",
+            "Workflow: Use preview mode for cancellation or change cost checks\nUse when: User asks for fees, refund amounts, change totals, or whether an option is cheaper, but has not yet authorized final action.\nVerify first:\n- Use get_booking to verify the target booking exists and identify the route/cabin context.\n- Use cancel_booking with non-confirming preview behavior to inspect cancellation fee and refund amount.\n- When evaluating a specific replacement on the existing booking, use update_booking with non-confirming preview behavior to inspect change fee and fare difference.\n- Use search_flights first if a specific target flight must be identified before an update preview can be run.\nProcedure:\n1. get_booking\n2. search_flights\n3. cancel_booking\n4. update_booking\nBranches:\n- If only cancellation economics are needed, stop after the cancel preview and provide a no-write answer.\n- If only direct-change economics are needed, stop after the update preview and provide a no-write answer.\n- If both paths are requested, compute and present both from preview outputs, then wait for approval.\n- If previews cannot be produced because no suitable replacement flight is found, return available cancellation information and explain the gap.\nAvoid:\n- Do not convert a preview into a final status in the narrative.\n- Do not make extra write calls after the user asked only for costs or comparison.\n- Do not assume previewed values remain valid for a different flight/date/search result without rerunning the relevant tool.\nProcess support: mean conformance=0.962\nObserved frequent paths:\n- 1x: get_booking -> cancel_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> update_booking -> update_booking -> cancel_booking -> create_booking\n- 1x: get_booking -> cancel_booking -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> update_booking -> search_flights -> search_flights -> cancel_booking -> cr"
+          ]
+        },
+        {
+          "name": "cancel_car_rental",
+          "arguments": {
+            "rental_id": "CR-0101",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "rental_id": "CR-0101",
+            "cancellation_fee": 50,
+            "refund_amount": 430,
+            "reason": "Free cancellation (24+ hours before pickup) + $50 luxury surcharge."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please cancel CR-0101 too. And once that’s done, can you give me a complete summary of everything canceled for the LA trip, including total fees and total refunds?"
+    },
+    {
+      "role": "assistant",
+      "content": "CR-0101 is now canceled.\n\nLA trip cancellation summary:\n- Flight BK-MS06: canceled, fee $0, refund $1,000\n- Hotel HR-0100: canceled, fee $1,400, refund $0\n- Car rental CR-0101: canceled, fee $50, refund $430\n\nTotals:\n- Total cancellation fees: $1,450\n- Total refunds: $1,430\n- Net result: $20 more in fees than refunds\n\nYour full LA trip now appears fully shut down.",
+      "tool_calls": [
+        {
+          "name": "get_car_rental",
+          "arguments": {
+            "rental_id": "CR-0101"
+          },
+          "result": {
+            "rental_id": "CR-0101",
+            "user_id": "user_001",
+            "company": "Avis",
+            "pickup_location": "LAX",
+            "dropoff_location": "LAX",
+            "pickup_date": "2026-06-18",
+            "dropoff_date": "2026-06-22",
+            "car_class": "luxury",
+            "daily_rate": 120,
+            "total_price": 480,
+            "car_id": null,
+            "status": "confirmed",
+            "insurance_included": false,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "cancel_car_rental",
+          "arguments": {
+            "rental_id": "CR-0101",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "rental_id": "CR-0101",
+            "cancellation_fee": 50,
+            "refund_amount": 430,
+            "reason": "Free cancellation (24+ hours before pickup) + $50 luxury surcharge."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Just to verify: all three LA reservations — BK-MS06, HR-0100, and CR-0101 — are canceled, with total fees of $1,450 and total refunds of $1,430, correct? [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 113297,
+    "cached_input_tokens": 0,
+    "output_tokens": 1940,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 115237,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 113297,
+  "cached_input_tokens": 0,
+  "output_tokens": 1940,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 115237,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "hotels": {
+        "HR-0100": {
+          "refund_amount": {
+            "old": null,
+            "new": 0
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 1400
+          },
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          }
+        }
+      },
+      "car_rentals": {
+        "CR-0101": {
+          "refund_amount": {
+            "old": null,
+            "new": 430
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 50
+          },
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          }
+        }
+      },
+      "bookings": {
+        "BK-MS06": {
+          "refund_amount": {
+            "old": null,
+            "new": 1000
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 0
+          },
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS06",
+      "field": "cancellation_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS06",
+      "field": "refund_amount",
+      "expected_value": 1000
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS06",
+      "field": "status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "car_rentals",
+      "record_key": "CR-0101",
+      "field": "cancellation_fee",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "car_rentals",
+      "record_key": "CR-0101",
+      "field": "refund_amount",
+      "expected_value": 430
+    },
+    {
+      "entity_type": "car_rentals",
+      "record_key": "CR-0101",
+      "field": "status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "cancellation_fee",
+      "expected_value": 1400
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "refund_amount",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "hotels",
+      "record_key": "HR-0100",
+      "field": "status",
+      "expected_value": "cancelled"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 3,
+  "ux_base_score": 2.2,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.23,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 15,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 4,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 3,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

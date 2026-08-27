@@ -1,0 +1,294 @@
+{
+  "task_id": "38-silent_promo_auto_drop",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning Standard customer (shop_004) has a pre-seeded cart with two items ($449 + $329 = $778) and SAVE15 promo applied (15%, min $500, saving $116). Customer asks to remove the chair ($329). The env silently auto-evicts SAVE15 on removal because cart drops to $449 (< $500 min_purchase), costing the customer $116 in discount. The eviction is silent in the tool response — cart simply reports new totals without highlighting the promo loss.\n\n**Challenge:** Proactive detection of a silent state change caused by a tool side effect. Pitfall: agent confirms the removal without noticing the promo vanished. Correct: agent either warns BEFORE removing (by reading cart first and computing the min_purchase impact) or surfaces the auto-drop AFTER with specific reason (min_purchase violation) and specific lost amount (~$116). Tests attention to tool result details beyond the headline action. Distinct from T13 (expired_promo_silent_drop) which tests expiry — T38 tests min_purchase violation triggered by customer's OWN cart action.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "removed_mesh_chair",
+      "kind": "must",
+      "requirement": "Agent called remove_from_cart (or update_cart_item with quantity=0) for SP-3004 ErgoDesk Mesh Chair. The chair must be out of the final cart.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Agent called remove_from_cart for product_id SP-3004, and the final get_cart shows only the standing desk remaining."
+    },
+    {
+      "id": "disclosed_promo_auto_drop",
+      "kind": "must",
+      "requirement": "Agent proactively informed the customer that the SAVE15 promo was (or would be) dropped. Silent completion without mentioning the promo eviction fails.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Assistant explicitly said, 'the previous promo code is no longer applied on the updated cart,' so the promo eviction was mentioned."
+    },
+    {
+      "id": "cited_min_purchase_reason",
+      "kind": "must",
+      "requirement": "Agent explained WHY SAVE15 was dropped — citing the $500 min_purchase violation (cart falling below the threshold). Vague 'the promo no longer applies' without the min_purchase reason fails.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Assistant did not explain that the promo dropped because the cart fell below the $500 minimum purchase threshold; it only noted the promo was no longer applied."
+    },
+    {
+      "id": "named_lost_discount_amount",
+      "kind": "must",
+      "requirement": "Agent named the specific dollar amount of discount lost (~$116, or 'about $116', or explicit before/after totals showing the $116 delta). Generic 'you'll lose your discount' without the number fails.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "Assistant did not state the specific lost discount amount of about $116, nor provide before/after totals explicitly framing the $116 loss."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "No set_shipping_option or redeem_loyalty_points tool calls were made."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.95,
+  "ux_reasoning": "The agent removed the item immediately without warning that this consequential cart change would also cause the SAVE15 promo to be lost, even though the pre-removal cart data made that foreseeable. It did at least mention afterward that the promo was no longer applied, so the state change was not completely silent, but it failed to explain the reason (falling below the $500 minimum) or the lost $116 discount. User effort stayed fairly low because the task completed in one pass with no need for correction or re-steering. Response density was mostly good: concise and readable, but missing the critical consequence details that would help the user evaluate the change.",
+  "turns": 1,
+  "tool_calls": 3,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Please remove the mesh chair from my cart — I don't need it after all."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I removed the ErgoDesk Mesh Chair from your cart.\n\nYour cart now has:\n- ErgoDesk Standing Desk — $449\n\nUpdated total:\n- Total: $449\n\nNote: the previous promo code is no longer applied on the updated cart.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-3003",
+                "product_name": "ErgoDesk Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 449,
+                "line_total": 449
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-3004",
+                "product_name": "ErgoDesk Mesh Chair",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 329,
+                "line_total": 329
+              }
+            ],
+            "subtotal": 778,
+            "discount_amount": 116,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 662,
+            "applied_promo_codes": [
+              "SAVE15"
+            ]
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3004"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_004",
+            "product_id": "SP-3004",
+            "variant_id": null,
+            "cart_subtotal": 449,
+            "cart_total": 449
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-3003",
+                "product_name": "ErgoDesk Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 449,
+                "line_total": 449
+              }
+            ],
+            "subtotal": 449,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 449,
+            "applied_promo_codes": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Got it, thanks. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 16407,
+    "cached_input_tokens": 0,
+    "output_tokens": 247,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 16654,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 16407,
+  "cached_input_tokens": 0,
+  "output_tokens": 247,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 16654,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "applied_promo_codes": {
+            "old": [
+              "SAVE15"
+            ],
+            "new": []
+          },
+          "subtotal": {
+            "old": 778,
+            "new": 449
+          },
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "total": {
+            "old": 662,
+            "new": 449
+          },
+          "discount_amount": {
+            "old": 116,
+            "new": 0
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-3004",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "applied_promo_codes",
+      "expected_value": []
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "discount_amount",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "item_ids",
+      "expected_value": [
+        "CI-0001"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 449
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 449
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 3.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 3,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

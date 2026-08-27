@@ -24,6 +24,24 @@ The 20-task split was subsequently used for error analysis, so it must now be
 treated as a development set. The latest fixes and deterministic rule compiler
 have unit coverage but still require a fresh end-to-end benchmark run.
 
+### TAPM Full-Test Run 1
+
+The `codex/tapm-statebench` branch adds Transition-Aware Process Memory (TAPM):
+an entity-scoped runtime ledger for fresh state, invalidation, policy evidence,
+preview/commit matching, and value consistency. A full one-run test evaluation
+from commit `0ac6338` produced 42% Shopping Assistant, 56% Customer Support, and
+54% Travel task completion when the one missing Shopping trajectory is counted
+as a failure. This run did not improve on the historical workflow-memory run.
+
+The full artifacts and caveats are in
+[`results/tapm_full_run1_0ac6338/RESULTS.md`](results/tapm_full_run1_0ac6338/RESULTS.md).
+An introductory explanation of AWM/PWM and TAPM is available in
+[`IDEA_EXPLANATION.md`](IDEA_EXPLANATION.md).
+
+These are one-run local results, not an official five-run submission or a SOTA
+claim. Shopping contains one task that exhausted the eight-tool-round limit,
+so the official metrics command correctly rejects that domain as incomplete.
+
 ## Method
 
 1. Split the public training trajectories into a deterministic build and

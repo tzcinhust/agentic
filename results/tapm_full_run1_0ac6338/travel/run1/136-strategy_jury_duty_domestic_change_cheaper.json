@@ -1,0 +1,461 @@
+{
+  "task_id": "136-strategy_jury_duty_domestic_change_cheaper",
+  "user_id": "user_002",
+  "task_summary": "Traveler wants the cheaper valid way to move an existing booking to 2026-06-27 and explicitly asks the agent to compare direct change versus cancel-and-rebook. Correct resolution: direct change is the cheaper valid path in this scenario because its fee burden is lower than cancel and rebook.\n\nChallenge: The agent must turn a jury-duty exception into a compare-recap-finalize workflow and explain the scope of the exception instead of treating it as automatic permission to act.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "strategy_jury_duty_domestic_change_cheaper_compare_both_paths",
+      "kind": "must",
+      "requirement": "Agent must compare the direct-change path against the cancel-and-rebook path before recommending or executing, using the direct-change fee and fare difference on one side and the cancellation fee, refund, and replacement fare on the other side.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent compared both paths side by side using direct-change fee + fare difference ($0 + $50) and cancel fee + refund + replacement fare ($50 fee, $230 refund, $330 replacement fare), and later computed net cancel-and-rebook cost as $150 versus $50 for direct change."
+    },
+    {
+      "id": "strategy_jury_duty_domestic_change_cheaper_choose_correct_strategy",
+      "kind": "must",
+      "requirement": "Agent must recommend direct change as the cheaper valid option for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly concluded that direct change is cheaper: 'So direct change is cheaper by $100,' and then proceeded with direct change after user approval."
+    },
+    {
+      "id": "strategy_jury_duty_domestic_change_cheaper_avoid_wrong_strategy",
+      "kind": "must_not",
+      "requirement": "Agent must not frame cancel and rebook as the cheaper valid option for this scenario.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "At no point did the agent say cancel and rebook was cheaper; the comparison consistently favored direct change."
+    },
+    {
+      "id": "strategy_jury_duty_domestic_change_cheaper_exception_reasoning",
+      "kind": "must",
+      "requirement": "Agent must explain how the jury-duty exception affects the direct-change fee and carry that into the strategy comparison.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explained that jury duty waives the direct-change fee, does not alter the cancellation fee, and affects the recommendation by improving the direct-change path rather than automatically dictating strategy."
+    },
+    {
+      "id": "strategy_jury_duty_domestic_change_cheaper_no_premature_write",
+      "kind": "must_not",
+      "requirement": "Agent must not cancel, create, or update any booking before the user gives an explicit final approval after the comparison recap.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Before approval, the agent only used preview calls: update_booking with confirm:false and cancel_booking preview. The actual booking update occurred only after the user said, 'please go ahead with the direct change to June 27.'"
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 4,
+  "ux_score": 3.95,
+  "ux_reasoning": "The agent respected the user’s no-action-before-approval boundary by using preview steps first and only executed the change after explicit approval. It gave the requested side-by-side comparison and correctly explained that the jury-duty exception mainly waives the direct-change fee rather than automatically changing the strategy. There was some extra back-and-forth to get the full cancellation math, but the user did not need to correct any major error. The final confirmations were concise and preserved the requested seat and add-on preferences.",
+  "turns": 7,
+  "tool_calls": 9,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Jury duty means I need to move booking BK-1000 to June 27. Please compare direct change against cancel-and-rebook before doing anything. I expect the jury-duty exception to matter, but I want you to explain whether it changes the strategy itself or only the fees, and I do not want you to do anything until I approve after the comparison recap."
+    },
+    {
+      "role": "assistant",
+      "content": "Before I make that change, I need to verify the required details or confirmation.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_002",
+            "flight_id": "AA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 280,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-08T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-23T10:45:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "route_type": "domestic",
+            "loyalty_tier": "basic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancel",
+            "cabin_class": "economy",
+            "route_type": "domestic",
+            "loyalty_tier": "basic"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "free_cancellation_window": "Full refund within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not cancellable after free window (unless insured)",
+              "economy_domestic": "Cancellation fee: max($50, 15% of ticket price)",
+              "economy_international": "Cancellation fee: max($75, 20% of ticket price)",
+              "business_domestic": "Cancellation fee: 5% of ticket price",
+              "business_international": "Cancellation fee: 8% of ticket price",
+              "first": "Free cancellation",
+              "insurance": "Travel insurance covers cancellation regardless of cabin class",
+              "route_type_matters": "Fees differ by route type (domestic vs international). Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_002"
+          },
+          "result": {
+            "user_id": "user_002",
+            "name": "Liam Johnson",
+            "email": "liam.johnson@example.com",
+            "loyalty_tier": "basic",
+            "loyalty_points": 5000
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "DEN",
+            "date": "2026-06-27",
+            "max_stops": 0,
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA100",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "DEN",
+                "departure_time": "2026-06-27T13:45:00",
+                "arrival_time": "2026-06-27T18:36:00",
+                "duration_minutes": 291,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 330,
+                  "business": 830
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA100",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "change_reason": "jury_duty",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "UA100",
+            "change_fee": 0,
+            "fare_difference": 50,
+            "price_paid": 330
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please stop there and compare both strategies side by side first: direct change fee + fare difference versus cancel fee + refund + replacement fare. Also tell me clearly whether the jury-duty exception only changes the fee structure or if it changes the overall strategy recommendation."
+    },
+    {
+      "role": "assistant",
+      "content": "Before I make that change, I need to verify the required details or confirmation.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Please compare both paths side by side first: direct change fee + fare difference versus cancel fee + refund + replacement fare. Also, tell me clearly whether the jury-duty exception only changes the fee structure or if it changes the overall strategy recommendation."
+    },
+    {
+      "role": "assistant",
+      "content": "Side by side:\n\n- Direct change to UA100 on 2026-06-27: change fee $0, fare difference $50, total extra cost $50.\n- Cancel + rebook:\n  - Cancellation fee: not yet previewed in-tool for BK-1000\n  - Replacement fare: $330\n  - Net cost can’t be finalized without the cancel preview\n\nJury-duty impact:\n- It changes the fee structure: the change fee becomes $0.\n- It does not automatically force a different strategy.\n- Based on the available preview, direct change is already the cleaner option because the only known incremental cost is $50.\n\nIf you want, I can now preview the cancellation terms so we can finish the exact cancel-and-rebook comparison.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Please preview the cancellation terms too—I need the side-by-side with the cancellation fee and refund before I approve anything. Also, can you confirm whether the jury-duty exception only waives the direct-change fee or if it affects the overall recommendation?"
+    },
+    {
+      "role": "assistant",
+      "content": "Here’s the side-by-side preview for BK-1000:\n\n- Direct change to UA100 on 2026-06-27: fee $0, fare difference $50, new total $330\n- Cancel preview: fee $50, refund $230\n- Replacement fare on UA100 for 2026-06-27: $330\n\nSo:\n- Direct change cash impact: +$50\n- Cancel + rebook cash impact: refund $230, then pay $330 for the new flight\n\nJury duty effect:\n- It waives the direct-change fee.\n- It does not change the basic cancel fee shown by the cancellation preview.\n- It changes the recommendation only if you were otherwise comparing fee-heavy change vs cancel; here, it mainly improves the direct-change path.\n\nIf you want, I can now help you choose the better path, but I won’t execute anything until you approve.",
+      "tool_calls": [
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "cancellation_fee": 50,
+            "refund_amount": 230,
+            "reason": "Economy cancellation fee: max($50, 15% of $280) = $50"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that helps, but can you recheck the cancel-and-rebook math against the waived direct-change fee one more time? I want the recommendation explicitly compared with the net cancel cost, and please confirm the extra $50 on direct change stays within my $800 budget."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes.\n\nRechecked:\n\n- Direct change: $0 change fee + $50 fare difference = $50 net\n- Cancel and rebook: $50 cancel fee, then $330 replacement fare, with a $230 refund on the old ticket\n  - Net out-of-pocket = $50 + $330 - $230 = $150\n\nSo direct change is cheaper by $100.\n\nBudget:\n- New total on direct change is $330, which is within your $800 budget.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Thanks — please go ahead with the direct change to June 27."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-1000 is now changed to June 27.\n\n- Change fee: $0\n- Fare difference: $50\n- New total paid: $330",
+      "tool_calls": [
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "UA100",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "change_reason": "jury_duty",
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 330,
+            "change_fee": 0,
+            "fare_difference": 50
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Great — please confirm the June 27 ORD to DEN itinerary and that my window seat, vegetarian meal, and no WiFi/extra legroom/insurance preferences were preserved. If that’s all correct, I’m good."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed:\n\n- ORD → DEN on June 27\n- Flight: UA100\n- Window seat: yes\n- Meal: vegetarian\n- WiFi: no\n- Extra legroom: no\n- Insurance: no\n\nAll set.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_002",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 330,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-08T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 0,
+            "fare_difference": 50,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "DEN",
+            "departure_time": "2026-06-27T13:45:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 151745,
+    "cached_input_tokens": 0,
+    "output_tokens": 4414,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 156159,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 151745,
+  "cached_input_tokens": 0,
+  "output_tokens": 4414,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 156159,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "price_paid": {
+            "old": 280,
+            "new": 330
+          },
+          "fare_difference": {
+            "old": null,
+            "new": 50
+          },
+          "flight_id": {
+            "old": "AA100",
+            "new": "UA100"
+          },
+          "change_fee": {
+            "old": null,
+            "new": 0
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "UA100"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 330
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 4.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 7,
+  "ux_tool_call_count": 9,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

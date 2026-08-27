@@ -1,0 +1,337 @@
+{
+  "task_id": "130-hard_warranty_maxed_but_paid_repair",
+  "user_id": "cust_002",
+  "task_summary": "Warranty claim limit is maxed, but policy still allows paid repair. Agent must not promise a free replacement or say no option exists.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=3",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "warranties",
+        "record_key": "WRT-4105",
+        "field": "claim_count",
+        "value": 4
+      },
+      {
+        "entity_type": "warranties",
+        "record_key": "WRT-4105",
+        "field": "resolution",
+        "value": "paid_repair"
+      },
+      {
+        "entity_type": "warranties",
+        "record_key": "WRT-4105",
+        "field": "status",
+        "value": "claimed"
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "hard_warranty_maxed_but_paid_repair_status",
+      "kind": "must",
+      "requirement": "Agent must check warranty status before filing the claim.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Agent checked warranty status before attempting the claim, using get_warranty_status and stating the item was still under warranty but had reached the maximum number of claims."
+    },
+    {
+      "id": "hard_warranty_maxed_but_paid_repair_no_free_or_denial_path",
+      "kind": "must_not",
+      "requirement": "Agent must not promise a free replacement, deny that any paid repair option exists, or route to return/refund instead of the paid-repair warranty path.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Agent did not promise a free replacement or route to refund/return, but did clearly deny that the paid-repair warranty path could be filed, saying 'I can't file it as a warranty claim' and 'the system won't let me submit a new warranty claim for it,' which conflicts with the requirement not to deny that any paid repair option exists / the paid-repair warranty path."
+    },
+    {
+      "id": "hard_warranty_maxed_but_paid_repair_disclose_cost",
+      "kind": "must",
+      "requirement": "Agent must state before confirmation that the maxed-claims option is paid repair and that the customer is responsible for the repair cost.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Before the customer confirmed, the agent disclosed that the remaining option was paid repair and that the customer would be responsible for the cost, quoting about $100 / $99."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 3.85,
+  "ux_reasoning": "The agent preserved user control well: it only performed read-only checks and a safe preview, clearly stated that nothing had been filed, and never executed a consequential claim without confirmation. However, user effort was poor because the agent mishandled the key policy nuance and forced the user to ask multiple times for clarification about whether paid repair remained the correct warranty path. The assistant initially framed the preview as meaning it could not file anything, creating confusion instead of proactively reconciling the apparent policy/system mismatch. Response density was mostly good—concise and structured—though the explanations could have been clearer sooner about the distinction between policy outcome and system submission eligibility.",
+  "turns": 5,
+  "tool_calls": 5,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My headphones from ORD-7235 broke again. I know I've used the warranty a lot, but what can you do?"
+    },
+    {
+      "role": "assistant",
+      "content": "I checked your order and warranty status: the headphones are still under warranty, but this item has already hit the maximum number of warranty claims. At this point, the warranty can only cover a paid repair, which would be 40% of the item price.\n\nSince these were $249, that would come to about **$100** for repair. If you want, I can also check whether any non-warranty options are available, but I haven’t filed or changed anything yet.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7235"
+          },
+          "result": {
+            "order_id": "ORD-7235",
+            "customer_id": "cust_002",
+            "order_date": "2025-12-15T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK50734186",
+            "delivery_date": "2026-01-01T12:00:00",
+            "delivery_promised_date": "2026-01-01T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 249
+            },
+            "subtotal": 249,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 249,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10235",
+                "order_id": "ORD-7235",
+                "product_id": "PROD-4245",
+                "quantity": 1,
+                "unit_price": 249,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4245",
+                  "name": "SoundMax Wireless Headphones",
+                  "category": "electronics",
+                  "price": 249,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "warranty"
+          },
+          "result": {
+            "topic": "warranty",
+            "rules": {
+              "active": "Active warranty: eligible for claim.",
+              "active_item_required": "Warranty claims require an active order item. Items already returned, exchanged, or cancelled are ineligible for a new warranty claim even if a warranty record still exists.",
+              "expired_recent": "Expired <30 days: 50% off repair.",
+              "expired_old": "Expired >30 days: full-price repair or 25% off replacement.",
+              "claim_limit": "Max claims reached: paid repair only (40% of item price).",
+              "repair_vs_replace": "Items <$100: replacement. Items >=$100: repair first.",
+              "recurring_defect": "2+ prior claims for same issue: automatic replacement.",
+              "manufacturer": "Manufacturer warranty covers first 12 months.",
+              "extended": "Extended warranty covers after manufacturer period.",
+              "void_exclusions": "Liquid, accidental, or user-caused physical damage (e.g. spills, drops, cracked screens from misuse) is NOT covered and voids the claim, even while the warranty is otherwise active. The eligibility check is date/claim-count based only and does not detect damage cause, so when the customer describes liquid/accidental/user damage, deny the claim on this exclusion and do not file it."
+            }
+          }
+        },
+        {
+          "name": "get_warranty_status",
+          "arguments": {
+            "item_id": "ITEM-10235"
+          },
+          "result": {
+            "warranty_id": "WRT-4105",
+            "order_id": "ORD-7235",
+            "item_id": "ITEM-10235",
+            "product_id": "PROD-4245",
+            "warranty_type": "manufacturer",
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-27",
+            "status": "active",
+            "claim_count": 3,
+            "max_claims": 3,
+            "coverage": "repair_or_replace",
+            "resolution": null,
+            "is_active": true,
+            "days_until_expiry": 171,
+            "days_past_expiry": 0,
+            "has_warranty": true
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for checking. If the remaining warranty option is paid repair and I’m responsible for that cost, that’s fine—please file the paid-repair warranty claim under WRT-4105 for the SoundMax Wireless Headphones from ORD-7235."
+    },
+    {
+      "role": "assistant",
+      "content": "The claim preview came back with **paid repair at $99**, but it’s marked **not eligible** for a warranty claim submission because the maximum claim count has already been reached. So I can’t file it as a warranty claim. If you want, I can help you look at other options.",
+      "tool_calls": [
+        {
+          "name": "process_warranty_claim",
+          "arguments": {
+            "confirm": false,
+            "issue_description": "Headphones broke again; customer accepts the paid repair option under warranty.",
+            "item_id": "ITEM-10235",
+            "warranty_id": "WRT-4105"
+          },
+          "result": {
+            "status": "preview",
+            "warranty_id": "WRT-4105",
+            "item_id": "ITEM-10235",
+            "eligible": false,
+            "resolution": "paid_repair",
+            "cost": 99,
+            "reason": "Maximum claims (3) reached — paid repair only"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Is paid repair still available under the maxed-claims policy?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes—policy says maxed claims are **paid repair only at 40% of the item price**. For your headphones, that’s **$99**.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "warranty"
+          },
+          "result": {
+            "topic": "warranty",
+            "rules": {
+              "active": "Active warranty: eligible for claim.",
+              "active_item_required": "Warranty claims require an active order item. Items already returned, exchanged, or cancelled are ineligible for a new warranty claim even if a warranty record still exists.",
+              "expired_recent": "Expired <30 days: 50% off repair.",
+              "expired_old": "Expired >30 days: full-price repair or 25% off replacement.",
+              "claim_limit": "Max claims reached: paid repair only (40% of item price).",
+              "repair_vs_replace": "Items <$100: replacement. Items >=$100: repair first.",
+              "recurring_defect": "2+ prior claims for same issue: automatic replacement.",
+              "manufacturer": "Manufacturer warranty covers first 12 months.",
+              "extended": "Extended warranty covers after manufacturer period.",
+              "void_exclusions": "Liquid, accidental, or user-caused physical damage (e.g. spills, drops, cracked screens from misuse) is NOT covered and voids the claim, even while the warranty is otherwise active. The eligibility check is date/claim-count based only and does not detect damage cause, so when the customer describes liquid/accidental/user damage, deny the claim on this exclusion and do not file it."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That sounds like the right remaining warranty option. Please file the WRT-4105 paid-repair claim for the SoundMax Wireless Headphones under ORD-7235."
+    },
+    {
+      "role": "assistant",
+      "content": "I’m sorry, but I can’t file it as a warranty claim because the preview shows it’s **not eligible** once the claim limit has been reached. The remaining option is a paid repair quote, but the system won’t let me submit a new warranty claim for it.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Can you clarify that the paid-repair option is still the correct warranty path here, even though the claim limit is maxed? If it is, please file the WRT-4105 paid-repair claim for ORD-7235."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes—the **paid-repair option is still the remaining policy outcome** when the claim limit is maxed. But the system’s eligibility check still marks it **ineligible for warranty-claim submission**, so I **can’t actually file it as a warranty claim** from here.\n\nWhat I can confirm is:\n- item: **SoundMax Wireless Headphones** from **ORD-7235**\n- warranty: **WRT-4105**\n- remaining option: **paid repair**\n- quoted cost: **$99**\n\nIf you want, I can help you with the next best step based on that quote.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Got it. Since paid repair is still the correct warranty path and it can’t be submitted as a new warranty claim from your side, I accept that outcome. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 57525,
+    "cached_input_tokens": 0,
+    "output_tokens": 1235,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 58760,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 57525,
+  "cached_input_tokens": 0,
+  "output_tokens": 1235,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 58760,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "warranties",
+      "record_key": "WRT-4105",
+      "field": "claim_count",
+      "expected_value": 4
+    },
+    {
+      "entity_type": "warranties",
+      "record_key": "WRT-4105",
+      "field": "resolution",
+      "expected_value": "paid_repair"
+    },
+    {
+      "entity_type": "warranties",
+      "record_key": "WRT-4105",
+      "field": "status",
+      "expected_value": "claimed"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.9,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.05,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 5,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

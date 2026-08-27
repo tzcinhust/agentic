@@ -1,0 +1,422 @@
+{
+  "task_id": "101-hard_price_match_cancel_language",
+  "user_id": "cust_003",
+  "task_summary": "Customer says they want to cancel a delivered tablet because its price dropped yesterday. Correct path is a price-match refund, not cancellation or return.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "hard_price_match_cancel_language_price_match_only",
+      "kind": "must",
+      "requirement": "Agent must present the refund as a price-match adjustment that keeps the tablet/order active, not as a cancellation.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Assistant framed the resolution as a direct $50 price-match refund and stated the tablet/order remain active, not canceled."
+    },
+    {
+      "id": "hard_price_match_cancel_language_lookup",
+      "kind": "must",
+      "requirement": "Agent must verify from system records that the purchased item has current price $549 before issuing the refund.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Assistant verified the order/product records and confirmed the item's current price is $549 before refunding $50."
+    },
+    {
+      "id": "hard_price_match_cancel_language_no_cancel_return",
+      "kind": "must_not",
+      "requirement": "Agent must not cancel, return, or exchange the item.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "No cancel, return, or exchange was processed; the tool result shows a refund only."
+    },
+    {
+      "id": "hard_price_match_cancel_language_extra",
+      "kind": "must",
+      "requirement": "Agent must explicitly pivot from the customer's cancellation wording to the price-match refund workflow.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Assistant explicitly shifted from the user's cancellation request to the price-match refund workflow."
+    },
+    {
+      "id": "hard_price_match_cancel_language_hard3_no_return_rebuy",
+      "kind": "must_not",
+      "requirement": "Agent must not recommend or route the customer toward return-and-rebuy as the way to capture an eligible price drop once the delivered item can be price matched.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Assistant did not recommend return-and-rebuy or route the customer toward that workaround."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.9,
+  "ux_reasoning": "The agent correctly distinguished cancellation from the appropriate price-match refund path and used preview/confirm sequencing before the irreversible refund. It kept the user in control by explicitly showing the exact $50 outcome, original payment method, and that no return/cancellation/exchange/reorder would occur. The interaction was smooth with no re-steering, and responses were concise and well matched to the decision the user needed to make.",
+  "turns": 4,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I want to cancel ORD-7201. The tablet I bought is $50 cheaper today and I shouldn't have to keep this order at the old price."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked your order and the cancellation policy: ORD-7201 was delivered yesterday, so it can’t be canceled.  \nSince you’re asking for a $50 price adjustment on the delivered tablet, I can help with a refund-only review instead if you want me to check that route.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7201"
+          },
+          "result": {
+            "order_id": "ORD-7201",
+            "customer_id": "cust_003",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK63958761",
+            "delivery_date": "2026-07-07T12:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10201",
+                "order_id": "ORD-7201",
+                "product_id": "PROD-4201",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4201",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": 549,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancellation"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "pre_shipment": "Free cancellation before shipment (pending/processing status).",
+              "in_transit": "$10 intercept fee per item for in-transit orders.",
+              "delivered": "Cannot cancel delivered orders — must use the return process instead.",
+              "partial": "Partial cancellation allowed if items not yet delivered.",
+              "split_payment": "Refund distributed proportionally to original payment methods.",
+              "already_cancelled": "Already cancelled orders cannot be cancelled again."
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I want to keep the SlateTab Pro 11-inch and get the price difference honored on ORD-7201. Please check the order and product records and see if the $50 price match can be refunded to my original payment method."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked the order and product records: your tablet on ORD-7201 was delivered on 2026-07-07, you paid $599, the current price is $549, and the difference is $50. I also checked the refund policy, which includes a price-drop refund path within 7 days of delivery.  \n\nI can submit a $50 refund request next. For the payout route, I can try your original payment method if you want me to proceed.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7201"
+          },
+          "result": {
+            "order_id": "ORD-7201",
+            "customer_id": "cust_003",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK63958761",
+            "delivery_date": "2026-07-07T12:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10201",
+                "order_id": "ORD-7201",
+                "product_id": "PROD-4201",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4201",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": 549,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "PROD-4201"
+          },
+          "result": {
+            "product_id": "PROD-4201",
+            "name": "SlateTab Pro 11-inch",
+            "category": "electronics",
+            "subcategory": "tablet",
+            "price": 599,
+            "warranty_months": 12,
+            "return_window_days": 15,
+            "restocking_fee_pct": 15,
+            "weight_lbs": 1.1,
+            "is_fragile": true,
+            "in_stock": true,
+            "current_price": 549
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Before I confirm, can you preview the exact outcome? I want to make sure it’s a direct $50 price-match refund to my original payment method and that the tablet stays with me with no cancellation, return, exchange, or reorder."
+    },
+    {
+      "role": "assistant",
+      "content": "Preview looks good: a direct $50 refund to your original payment method for ITEM-10201. Your tablet stays with you, and this does not create a return, cancellation, exchange, or reorder.  \n\nIf you want, I can finalize it.",
+      "tool_calls": [
+        {
+          "name": "process_refund",
+          "arguments": {
+            "amount": 50,
+            "item_id": "ITEM-10201",
+            "refund_method": "original_payment"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10201",
+            "refund_amount": 50,
+            "refund_method": "original_payment"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please finalize the $50 price-match refund to my original payment method, and keep the tablet/order active."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — the $50 price-match refund has been issued to your original payment method. The tablet and order remain active; no return, cancellation, exchange, or reorder was created.",
+      "tool_calls": [
+        {
+          "name": "process_refund",
+          "arguments": {
+            "amount": 50,
+            "confirm": true,
+            "item_id": "ITEM-10201",
+            "refund_method": "original_payment"
+          },
+          "result": {
+            "status": "refunded",
+            "item_id": "ITEM-10201",
+            "mode": "refund",
+            "refund_amount": 50,
+            "refund_method": "original_payment",
+            "total_goodwill_credit": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that works for me. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 65251,
+    "cached_input_tokens": 0,
+    "output_tokens": 1578,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 66829,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 65251,
+  "cached_input_tokens": 0,
+  "output_tokens": 1578,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 66829,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10201": {
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 50
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10201",
+      "field": "refund_amount",
+      "expected_value": 50
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10201",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 4,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

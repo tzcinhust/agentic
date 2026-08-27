@@ -1,0 +1,637 @@
+{
+  "task_id": "27-hard_warranty_maxed_tablet_return_better",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** Customer asks for a no-cost warranty resolution for a defective tablet. The warranty has reached its claim cap, but the tablet is still inside the return window. Correct handling is to check both paths, explain that defective return is better than paid repair, and process the full refund.\n\n**Challenge:** Reuses tasks 100/126's reliable failure pattern: weak agents stop at the maxed warranty path instead of proactively checking the superior return path.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "166_check_warranty_and_return",
+      "kind": "must",
+      "requirement": "Agent must check warranty status and then check the return path before choosing, recommending, or previewing the final resolution.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The agent checked warranty first, but did not check the return path before initially choosing/recommending a resolution. In the first reply, the agent stated the only warranty option was paid repair at $239 before checking returns; the return path was only checked later after the customer asked."
+    },
+    {
+      "id": "166_explain_return_better",
+      "kind": "must",
+      "requirement": "Agent must explain that the warranty path is maxed or paid and that a defective return is the better no-cost option before the customer asks about returns.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent explained the warranty was maxed and offered to check returns, but did not proactively explain that defective return was the better no-cost option before the customer asked about returns. That explanation came only after the user's second message."
+    },
+    {
+      "id": "166_process_defective_return",
+      "kind": "must",
+      "requirement": "Agent must process ITEM-10520 as a defective return for a full $599 original-payment refund with no restocking fee.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent completed process_return for ITEM-10520 with reason 'defective', confirm=true, amount 599. The result shows status 'returned', refund_amount 599, refund_method 'original_payment', and restocking_fee 0."
+    },
+    {
+      "id": "166_no_paid_repair_or_claim",
+      "kind": "must_not",
+      "requirement": "Agent must not file another warranty claim, route the customer to paid repair, or stop after saying the warranty is maxed.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent did not execute another warranty claim or route the customer to paid repair. The warranty claim call was only a preview (confirm=false), and the final executed action was the defective return."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 4.25,
+  "ux_reasoning": "The agent maintained strong consent boundaries: it previewed the warranty outcome, then separately previewed the return/refund terms, and only executed the return after the user explicitly confirmed the exact refund, fees, and label conditions. Response content was concise and decision-relevant, clearly stating the paid repair cost first and later the full $599 refund, no restocking fee, and free return label. The main UX miss was user effort: the customer initially asked to handle it without charging them, and the agent should have proactively checked the superior defective-return path instead of stopping at the maxed warranty path and making the user request that next step. Tool use was otherwise appropriate and the final state was clearly summarized.",
+  "turns": 3,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 3,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "My SlateTab from ORD-7519 will not turn on again. I have a warranty, so please handle it without charging me."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked your warranty, and this tablet is still within the coverage period, but the warranty has already reached its maximum of 3 claims. That means I can’t process a no-charge warranty claim now; the only warranty option available is a paid repair at $239.\n\nI haven’t submitted anything yet. If you want, I can also check whether a return/refund path is still available instead.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7519"
+          },
+          "result": {
+            "order_id": "ORD-7519",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK54293599",
+            "delivery_date": "2026-07-06T12:00:00",
+            "delivery_promised_date": "2026-07-06T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10520",
+                "order_id": "ORD-7519",
+                "product_id": "PROD-4522",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4522",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "warranty"
+          },
+          "result": {
+            "topic": "warranty",
+            "rules": {
+              "active": "Active warranty: eligible for claim.",
+              "active_item_required": "Warranty claims require an active order item. Items already returned, exchanged, or cancelled are ineligible for a new warranty claim even if a warranty record still exists.",
+              "expired_recent": "Expired <30 days: 50% off repair.",
+              "expired_old": "Expired >30 days: full-price repair or 25% off replacement.",
+              "claim_limit": "Max claims reached: paid repair only (40% of item price).",
+              "repair_vs_replace": "Items <$100: replacement. Items >=$100: repair first.",
+              "recurring_defect": "2+ prior claims for same issue: automatic replacement.",
+              "manufacturer": "Manufacturer warranty covers first 12 months.",
+              "extended": "Extended warranty covers after manufacturer period.",
+              "void_exclusions": "Liquid, accidental, or user-caused physical damage (e.g. spills, drops, cracked screens from misuse) is NOT covered and voids the claim, even while the warranty is otherwise active. The eligibility check is date/claim-count based only and does not detect damage cause, so when the customer describes liquid/accidental/user damage, deny the claim on this exclusion and do not file it."
+            }
+          }
+        },
+        {
+          "name": "get_warranty_status",
+          "arguments": {
+            "item_id": "ITEM-10520"
+          },
+          "result": {
+            "warranty_id": "WRT-4519",
+            "order_id": "ORD-7519",
+            "item_id": "ITEM-10520",
+            "product_id": "PROD-4522",
+            "warranty_type": "manufacturer",
+            "start_date": "2026-07-06",
+            "end_date": "2027-07-01",
+            "status": "active",
+            "claim_count": 3,
+            "max_claims": 3,
+            "coverage": "repair_or_replace",
+            "resolution": null,
+            "is_active": true,
+            "days_until_expiry": 353,
+            "days_past_expiry": 0,
+            "has_warranty": true
+          }
+        },
+        {
+          "name": "process_warranty_claim",
+          "arguments": {
+            "confirm": false,
+            "issue_description": "Device will not turn on.",
+            "item_id": "ITEM-10520",
+            "warranty_id": "WRT-4519"
+          },
+          "result": {
+            "status": "preview",
+            "warranty_id": "WRT-4519",
+            "item_id": "ITEM-10520",
+            "eligible": false,
+            "resolution": "paid_repair",
+            "cost": 239,
+            "reason": "Maximum claims (3) reached — paid repair only"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I don’t want a paid repair for a tablet that’s defective again. Please check whether there’s a no-cost return/refund option for this recently delivered SlateTab Pro 11-inch instead."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — I checked, and this item does have a no-cost return option because it’s being returned as defective. The preview shows it’s eligible, with a return refund of $599 to your original payment, and I haven’t submitted it yet.\n\nIf you want, I can process that return now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7519"
+          },
+          "result": {
+            "order_id": "ORD-7519",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK54293599",
+            "delivery_date": "2026-07-06T12:00:00",
+            "delivery_promised_date": "2026-07-06T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10520",
+                "order_id": "ORD-7519",
+                "product_id": "PROD-4522",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4522",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10520",
+            "reason": "defective"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10520",
+            "return_eligible": true,
+            "reason": "defective",
+            "refund_amount": 599,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": true,
+            "shipping_refund": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please process the defective return as long as it’s $599 back to my original payment, with no restocking fee and a free return label."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I processed the defective return for your SlateTab Pro 11-inch.\n\nYou’ll receive $599 back to your original payment method, there was no restocking fee, and the free return label has been issued.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7519"
+          },
+          "result": {
+            "order_id": "ORD-7519",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK54293599",
+            "delivery_date": "2026-07-06T12:00:00",
+            "delivery_promised_date": "2026-07-06T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10520",
+                "order_id": "ORD-7519",
+                "product_id": "PROD-4522",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4522",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-10520",
+            "reason": "defective",
+            "confirm": true,
+            "amount": 599
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-10520",
+            "refund_amount": 599,
+            "policy_computed_amount": 599,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "return_label_issued": true,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 61769,
+    "cached_input_tokens": 0,
+    "output_tokens": 1025,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 62794,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 61769,
+  "cached_input_tokens": 0,
+  "output_tokens": 1025,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 62794,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "orders": {
+        "ORD-7519": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      },
+      "order_items": {
+        "ITEM-10520": {
+          "return_reason": {
+            "old": null,
+            "new": "defective"
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 599
+          },
+          "return_label_issued": {
+            "old": false,
+            "new": true
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "refund_amount",
+      "expected_value": 599
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "return_label_issued",
+      "expected_value": true
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10520",
+      "field": "return_reason",
+      "expected_value": "defective"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7519",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 5,
+  "ux_base_score": 4.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.15,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 10,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 3,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

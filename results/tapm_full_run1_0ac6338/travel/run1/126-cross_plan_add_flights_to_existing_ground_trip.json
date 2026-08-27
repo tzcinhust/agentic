@@ -1,0 +1,566 @@
+{
+  "task_id": "126-cross_plan_add_flights_to_existing_ground_trip",
+  "user_id": "user_002",
+  "task_summary": "Traveler already has hotel and car reservations and now needs flights built around those fixed dates. Correct resolution: the agent should anchor the flight plan to the existing ground-trip reservations instead of proposing flights that require rebuilding the trip.\n\nChallenge: This tests whether the agent can plan around pre-existing trip state rather than assuming every package starts from scratch.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "cross_plan_add_flights_to_existing_ground_trip_anchor",
+      "kind": "must",
+      "requirement": "Agent must use hotel reservation HR-0100 and car rental CR-0100 as fixed date constraints when proposing flights, including the hotel check-in/check-out and car pickup/dropoff dates.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly used HR-0100 and CR-0100 dates as fixed constraints, matching the hotel check-in/check-out and car pickup/dropoff dates when searching and proposing flights."
+    },
+    {
+      "id": "cross_plan_add_flights_to_existing_ground_trip_no_date_drift",
+      "kind": "must_not",
+      "requirement": "Agent must not propose flights that would require changing the already-booked hotel or car dates.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The proposed flights match the booked hotel and car dates exactly (2026-06-24 outbound, 2026-06-27 return) and do not require changing the existing reservations."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 3,
+  "ux_score": 3.0,
+  "ux_reasoning": "The agent preserved the user’s control over the hotel and car, and it did wait for explicit approval before booking flights. However, it forced the user to supply detailed flight preferences and payment method instead of using the already-established budget and trip context more smoothly. The responses were functional but somewhat repetitive and not especially decision-ready, with the booking confirmation and preference verification split into extra turns. Overall this is ordinary/adequate rather than notably clean UX.",
+  "turns": 5,
+  "tool_calls": 12,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I already have a Los Angeles hotel and car booked, but now I need to add flights from Chicago ORD to complete the trip. Can you help me build around what I already have?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — I found your existing LA hotel and car:\n\n- Hotel: LAX Inn, 2026-06-24 to 2026-06-27\n- Car: Avis economy, LAX pickup/dropoff, same dates\n\nBest matching flight from ORD to LAX on 2026-06-24:\n- UA-ET06A, nonstop\n- Departs 10:15 AM, arrives 12:59 PM\n- Economy: $250\n- Business: $760\n\nIf you want, I can book the flight and keep the hotel/car unchanged.",
+      "tool_calls": [
+        {
+          "name": "get_user_reservations",
+          "arguments": {
+            "user_id": "user_002"
+          },
+          "result": {
+            "user_id": "user_002",
+            "booking_ids": [],
+            "hotel_ids": [
+              "HR-0100"
+            ],
+            "car_rental_ids": [
+              "CR-0100"
+            ]
+          }
+        },
+        {
+          "name": "get_hotel_reservation",
+          "arguments": {
+            "reservation_id": "HR-0100"
+          },
+          "result": {
+            "reservation_id": "HR-0100",
+            "user_id": "user_002",
+            "hotel_name": "LAX Inn",
+            "city": "LAX",
+            "check_in": "2026-06-24",
+            "check_out": "2026-06-27",
+            "room_type": "standard",
+            "nightly_rate": 155,
+            "total_price": 465,
+            "hotel_id": null,
+            "status": "confirmed",
+            "booked_at": "2026-06-11T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "get_car_rental",
+          "arguments": {
+            "rental_id": "CR-0100"
+          },
+          "result": {
+            "rental_id": "CR-0100",
+            "user_id": "user_002",
+            "company": "Avis",
+            "pickup_location": "LAX",
+            "dropoff_location": "LAX",
+            "pickup_date": "2026-06-24",
+            "dropoff_date": "2026-06-27",
+            "car_class": "economy",
+            "daily_rate": 46,
+            "total_price": 138,
+            "car_id": null,
+            "status": "confirmed",
+            "insurance_included": false,
+            "booked_at": "2026-06-11T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "LAX",
+            "date": "2026-06-24",
+            "max_stops": 0,
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA-ET06A",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "LAX",
+                "departure_time": "2026-06-24T10:15:00",
+                "arrival_time": "2026-06-24T12:59:00",
+                "duration_minutes": 164,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 250,
+                  "business": 760
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please add the round-trip flights around my fixed hotel and car dates — outbound ORD to LAX on 2026-06-24 and return LAX to ORD on 2026-06-27. I’m only looking at flights, and the total new flight cost has to stay within my $800 budget."
+    },
+    {
+      "role": "assistant",
+      "content": "Here are the nonstop options that fit your dates and stay under budget:\n\n- Outbound: UA-ET06A ORD → LAX, 2026-06-24 10:15 AM, economy $250 / business $760\n- Return: UA-ET06B LAX → ORD, 2026-06-27 8:15 PM, economy $260 / business $770\n\nRound-trip totals:\n- Economy: $510\n- Business: $1,530\n\nSo only the economy round trip fits your $800 flight budget. If you want, I can book that pair.",
+      "tool_calls": [
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "LAX",
+            "date": "2026-06-24",
+            "max_price": 800,
+            "max_stops": 0
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA-ET06A",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "LAX",
+                "departure_time": "2026-06-24T10:15:00",
+                "arrival_time": "2026-06-24T12:59:00",
+                "duration_minutes": 164,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 250,
+                  "business": 760
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "LAX",
+            "destination": "ORD",
+            "date": "2026-06-27",
+            "max_price": 800,
+            "max_stops": 0
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA-ET06B",
+                "airline_code": "UA",
+                "origin": "LAX",
+                "destination": "ORD",
+                "departure_time": "2026-06-27T20:15:00",
+                "arrival_time": "2026-06-27T23:59:00",
+                "duration_minutes": 224,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 260,
+                  "business": 770
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please book the economy round trip: UA-ET06A on 2026-06-24 ORD to LAX, and UA-ET06B on 2026-06-27 LAX to ORD. Keep the hotel and car unchanged, and make sure the flight total stays within my $800 budget."
+    },
+    {
+      "role": "assistant",
+      "content": "I can do that, but I’m missing the flight booking preferences required by the booking tool.\n\nPlease confirm for both flights:\n- cabin: economy\n- seat type: window / middle / aisle\n- meal preference: standard / vegetarian / vegan / kosher / halal / gluten_free\n- add Wi‑Fi: yes/no\n- add extra legroom: yes/no\n- add insurance: yes/no\n- payment method: credit_card / points / points_plus_cash\n\nBudget check: the economy round trip is $510 total, so it fits your $800 limit.",
+      "tool_calls": [
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_002"
+          },
+          "result": {
+            "user_id": "user_002",
+            "name": "Liam Johnson",
+            "email": "liam.johnson@example.com",
+            "loyalty_tier": "basic",
+            "loyalty_points": 5000
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "booking round trip flights with budget constraint and existing hotel car unchanged, need explicit flight preferences and confirmation before create_booking"
+          },
+          "result": [
+            "Workflow: Cancel selected trip components while leaving others unchanged\nUse when: User wants to cancel some combination of flight, hotel, and car rental in one trip, often with a request for previews first and an explicit instruction to keep another reservation active.\nVerify first:\n- Fetch the user's reservation inventory with get_user_reservations(user_id) when identifying tied components matters.\n- Verify each targeted item with the matching read tool: get_booking, get_hotel_reservation, get_car_rental.\n- Confirm which components are to be cancelled versus explicitly kept unchanged.\n- If the user requests fees/refunds first, obtain preview results before any confirmed cancellation.\nProcedure:\n1. get_user_reservations(user_id=<USER_ID>)\n2. get_booking(booking_id=<BOOKING_ID>)\n3. get_hotel_reservation(reservation_id=<HOTEL_ID>)\n4. get_car_rental(rental_id=<RENTAL_ID>)\n5. cancel_booking(booking_id=<BOOKING_ID>, confirm=false)\n6. cancel_hotel_reservation(confirm=false, reservation_id=<HOTEL_ID>)\n7. cancel_car_rental(confirm=false, rental_id=<RENTAL_ID>)\n8. cancel_booking(booking_id=<BOOKING_ID>, confirm=true)\n9. cancel_hotel_reservation(confirm=true, reservation_id=<HOTEL_ID>)\n10. cancel_car_rental(confirm=true, rental_id=<RENTAL_ID>)\nBranches:\n- Only call the read and cancel tools for component types actually mentioned or discovered as relevant.\n- If the user wants preview before deciding, stop after preview calls and summarize fees/refunds plus which untargeted reservations remain unchanged.\n- If the user confirms cancellation of only some items, execute confirm=true only for those items and explicitly leave all others untouched.\n- If there are related reservations tied to the same trip, present them for review before mutation when the user asks.\n- If a targeted component cannot be found or does not belong to the user, do not mutate that item; continue only with verified authorized items if appropriate.\nAvoid:\n- Do not cancel untargeted hotel/car/flight components just because they are part of the same trip.\n- Do not use flight booking cancellation as a substitute for hotel or car cancellation.\n- Do not promise totals until preview or cancellation outputs prov",
+            "Workflow: Book confirmed flight+hotel+car package\nUse when: User has explicitly approved a specific package after search results are reviewed, including flight preferences and payment method, and the itinerary requires flights plus hotel plus rental car.\nVerify first:\n- Identify the exact outbound and return flight options to book from prior search results.\n- Identify the chosen hotel and car rental from prior search results.\n- Confirm traveler preferences for seat, meal, Wi‑Fi, extra legroom, insurance, cabin, and payment method.\n- Confirm the total package still aligns with the user-approved quote or selected combination.\nProcedure:\n1. create_booking(flight_id=<outbound flight>, cabin_class, seat_type, meal_preference, add_wifi, add_extra_legroom, add_insurance, payment_method, paid_checked_bags, points_used, cash_amount, user_id)\n2. create_booking(flight_id=<return flight>, cabin_class, seat_type, meal_preference, add_wifi, add_extra_legroom, add_insurance, payment_method, paid_checked_bags, points_used, cash_amount, user_id)\n3. book_hotel(hotel_id=<selected hotel>, user_id)\n4. book_car_rental(car_id=<selected car>, user_id)\nBranches:\n- If one flight booking succeeds and the other fails, stop and report partial completion clearly; do not invent compensating actions.\n- If hotel or car booking fails after flight booking, report which components are confirmed and which are not.\n- If the user wants booking only if the package remains at or under a target total, verify from current search results before the first create_booking.\n- If the user has not specified hotel/car extras, book only the selected hotel and car returned by search tools.\nAvoid:\n- Do not book hotel or car before the user confirms the package.\n- Do not swap to different flight_ids, hotel_ids, or car_ids at booking time without user approval.\n- Do not fabricate reservation details not returned by tools.\n- Do not assume return flight booking parameters differ from outbound unless requested.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_flights -> search_flights -> search_hotels -> search_car_rentals -> search_car_rentals -> search_flights -> search_flights -> search_f",
+            "Workflow: Change flight with quote-first preview and preserve ancillaries\nUse when: User wants to move an existing booking to a different date/flight, asks for fees/search criteria before approval, and expects existing booking preferences/ancillaries to remain unchanged unless explicitly modified.\nVerify first:\n- Use get_booking to verify the booking exists and read current itinerary, cabin, route, and all current preferences/ancillaries to preserve on update.\n- If policy questions matter, use get_user_details to obtain loyalty tier when available.\n- Use get_policies to verify applicable change-fee rules, reason requirements, and whether route/cabin affect the fee.\n- Identify a candidate replacement via search_flights using the user’s stated constraints or the current itinerary as defaults for origin/destination/cabin context.\nProcedure:\n1. get_booking(<booking_id>)\n2. Optional: get_user_details(<user_id>) if loyalty-sensitive policy explanation is needed\n3. Optional: get_policies(<cabin_class>, <loyalty_tier>, <route_type>, <topic='changes'>)\n4. search_flights(<airline_or_any>, <new_date>, <destination>, <max_price_or_none>, <max_stops_or_none>, <origin>, <time_range_or_none>)\n5. Repeat search_flights with adjusted allowed constraints if no suitable option is found\n6. update_booking(<booking_id>, <candidate_flight_id>, <current_cabin_class>, <change_reason>, <confirm=false>, <preserved_seat_type>, <preserved_meal_preference>, <preserved_paid_checked_bags>, <preserved_add_wifi>, <preserved_add_extra_legroom>, <preserved_add_insurance>, <preserved_delay_compensation>)\n7. After user approval, update_booking(<same preserved fields>, <confirm=true>)\n8. Optional: get_booking(<booking_id>) to verify the final state and preserved ancillaries\nBranches:\n- If search_flights returns no matches, report no-write outcome and ask the user whether to broaden airline/time/stops/budget constraints.\n- If multiple candidates are found, compare them and preview one or more with update_booking(confirm=false) before any mutation.\n- If the user asks whether a specific protection product changes the fee, confirm that only policy/tool outputs are authoritative; use get_policies for the r"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Economy is fine, and please use my preferences: window seat, vegetarian meal, no Wi‑Fi, no extra legroom, and no insurance. I’m okay to proceed as long as the total stays at $510."
+    },
+    {
+      "role": "assistant",
+      "content": "Booked.\n\n- BK-0001: UA-ET06A, ORD → LAX, 2026-06-24, economy, $250\n- BK-0002: UA-ET06B, LAX → ORD, 2026-06-27, economy, $260\n\nTotal flight cost: $510\n\nYour hotel and car remain unchanged.",
+      "tool_calls": [
+        {
+          "name": "create_booking",
+          "arguments": {
+            "flight_id": "UA-ET06A",
+            "user_id": "user_002",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "payment_method": "credit_card"
+          },
+          "result": {
+            "status": "confirmed",
+            "booking_id": "BK-0001",
+            "flight_id": "UA-ET06A",
+            "cabin_class": "economy",
+            "price": 250,
+            "payment_method": "credit_card"
+          }
+        },
+        {
+          "name": "create_booking",
+          "arguments": {
+            "flight_id": "UA-ET06B",
+            "user_id": "user_002",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "payment_method": "credit_card"
+          },
+          "result": {
+            "status": "confirmed",
+            "booking_id": "BK-0002",
+            "flight_id": "UA-ET06B",
+            "cabin_class": "economy",
+            "price": 260,
+            "payment_method": "credit_card"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Great, thanks — can you confirm both bookings include my preferences: window seat, vegetarian meal, no Wi‑Fi, no extra legroom, and no insurance? If so, I’m all set."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — both bookings match your preferences exactly:\n\n- Window seat\n- Vegetarian meal\n- No Wi‑Fi\n- No extra legroom\n- No insurance\n\nYou’re all set.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-0001"
+          },
+          "result": {
+            "booking_id": "BK-0001",
+            "user_id": "user_002",
+            "flight_id": "UA-ET06A",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 250,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 250,
+            "booked_at": "2026-06-15T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "LAX",
+            "departure_time": "2026-06-24T10:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-0002"
+          },
+          "result": {
+            "booking_id": "BK-0002",
+            "user_id": "user_002",
+            "flight_id": "UA-ET06B",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 260,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 260,
+            "booked_at": "2026-06-15T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "LAX",
+            "destination": "ORD",
+            "departure_time": "2026-06-27T20:15:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 118612,
+    "cached_input_tokens": 0,
+    "output_tokens": 2519,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 121131,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 118612,
+  "cached_input_tokens": 0,
+  "output_tokens": 2519,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 121131,
+  "state_diff": {
+    "created": {
+      "bookings": {
+        "BK-0001": {
+          "booking_id": "BK-0001",
+          "user_id": "user_002",
+          "flight_id": "UA-ET06A",
+          "status": "confirmed",
+          "cabin_class": "economy",
+          "seat_type": "window",
+          "meal_preference": "vegetarian",
+          "add_wifi": false,
+          "add_extra_legroom": false,
+          "add_insurance": false,
+          "price_paid": 250,
+          "payment_method": "credit_card",
+          "points_used": 0,
+          "cash_amount": 250,
+          "booked_at": "2026-06-15T10:00:00",
+          "cancellation_fee": null,
+          "refund_amount": null,
+          "change_fee": null,
+          "fare_difference": null,
+          "delay_compensation": null,
+          "paid_checked_bags": 0
+        },
+        "BK-0002": {
+          "booking_id": "BK-0002",
+          "user_id": "user_002",
+          "flight_id": "UA-ET06B",
+          "status": "confirmed",
+          "cabin_class": "economy",
+          "seat_type": "window",
+          "meal_preference": "vegetarian",
+          "add_wifi": false,
+          "add_extra_legroom": false,
+          "add_insurance": false,
+          "price_paid": 260,
+          "payment_method": "credit_card",
+          "points_used": 0,
+          "cash_amount": 260,
+          "booked_at": "2026-06-15T10:00:00",
+          "cancellation_fee": null,
+          "refund_amount": null,
+          "change_fee": null,
+          "fare_difference": null,
+          "delay_compensation": null,
+          "paid_checked_bags": 0
+        }
+      }
+    },
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "match_fields": {
+        "user_id": "user_002",
+        "flight_id": "UA-ET06A",
+        "status": "confirmed",
+        "payment_method": "credit_card",
+        "cash_amount": 250,
+        "points_used": 0,
+        "cabin_class": "economy",
+        "seat_type": "window",
+        "meal_preference": "vegetarian",
+        "add_wifi": false,
+        "add_extra_legroom": false,
+        "add_insurance": false,
+        "paid_checked_bags": 0
+      },
+      "expected_fields": {
+        "add_extra_legroom": false,
+        "add_insurance": false,
+        "add_wifi": false,
+        "booked_at": "2026-06-15T10:00:00",
+        "booking_id": "BK-0001",
+        "cabin_class": "economy",
+        "cancellation_fee": null,
+        "cash_amount": 250,
+        "change_fee": null,
+        "delay_compensation": null,
+        "fare_difference": null,
+        "flight_id": "UA-ET06A",
+        "meal_preference": "vegetarian",
+        "paid_checked_bags": 0,
+        "payment_method": "credit_card",
+        "points_used": 0,
+        "price_paid": 250,
+        "refund_amount": null,
+        "seat_type": "window",
+        "status": "confirmed",
+        "user_id": "user_002"
+      }
+    },
+    {
+      "entity_type": "bookings",
+      "match_fields": {
+        "user_id": "user_002",
+        "flight_id": "UA-ET06B",
+        "status": "confirmed",
+        "payment_method": "credit_card",
+        "cash_amount": 260,
+        "points_used": 0,
+        "cabin_class": "economy",
+        "seat_type": "window",
+        "meal_preference": "vegetarian",
+        "add_wifi": false,
+        "add_extra_legroom": false,
+        "add_insurance": false,
+        "paid_checked_bags": 0
+      },
+      "expected_fields": {
+        "add_extra_legroom": false,
+        "add_insurance": false,
+        "add_wifi": false,
+        "booked_at": "2026-06-15T10:00:00",
+        "booking_id": "BK-0002",
+        "cabin_class": "economy",
+        "cancellation_fee": null,
+        "cash_amount": 260,
+        "change_fee": null,
+        "delay_compensation": null,
+        "fare_difference": null,
+        "flight_id": "UA-ET06B",
+        "meal_preference": "vegetarian",
+        "paid_checked_bags": 0,
+        "payment_method": "credit_card",
+        "points_used": 0,
+        "price_paid": 260,
+        "refund_amount": null,
+        "seat_type": "window",
+        "status": "confirmed",
+        "user_id": "user_002"
+      }
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 3,
+  "ux_base_score": 3.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 12,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

@@ -1,0 +1,578 @@
+{
+  "task_id": "7-category_bundle_vs_promo",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning customer (shop_004) wants to buy 3 kitchen items — PowerBlend Pro Blender (SP-3001, $229), CasaGrande Cast-Iron Skillet (SP-3007, $89), HomeBrew Pour-Over Coffee Set (SP-3008, $59). Subtotal $377. The customer has the KITCHEN10 promo code (10% off kitchen) and wants it applied.\n\n**Challenge:** 3+ same-category items activate the `category_bundle` policy (5% off qualifying items' line totals). The customer also has KITCHEN10 (10% off). Per `category_bundle` and `promo_stacking` policies: category_bundle does NOT stack with promo codes on the same items — customer gets the better. The correct behavior is to (a) recognize the 3-item same-category qualifier, (b) compute both discounts (category_bundle 5% = ~$18, KITCHEN10 10% = $37), (c) explain non-stacking, (d) apply KITCHEN10 as the larger discount. Pitfalls: agent silently applies KITCHEN10 without surfacing the category-bundle alternative (missed disclosure), agent tries to stack both in conversation (policy violation + customer mistrust), or agent applies category_bundle instead and misses KITCHEN10 (under-discount).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "recognized_category_bundle_eligibility",
+      "kind": "must",
+      "requirement": "Agent verbalized that 3+ same-category items qualify for the category_bundle policy (5% off). Evidence: the agent mentioned the category bundle or same-category bonus before or during the discount decision. Silently applying KITCHEN10 without ever mentioning category_bundle fails this requirement.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never mentioned that buying 3 kitchen items qualifies for the category_bundle 5% discount; it only said it added the items and applied KITCHEN10."
+    },
+    {
+      "id": "explained_non_stacking_rule",
+      "kind": "must",
+      "requirement": "Agent explicitly explained that category_bundle and promo codes do NOT stack — customer gets the better of the two. Language like 'they can't combine, so I'll apply whichever saves you more' is sufficient. Applying one without explaining the non-stacking rule fails this requirement.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The conversation contains no explanation that category_bundle and promo codes do not stack and that the better discount would be applied."
+    },
+    {
+      "id": "applied_better_discount",
+      "kind": "must",
+      "requirement": "Agent applied KITCHEN10 via apply_promo (10% = $37 discount), NOT category_bundle (5% = ~$18). At cart summary, discount_amount=$37 and applied_promo_codes=['KITCHEN10']. The larger discount must win.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show apply_promo with promo_code KITCHEN10, and the final cart has discount_amount 37 and applied_promo_codes [\"KITCHEN10\"], matching the required better discount."
+    },
+    {
+      "id": "no_stacking_claim",
+      "kind": "must_not",
+      "requirement": "Agent must NOT claim in conversation that both KITCHEN10 and the category bundle are applied simultaneously, or that the customer is getting 15% off, or otherwise mislead about combined discounts. Category bundle does not stack with promo codes per policy — any such claim is a disclosure failure.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant did not claim that both the category bundle and KITCHEN10 were applied together or that the customer received a combined 15% discount."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points tool calls."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.26,
+  "ux_reasoning": "The assistant directly mutated the cart and applied the promo in the same turn without any prior preview or explicit confirmation, which is a consequential shopping action under the rules. It also failed to surface the important category-bundle alternative and the non-stacking policy, so the user was not informed that another discount path existed or why KITCHEN10 was the right choice. Although the task outcome happened to use the better discount, the user had to accept a less transparent flow and missed critical decision-support context. The response itself was concise and readable, but it omitted the key discount comparison and policy explanation.",
+  "turns": 1,
+  "tool_calls": 16,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added all 3 items and applied KITCHEN10.\n\nCart:\n- PowerBlend Pro Blender — $229\n- CasaGrande Cast-Iron Skillet 12\" — $89\n- HomeBrew Pour-Over Coffee Set — $59\n\nSummary:\n- Subtotal: $377\n- Promo discount: -$37\n- Total: $340\n\nYour cart currently has no shipping option selected yet.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "PowerBlend Pro Blender"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "CasaGrande Cast-Iron Skillet"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3007",
+                "name": "CasaGrande Cast-Iron Skillet 12\"",
+                "brand": "CasaGrande",
+                "category": "kitchen",
+                "subcategory": "cookware",
+                "price": 89,
+                "rating": 4.6,
+                "review_count": 820,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "HomeBrew Pour-Over Coffee Set"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3008",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "HomeBrew",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 460,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 2200,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "kitchen"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "KITCHEN10",
+                "description": "10% off any kitchen-category purchase.",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": [
+                  "kitchen"
+                ],
+                "expiry_date": "2026-12-31",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "base_price": 229,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3007"
+          },
+          "result": {
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "base_price": 89,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3008"
+          },
+          "result": {
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "base_price": 59,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off any kitchen-category purchase.",
+            "estimated_discount": 0
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 229,
+            "cart_subtotal": 229,
+            "cart_total": 229
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 89,
+            "cart_subtotal": 318,
+            "cart_total": 318
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 59,
+            "cart_subtotal": 377,
+            "cart_total": 377
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "KITCHEN10",
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ],
+            "discount_amount": 37,
+            "cart_subtotal": 377,
+            "cart_total": 340
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-3001",
+                "product_name": "PowerBlend Pro Blender",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 229,
+                "line_total": 229
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-3007",
+                "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 89
+              },
+              {
+                "cart_item_id": "CI-0003",
+                "product_id": "SP-3008",
+                "product_name": "HomeBrew Pour-Over Coffee Set",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 59,
+                "line_total": 59
+              }
+            ],
+            "subtotal": 377,
+            "discount_amount": 37,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 340,
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that looks good. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 41675,
+    "cached_input_tokens": 0,
+    "output_tokens": 742,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 42417,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 41675,
+  "cached_input_tokens": 0,
+  "output_tokens": 742,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 42417,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-3001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-3007",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_004",
+          "product_id": "SP-3008",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "applied_promo_codes": {
+            "old": [],
+            "new": [
+              "KITCHEN10"
+            ]
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 377
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001",
+              "CI-0002",
+              "CI-0003"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 340
+          },
+          "discount_amount": {
+            "old": 0,
+            "new": 37
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "applied_promo_codes",
+      "expected_value": [
+        "KITCHEN10"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "discount_amount",
+      "expected_value": 37
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 377
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 340
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3007",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3008",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 2.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.14,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 16,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 4,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

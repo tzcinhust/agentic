@@ -1,0 +1,556 @@
+{
+  "task_id": "127-hard_promo_invalidation_replace_after_remove",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** Customer shop_003 opens with: \"Remove the ErgoLift Standing Desk from my cart. If that makes OFFICE20 invalid, use the best valid remaining code instead, but tell me the promo impact before changing it.\" Relevant catalog/policy surface: Seeded cart with ErgoLift Standing Desk (SP-H120), LumaDesk Task Lamp (SP-H122), OFFICE20 applied, SAVE10 available. Correct final state: desk removed, lamp remains, OFFICE20 gone, SAVE10 applied, total is $63.\n\n**Challenge:** Removing the desk invalidates OFFICE20, but a weaker fallback code remains valid; the agent must plan the promo replacement before writing. Primary pitfall: Leaves invalid OFFICE20, fails to apply SAVE10, changes cart before explaining impact, or quotes wrong final total. Correct behavior: Check cart/promos, explain OFFICE20 invalidation and SAVE10 fallback, get consent, remove desk, apply SAVE10 only. Novelty: Cart removal forces promo replacement rather than simple promo drop disclosure. Family: promotions_discounts.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_cart_and_promo_rules",
+      "kind": "must",
+      "requirement": "Agent checked the current cart and promo eligibility before removing the desk or changing promo codes.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Before making changes, the agent used get_cart, get_promotions, validate_promo, and get_policies, and explicitly summarized the current cart and promo situation prior to removal."
+    },
+    {
+      "id": "explained_office20_invalid_save10_fallback",
+      "kind": "must",
+      "requirement": "Agent explained that removing the $299 desk leaves only the $69 lamp, making OFFICE20 invalid because the home-office subtotal falls below $250, and that SAVE10 is the best valid remaining code for $6 off the lamp.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The agent correctly said removal leaves a $69 subtotal and makes OFFICE20 invalid below the $250 threshold, but before changing the cart it did not explain that SAVE10 would give $6 off the lamp; instead it said SAVE10 was only a candidate and had not been validated on the post-removal cart."
+    },
+    {
+      "id": "got_consent_for_remove_and_replace",
+      "kind": "must",
+      "requirement": "Agent got explicit consent after explaining the promo invalidation and SAVE10 fallback before removing the desk and replacing OFFICE20 with SAVE10.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Although the user later gave consent, the consent was obtained after an incomplete promo-impact explanation. The requirement specifically asks for explicit consent after explaining the invalidation and SAVE10 fallback before making changes."
+    },
+    {
+      "id": "removed_desk_replaced_promo",
+      "kind": "must",
+      "requirement": "Agent removed the ErgoLift Standing Desk, removed or allowed OFFICE20 to drop, and applied SAVE10 only; final cart keeps the LumaDesk Task Lamp with total $63.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show remove_from_cart for SP-H120, OFFICE20 absent afterward, apply_promo with SAVE10, and final get_cart containing only the LumaDesk Task Lamp with total $63 and SAVE10 applied."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.62,
+  "ux_reasoning": "The agent respected the user's request to hear the promo impact before making changes, explained that OFFICE20 would become invalid, and waited for explicit approval before mutating the cart. The main control flaw is that it did not clearly preview the exact fallback discount and final total before execution, even though the available promo data strongly suggested SAVE10 and the final amount. User effort was low overall and the task completed correctly, but the agent introduced a small avoidable detour by saying it could not confirm the replacement promo impact until after updating the cart. Responses were well-structured and concise, though the first reply was slightly under-informative because it withheld the likely post-change total instead of presenting a firmer decision-ready preview.",
+  "turns": 2,
+  "tool_calls": 15,
+  "tool_errors": 0,
+  "redundant_calls": 7,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Remove the ErgoLift Standing Desk from my cart. If that makes OFFICE20 invalid, use the best valid remaining code instead, but tell me the promo impact before changing it."
+    },
+    {
+      "role": "assistant",
+      "content": "Before I change anything:\n\n- Your cart now is:\n  - ErgoLift Standing Desk — $299\n  - LumaDesk Task Lamp — $69\n  - Subtotal: $368\n  - Current promo: `OFFICE20` for $20 off\n  - Total: $348\n\nIf I remove the desk, the remaining subtotal would be $69.\n\nPromo impact after removal:\n- `OFFICE20` would no longer qualify, because it requires at least $250 in home office items.\n- `SAVE10` looks like the best remaining candidate, but I have not validated it on the post-removal cart yet, so I can’t confirm its exact discount after removal until I actually update the cart and re-check.\n\nAlso, only one promo code can be on the cart at a time.\n\nIf you want, I can proceed to:\n1. remove the ErgoLift Standing Desk,\n2. remove `OFFICE20` if needed,\n3. check which promo is now valid on the updated cart,\n4. and tell you the new discount before applying a replacement code.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H120",
+                "product_name": "ErgoLift Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 299,
+                "line_total": 299
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 368,
+            "discount_amount": 20,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 348,
+            "applied_promo_codes": [
+              "OFFICE20"
+            ]
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "home_office"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "OFFICE20",
+                "description": "$20 off home office over $250",
+                "discount_type": "fixed",
+                "discount_value": 20,
+                "min_purchase": 250,
+                "max_discount": 0,
+                "category_restriction": [
+                  "home_office"
+                ],
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              },
+              {
+                "promo_code": "SAVE10",
+                "description": "10% off eligible orders",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": null,
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "OFFICE20"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: $20 off home office over $250",
+            "estimated_discount": 20
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 36
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes—go ahead and remove the desk, and if OFFICE20 drops off, replace it with SAVE10."
+    },
+    {
+      "role": "assistant",
+      "content": "Done.\n\nWhat changed:\n- Removed: ErgoLift Standing Desk\n- `OFFICE20` dropped off automatically after removal\n- Applied replacement promo: `SAVE10`\n\nUpdated cart:\n- LumaDesk Task Lamp — $69\n- Promo discount: $6\n- New total: $63\n\nPromo impact summary:\n- Before: `OFFICE20` saved you $20 on a $368 cart\n- After removing the desk: `OFFICE20` became invalid because the cart fell below its $250 minimum\n- Replacement: `SAVE10` is valid and saves $6 on the remaining $69 cart\n\n",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H120",
+                "product_name": "ErgoLift Standing Desk",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 299,
+                "line_total": 299
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 368,
+            "discount_amount": 20,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 348,
+            "applied_promo_codes": [
+              "OFFICE20"
+            ]
+          }
+        },
+        {
+          "name": "remove_from_cart",
+          "arguments": {
+            "customer_id": "shop_003",
+            "product_id": "SP-H120"
+          },
+          "result": {
+            "status": "removed",
+            "cart_id": "CART-shop_003",
+            "product_id": "SP-H120",
+            "variant_id": null,
+            "cart_subtotal": 69,
+            "cart_total": 69
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 69,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 69,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "home_office"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "OFFICE20",
+                "description": "$20 off home office over $250",
+                "discount_type": "fixed",
+                "discount_value": 20,
+                "min_purchase": 250,
+                "max_discount": 0,
+                "category_restriction": [
+                  "home_office"
+                ],
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              },
+              {
+                "promo_code": "SAVE10",
+                "description": "10% off eligible orders",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": null,
+                "expiry_date": "2026-12-31T23:59:59",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 6
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "SAVE10",
+            "applied_promo_codes": [
+              "SAVE10"
+            ],
+            "discount_amount": 6,
+            "cart_subtotal": 69,
+            "cart_total": 63
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "cart_id": "CART-shop_003",
+            "customer_id": "shop_003",
+            "items": [
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H122",
+                "product_name": "LumaDesk Task Lamp",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 69,
+                "line_total": 69
+              }
+            ],
+            "subtotal": 69,
+            "discount_amount": 6,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 63,
+            "applied_promo_codes": [
+              "SAVE10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that works. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 62169,
+    "cached_input_tokens": 0,
+    "output_tokens": 1334,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 63503,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 62169,
+  "cached_input_tokens": 0,
+  "output_tokens": 1334,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 63503,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "carts": {
+        "CART-shop_003": {
+          "applied_promo_codes": {
+            "old": [
+              "OFFICE20"
+            ],
+            "new": [
+              "SAVE10"
+            ]
+          },
+          "subtotal": {
+            "old": 368,
+            "new": 69
+          },
+          "item_ids": {
+            "old": [
+              "CI-0001",
+              "CI-0002"
+            ],
+            "new": [
+              "CI-0002"
+            ]
+          },
+          "total": {
+            "old": 348,
+            "new": 63
+          },
+          "discount_amount": {
+            "old": 20,
+            "new": 6
+          }
+        }
+      }
+    },
+    "deleted": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_003",
+          "product_id": "SP-H120",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    }
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "applied_promo_codes",
+      "expected_value": [
+        "SAVE10"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "discount_amount",
+      "expected_value": 6
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "item_ids",
+      "expected_value": [
+        "CI-0002"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "subtotal",
+      "expected_value": 69
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_003",
+      "field": "total",
+      "expected_value": 63
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 4,
+  "ux_response_density": 4,
+  "ux_base_score": 4.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.38,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 15,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 7,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 3,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

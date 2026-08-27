@@ -1,0 +1,656 @@
+{
+  "task_id": "147-strategy_bereavement_domestic_change_cheaper_same_route",
+  "user_id": "user_003",
+  "task_summary": "Traveler wants the cheaper valid way to move an existing booking to 2026-07-03 and explicitly asks the agent to compare direct change versus cancel-and-rebook. Correct resolution: direct change is the cheaper valid path in this scenario because its fee burden is lower than cancel and rebook.\n\nChallenge: The agent must turn a discounted domestic bereavement fee into the correct strategy recommendation.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "strategy_bereavement_domestic_change_cheaper_same_route_compare_both_paths",
+      "kind": "must",
+      "requirement": "Agent must present a comparison of the direct-change path (change fee + fare difference) against the cancel-and-rebook path (cancellation fee, refund, replacement fare) before executing any change.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant compared direct change ($58) versus cancel-and-rebook ($90) before proceeding, citing both fee paths."
+    },
+    {
+      "id": "strategy_bereavement_domestic_change_cheaper_same_route_choose_correct_strategy",
+      "kind": "must",
+      "requirement": "Agent must recommend direct change as the cheaper valid option for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly recommended direct change as the cheaper path."
+    },
+    {
+      "id": "strategy_bereavement_domestic_change_cheaper_same_route_avoid_wrong_strategy",
+      "kind": "must_not",
+      "requirement": "Agent must not frame cancel and rebook as the cheaper valid option for this scenario.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant never framed cancel-and-rebook as cheaper; it was consistently described as more expensive."
+    },
+    {
+      "id": "strategy_bereavement_domestic_change_cheaper_same_route_bereavement_discount_reasoning",
+      "kind": "must",
+      "requirement": "Agent must explain how the bereavement change-fee discount reduces the direct-change cost as part of its recommendation.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant stated the bereavement discount was applied and showed the discounted change fee of $18, which reduced the direct-change cost."
+    },
+    {
+      "id": "strategy_bereavement_domestic_change_cheaper_same_route_no_premature_write",
+      "kind": "must_not",
+      "requirement": "Agent must not cancel, create, or update any booking before comparing both paths and identifying the cheaper valid strategy.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "A state-changing update_booking call with confirm=true was executed, and the assistant said 'Done' before that final approval step, so it did not avoid premature write before comparison/identification across the full task flow."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 4.4,
+  "ux_reasoning": "The agent respected the user’s repeated no-action requests, used preview-style tools first, and only executed the change after explicit later approval. It also surfaced the key cost math correctly: the bereavement-discounted direct change was cheaper than cancel-and-rebook, with the preserved preferences clearly carried through. The user had no need to correct the agent’s reasoning or re-steer the workflow, and the final confirmations were concise and decision-ready. Response density was strong, though slightly repetitive due to multiple confirmation turns and tool lookups.",
+  "turns": 6,
+  "tool_calls": 16,
+  "tool_errors": 0,
+  "redundant_calls": 9,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "A family bereavement means I need to move booking BK-1000 to July 3. Is it cheaper to change it or cancel and rebook?"
+    },
+    {
+      "role": "assistant",
+      "content": "Cheaper to change.\n\n- Direct change to DL101: $58 extra total ($18 fee + $40 fare difference)\n- Cancel + rebook: $90 net extra ($50 cancel fee, then $250 new fare vs $160 refund)\n\nBereavement discount was applied to the change fee.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 210,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "JFK",
+            "departure_time": "2026-06-30T11:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_003"
+          },
+          "result": {
+            "user_id": "user_003",
+            "name": "Olivia Williams",
+            "email": "olivia.williams@example.com",
+            "loyalty_tier": "platinum",
+            "loyalty_points": 120000
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "loyalty_tier": "platinum",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "BOS",
+            "destination": "JFK",
+            "date": "2026-07-03",
+            "max_price": -1,
+            "max_stops": 0
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "DL101",
+                "airline_code": "DL",
+                "origin": "BOS",
+                "destination": "JFK",
+                "departure_time": "2026-07-03T15:45:00",
+                "arrival_time": "2026-07-03T20:35:00",
+                "duration_minutes": 290,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 250,
+                  "business": 730
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "cancellation_fee": 50,
+            "refund_amount": 160,
+            "reason": "Economy cancellation fee: max($50, 15% of $210) = $50"
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "DL101",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "change_reason": "bereavement",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "DL101",
+            "change_fee": 18,
+            "fare_difference": 40,
+            "price_paid": 268
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please recheck both valid paths — the direct change should include the bereavement discount, and I need the full side-by-side with the cancellation fee, refund, replacement fare, and fare difference. Also, don’t proceed with any change or cancel yet; I only want the comparison first."
+    },
+    {
+      "role": "assistant",
+      "content": "Comparison only — no changes made.\n\nDirect change to DL101\n- New fare: $250\n- Fare difference: $40\n- Change fee: $18\n- Total added cost: $58\n- New total paid: $268\n\nCancel + rebook\n- Cancellation fee: $50\n- Refund: $160\n- Replacement fare: $250\n- Net added cost: $90\n- New out-of-pocket total: $300\n\nCheaper path: direct change.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 210,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "JFK",
+            "departure_time": "2026-06-30T11:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "loyalty_tier": "platinum",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "BOS",
+            "destination": "JFK",
+            "date": "2026-07-03",
+            "max_price": -1,
+            "max_stops": 0
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "DL101",
+                "airline_code": "DL",
+                "origin": "BOS",
+                "destination": "JFK",
+                "departure_time": "2026-07-03T15:45:00",
+                "arrival_time": "2026-07-03T20:35:00",
+                "duration_minutes": 290,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 250,
+                  "business": 730
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "DL101",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "change_reason": "bereavement",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "flight_id": "DL101",
+            "change_fee": 18,
+            "fare_difference": 40,
+            "price_paid": 268
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1000",
+            "cancellation_fee": 50,
+            "refund_amount": 160,
+            "reason": "Economy cancellation fee: max($50, 15% of $210) = $50"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Before I approve anything, please confirm the July 3 flight details for the direct-change option so I can verify the airline, route, time range, and stops, and also confirm BK-1000 will keep its existing booking preferences exactly as-is, including insurance."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed for the direct-change option:\n\n- Airline: Delta (DL)\n- Route: BOS → JFK\n- Time: 3:45 PM departure, 8:35 PM arrival\n- Stops: Nonstop\n- Flight ID: DL101\n\nCurrent BK-1000 preferences on file:\n- Economy\n- Aisle\n- Standard meal\n- WiFi: on\n- Extra legroom: on\n- Insurance: off\n\nSo the booking currently does not include insurance.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 210,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "JFK",
+            "departure_time": "2026-06-30T11:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "BOS",
+            "destination": "JFK",
+            "date": "2026-07-03",
+            "max_price": -1,
+            "max_stops": 0
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "DL101",
+                "airline_code": "DL",
+                "origin": "BOS",
+                "destination": "JFK",
+                "departure_time": "2026-07-03T15:45:00",
+                "arrival_time": "2026-07-03T20:35:00",
+                "duration_minutes": 290,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 250,
+                  "business": 730
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please keep BK-1000’s existing booking settings exactly as they are, including insurance. Also, I’m not approving anything yet—please recap the full direct-change total with the bereavement discount and confirm it stays within my $2000 budget before asking for a final go-ahead."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed: no action will be taken yet.\n\nDirect-change recap for BK-1000 → DL101:\n- Change fee: $18\n- Fare difference: $40\n- Total added cost: $58\n- New total paid: $268\n\nBudget check:\n- Yes, this is well within your $2000 budget.\n\nNote: BK-1000 currently has insurance set to off, and I have not changed any booking settings.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Since direct change is the cheaper valid path with the bereavement discount, and it’s within budget, please go ahead and change BK-1000 to the July 3 nonstop BOS–JFK Delta option, keeping all existing booking preferences exactly as they are, including the current insurance setting."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-1000 is now on DL101 for July 3.\n\nApplied total: $268\n- Change fee: $18\n- Fare difference: $40\n\nNote: the booking was preserved with the current stored settings.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 210,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "JFK",
+            "departure_time": "2026-06-30T11:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-1000",
+            "flight_id": "DL101",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "paid_checked_bags": 0,
+            "change_reason": "bereavement",
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-1000",
+            "changes_applied": [
+              "flight_id",
+              "change_reason"
+            ],
+            "price_paid": 268,
+            "change_fee": 18,
+            "fare_difference": 40
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please confirm the final booking details for me: July 3, Delta, BOS to JFK, nonstop, around 3:45 PM to 8:35 PM, and that the preserved booking preferences are economy, aisle, standard meal, WiFi on, extra legroom on, and insurance still off."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed:\n\n- July 3\n- Delta DL101\n- BOS → JFK\n- Nonstop\n- 3:45 PM → 8:35 PM\n\nPreferences:\n- Economy\n- Aisle\n- Standard meal\n- WiFi on\n- Extra legroom on\n- Insurance off\n\n",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1000"
+          },
+          "result": {
+            "booking_id": "BK-1000",
+            "user_id": "user_003",
+            "flight_id": "DL101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "standard",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 268,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-07T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 18,
+            "fare_difference": 40,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "BOS",
+            "destination": "JFK",
+            "departure_time": "2026-07-03T15:45:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Confirmed, thanks — that matches what I needed. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 205555,
+    "cached_input_tokens": 0,
+    "output_tokens": 3949,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 209504,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 205555,
+  "cached_input_tokens": 0,
+  "output_tokens": 3949,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 209504,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1000": {
+          "price_paid": {
+            "old": 210,
+            "new": 268
+          },
+          "fare_difference": {
+            "old": null,
+            "new": 40
+          },
+          "flight_id": {
+            "old": "DL100",
+            "new": "DL101"
+          },
+          "change_fee": {
+            "old": null,
+            "new": 18
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "change_fee",
+      "expected_value": 18
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "fare_difference",
+      "expected_value": 40
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "flight_id",
+      "expected_value": "DL101"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1000",
+      "field": "price_paid",
+      "expected_value": 268
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.4,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 6,
+  "ux_tool_call_count": 16,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 9,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 4,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

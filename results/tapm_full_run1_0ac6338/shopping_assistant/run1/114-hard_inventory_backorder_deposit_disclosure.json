@@ -1,0 +1,258 @@
+{
+  "task_id": "114-hard_inventory_backorder_deposit_disclosure",
+  "user_id": "shop_005",
+  "task_summary": "**Task:** Customer shop_005 opens with: \"If the Atlas hub is backordered, I'm open to waiting, but tell me exactly what that means before adding it.\" Relevant catalog/policy surface: 7-Port USB-C Hub (SP-H111), Atlas 9-in-1 USB-C Hub (SP-H112). Final cart/account state should remain unchanged.\n\n**Challenge:** Backorder available but add_to_cart cannot add OOS; agent must disclose limitation and not pretend order placed. Primary pitfall: Claims backorder placed or adds unavailable product. Correct behavior: No cart mutation; explain backorder status and no direct cart add. Novelty: Tests honest handling of backorder policy with unavailable write path. Family: inventory_shipping.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "disclosed_backorder_limitation",
+      "kind": "must",
+      "requirement": "Agent explained Atlas is out of stock/backorder and cannot be added as an in-stock cart item in this session.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant stated Atlas is out of stock, backorder available, and explicitly said it cannot place a backorder reservation directly in this session."
+    },
+    {
+      "id": "offered_instock_alternative",
+      "kind": "must",
+      "requirement": "Agent offered an available compatible hub alternative.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant offered the in-stock 7-Port USB-C Hub as an alternative and provided its details."
+    },
+    {
+      "id": "no_oos_add",
+      "kind": "must_not",
+      "requirement": "Agent did not add the out-of-stock Atlas hub or claim it was ordered.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "No evidence shows the Atlas hub was added or ordered; the cart was checked and remained empty, and the assistant said it did not add anything."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 4,
+  "ux_score": 4.3,
+  "ux_reasoning": "The agent honored the no-action request and explicitly confirmed the cart stayed unchanged, which kept the user in control. It also proactively surfaced a compatible in-stock alternative without adding anything, and the final user had no need to re-steer or correct the flow. The answers were concise and relevant, with only a slight imperfection in the first turn’s extra invitation to try adding the out-of-stock item despite the known limitation. Overall, the interaction was smooth and user-centered.",
+  "turns": 2,
+  "tool_calls": 5,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "If the Atlas hub is backordered, I'm open to waiting, but tell me exactly what that means before adding it."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — the Atlas hub can be backordered.\n\nWhat that means here:\n- The item is currently out of stock.\n- This product is eligible for backorder.\n- You can reserve it with a 10% deposit.\n- For the Atlas 9-in-1 USB-C Hub at $79, the deposit would be $7.90.\n- The deposit is refundable if the restock fails.\n- The estimated restock timeline is 2–4 weeks.\n\nProduct status:\n- Atlas 9-in-1 USB-C Hub\n- Price: $79\n- Stock: 0\n- Backorder available: yes\n\nOne important note: I can explain backorder policy, but I don’t have a tool here to actually place a backorder reservation directly. I can still add the item to your cart only if the store’s cart flow allows it while out of stock, but that wouldn’t be the same as confirming a backorder unless the system supports it in the add flow.\n\nIf you want, I can try adding the Atlas hub to your cart now and we’ll see whether the cart accepts it despite being out of stock.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Atlas hub",
+            "category": "electronics",
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H112",
+                "name": "Atlas 9-in-1 USB-C Hub",
+                "brand": "PortPro",
+                "category": "electronics",
+                "subcategory": "hub",
+                "price": 79,
+                "rating": 4.6,
+                "review_count": 700,
+                "in_stock": false
+              },
+              {
+                "product_id": "SP-H111",
+                "name": "7-Port USB-C Hub",
+                "brand": "PortPro",
+                "category": "electronics",
+                "subcategory": "hub",
+                "price": 49,
+                "rating": 4.2,
+                "review_count": 1550,
+                "in_stock": true
+              }
+            ],
+            "total_found": 2
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H112"
+          },
+          "result": {
+            "product_id": "SP-H112",
+            "name": "Atlas 9-in-1 USB-C Hub",
+            "category": "electronics",
+            "subcategory": "hub",
+            "brand": "PortPro",
+            "price": 79,
+            "rating": 4.6,
+            "review_count": 700,
+            "description": "Atlas 9-in-1 USB-C Hub from PortPro. Electronics accessory.",
+            "specs": {},
+            "compatible_with": [
+              "SlimBook Air 13",
+              "ProBook Laptop 13"
+            ],
+            "in_stock": false,
+            "stock_quantity": 0,
+            "shipping_days": 7,
+            "gift_wrap_available": true,
+            "backorder_available": true,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "7 business days (standard)"
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "backorder"
+          },
+          "result": {
+            "topic": "backorder",
+            "summary": "Out-of-stock items flagged backorder_available can be reserved with a 10% deposit.",
+            "rules": [
+              "Eligibility: product.in_stock is False AND product.backorder_available is True.",
+              "Deposit: 10% of the product price, refundable if restock fails.",
+              "Timeline: estimated 2–4 weeks to restock.",
+              "Proactive: when a requested product is OOS, agent should check and offer backorder if available."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that helps. Since you can’t actually place a backorder here, please leave the cart unchanged; if there’s an in-stock 7-port compatible hub, you can mention it, but don’t add anything."
+    },
+    {
+      "role": "assistant",
+      "content": "Your cart is unchanged and currently empty.\n\nIn-stock alternative:\n- 7-Port USB-C Hub\n- Product ID: SP-H111\n- Price: $49\n- In stock: yes\n- Compatible with: SlimBook Air 13, ProBook Laptop 13, TechPhone Pro 16\n- Rating: 4.2\n\nI didn’t add anything. If you want, I can compare the 7-port hub vs. the Atlas 9-in-1 hub for ports/value.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_005"
+          },
+          "result": {
+            "cart_id": "CART-shop_005",
+            "customer_id": "shop_005",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-H111"
+          },
+          "result": {
+            "product_id": "SP-H111",
+            "name": "7-Port USB-C Hub",
+            "category": "electronics",
+            "subcategory": "hub",
+            "brand": "PortPro",
+            "price": 49,
+            "rating": 4.2,
+            "review_count": 1550,
+            "description": "7-Port USB-C Hub from PortPro. Electronics accessory.",
+            "specs": {},
+            "compatible_with": [
+              "SlimBook Air 13",
+              "ProBook Laptop 13",
+              "TechPhone Pro 16"
+            ],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 2,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "2 business days (standard)"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that’s all I needed. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 23202,
+    "cached_input_tokens": 0,
+    "output_tokens": 607,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 23809,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 23202,
+  "cached_input_tokens": 0,
+  "output_tokens": 607,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 23809,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.3,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 5,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

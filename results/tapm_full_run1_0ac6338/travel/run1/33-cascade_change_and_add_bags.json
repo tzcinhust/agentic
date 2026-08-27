@@ -1,0 +1,496 @@
+{
+  "task_id": "33-cascade_change_and_add_bags",
+  "user_id": "user_002",
+  "task_summary": "**Task:** A traveler changes a domestic economy flight for a medical reason and then adds two extra checked bags. Correct resolution: The medical reason cuts the standard domestic change fee in half, producing a $75 change fee for the booking.\n\n**Challenge:** The agent explains the medical-discounted $75 change fee, quotes the baggage allowance and per-bag pricing correctly, and provides a combined summary of the flight-change math plus the added-bag charges.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "state_medical_discount_explained",
+      "kind": "must",
+      "requirement": "Agent must explain that the medical reason cuts the standard domestic change fee in half, producing a $75 change fee for this booking.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly explained that a medical reason gives a 50% discount on the standard domestic change fee and stated the resulting fee is $75, e.g. 'medical changes get a 50% discount on the applicable standard change fee' and later 'Medical-discounted change fee: $75.'"
+    },
+    {
+      "id": "state_baggage_allowance_and_fee_explained",
+      "kind": "must",
+      "requirement": "Agent must explain the free checked-bag allowance for this traveler and quote the extra-bag fee as $35 per added bag before finalizing the baggage update.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Before finalizing, the agent explained the traveler has 1 free checked bag and that extra checked bags cost $35 each, including 'Free checked bags included: 1' and 'Extra checked bag charge: $35 each,' then applied that to 2 extra bags = $70."
+    },
+    {
+      "id": "state_combined_change_and_bags_summary",
+      "kind": "must",
+      "requirement": "Agent must summarize both the flight-change charges and the additional baggage charges together, rather than only confirming one part of the workflow.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent provided a combined summary of flight-change and baggage charges together before confirmation, including the $75 change fee, $20 fare difference, 1 free checked bag, and 2 extra bags at $35 each for a $505 total, and repeated the combined breakdown in the final summary."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.7,
+  "ux_reasoning": "The agent kept preview and execution cleanly separated: it only used non-mutating previews before the user explicitly approved the final change, and it preserved key booking preferences while surfacing the medical change reason and bag additions. It correctly identified the medical-discounted domestic change fee as $75, explained the 1 free checked bag plus 2 extra bags at $35 each, checked the $800 budget, and then executed only after a clear approval turn. User effort was very low because the agent gathered needed constraints once, found suitable nonstop afternoon options, and provided the requested combined math without requiring correction. Response density was strong and decision-ready, though the intermediate explanation about whether preview totals included baggage was a bit more cautious and verbose than necessary given the later confirmed total.",
+  "turns": 5,
+  "tool_calls": 10,
+  "tool_errors": 0,
+  "redundant_calls": 2,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to change my flight (BK-MS08) to a later date. I have a medical appointment that conflicts. Also, I'll need to bring extra luggage."
+    },
+    {
+      "role": "assistant",
+      "content": "I can help with that.\n\nFor your current booking BK-MS08, I see:\n- ORD → SFO\n- Current departure: 2026-06-20 at 12:15 PM\n- Cabin: economy\n\nBecause this is a medical conflict, the change policy says medical changes get a 50% discount on the applicable standard change fee, plus any fare difference. To get the official quote, I’ll need the new date you want.\n\nFor the extra luggage, I can also include extra checked bags in the updated booking, but I need to know how many extra checked bags you want to add.\n\nPlease send me:\n1. Your new preferred travel date\n2. If you have a preferred time window: early morning, morning, afternoon, evening, or red-eye\n3. Whether you want nonstop only\n4. How many extra checked bags you want to add\n\nThen I’ll look for options and get the exact change quote.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS08"
+          },
+          "result": {
+            "booking_id": "BK-MS08",
+            "user_id": "user_002",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 340,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "SFO",
+            "departure_time": "2026-06-20T12:15:00",
+            "route_type": "domestic"
+          }
+        },
+        {
+          "name": "get_user_details",
+          "arguments": {
+            "user_id": "user_002"
+          },
+          "result": {
+            "user_id": "user_002",
+            "name": "Liam Johnson",
+            "email": "liam.johnson@example.com",
+            "loyalty_tier": "basic",
+            "loyalty_points": 5000
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "change",
+            "cabin_class": "economy",
+            "loyalty_tier": "basic",
+            "route_type": "domestic"
+          },
+          "result": {
+            "topic": "change",
+            "rules": {
+              "free_change_window": "Free changes within 24 hours (domestic) or 48 hours (international) of booking",
+              "basic_economy": "Not changeable after free window",
+              "economy_domestic_personal": "Domestic change fee: $75 if departure >7 days, $150 if ≤7 days. Fare difference also applies.",
+              "economy_international_personal": "International change fee: $100 if departure >7 days, $200 if ≤7 days. Fare difference also applies.",
+              "economy_medical": "Medical changes: 50% discount on standard fee, rounded down to the nearest dollar (requires change_reason='medical')",
+              "economy_bereavement": "Bereavement changes: 75% discount on standard fee, rounded down to the nearest dollar (requires change_reason='bereavement')",
+              "jury_duty": "Jury duty: free change (change_reason='jury_duty')",
+              "military": "Military deployment: free change (change_reason='military')",
+              "schedule_change": "Airline schedule changes: free, no fee (change_reason='schedule_change')",
+              "weather": "Weather-related changes: free, no fee (change_reason='weather')",
+              "business": "Free changes (fare difference still applies)",
+              "first": "Free changes (fare difference still applies)",
+              "change_reason_required": "Pass change_reason parameter: 'personal', 'medical', 'bereavement', 'jury_duty', 'military', 'schedule_change', or 'weather'",
+              "route_type_matters": "Fees differ by route type. Check flight route_type."
+            },
+            "applicable_cabin_class": "economy",
+            "applicable_route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I need to fly on June 22, preferably in the afternoon, and nonstop only. I also need 2 extra checked bags added.\n\nSince this is for a medical appointment, can you check whether that changes the fee and give me a combined preview with the flight option, change fee, fare difference, baggage allowance, extra-bag charges, and final total?"
+    },
+    {
+      "role": "assistant",
+      "content": "Here’s the combined preview for June 22 afternoon nonstop options for BK-MS08.\n\nBaggage and fee context\n- Current fare: economy\n- Loyalty tier: basic\n- Free checked bags included: 1\n- Extra checked bag charge: $35 each\n- Requested extra checked bags: 2\n- Extra bag charges: $70 total\n\nMedical-change policy\n- For domestic economy, the policy says medical changes get a discounted change fee.\n- The live preview returned a change fee of $75 for both options, with medical selected as the change reason.\n\nFlight options and previews\n\n1. UA113\n- Route: ORD → SFO\n- Departure: 2026-06-22 1:00 PM\n- Arrival: 6:19 PM\n- Nonstop: Yes\n- Change fee: $75\n- Fare difference: $20\n- Tool preview returned price_paid: $435\n- Baggage allowance: 1 free checked bag\n- Extra-bag charges for 2 extra checked bags: $70\n\n2. AS104\n- Route: ORD → SFO\n- Departure: 2026-06-22 3:15 PM\n- Arrival: 6:05 PM\n- Nonstop: Yes\n- Change fee: $75\n- Fare difference: $13\n- Tool preview returned price_paid: $428\n- Baggage allowance: 1 free checked bag\n- Extra-bag charges for 2 extra checked bags: $70\n\nImportant note\n- I’m reporting the preview exactly as returned by the tool.\n- The preview returned:\n  - UA113: change fee $75, fare difference $20, price_paid $435\n  - AS104: change fee $75, fare difference $13, price_paid $428\n- Separately, the baggage policy shows 2 extra checked bags would cost $70 total.\n- The tool preview did not explicitly break out or confirm whether those bag charges are already included in the returned price_paid, so I can’t label $435 or $428 as final totals.\n\nIf you want, I can proceed with either:\n- UA113, or\n- AS104\n\nJust tell me which flight you want, and I’ll make the change with 2 extra checked bags.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "baggage",
+            "cabin_class": "economy",
+            "loyalty_tier": "basic"
+          },
+          "result": {
+            "topic": "baggage",
+            "carry_on": 1,
+            "base_checked_bags": 1,
+            "loyalty_bonus_checked_bags": 0,
+            "checked_bags_free": 1,
+            "checked_bag_fee": 35,
+            "oversized_bag_fee": 100,
+            "cabin_class": "economy",
+            "loyalty_tier": "basic"
+          }
+        },
+        {
+          "name": "search_flights",
+          "arguments": {
+            "origin": "ORD",
+            "destination": "SFO",
+            "date": "2026-06-22",
+            "max_stops": 0,
+            "time_range": "afternoon",
+            "max_price": -1
+          },
+          "result": {
+            "flights": [
+              {
+                "flight_id": "UA113",
+                "airline_code": "UA",
+                "origin": "ORD",
+                "destination": "SFO",
+                "departure_time": "2026-06-22T13:00:00",
+                "arrival_time": "2026-06-22T18:19:00",
+                "duration_minutes": 319,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 360,
+                  "business": 900
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              },
+              {
+                "flight_id": "AS104",
+                "airline_code": "AS",
+                "origin": "ORD",
+                "destination": "SFO",
+                "departure_time": "2026-06-22T15:15:00",
+                "arrival_time": "2026-06-22T18:05:00",
+                "duration_minutes": 170,
+                "stops": 0,
+                "cabin_prices": {
+                  "economy": 353,
+                  "business": 819
+                },
+                "status": "scheduled",
+                "route_type": "domestic"
+              }
+            ]
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-MS08",
+            "flight_id": "UA113",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 2,
+            "change_reason": "medical",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-MS08",
+            "flight_id": "UA113",
+            "change_fee": 75,
+            "fare_difference": 20,
+            "price_paid": 435
+          }
+        },
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-MS08",
+            "flight_id": "AS104",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 2,
+            "change_reason": "medical",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-MS08",
+            "flight_id": "AS104",
+            "change_fee": 75,
+            "fare_difference": 13,
+            "price_paid": 428
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "I only want the June 22 United afternoon nonstop option, UA113. Before you proceed, can you confirm the final total for UA113 including the $75 medical-discounted change fee, the $20 fare difference, the 1 free checked bag allowance, and the 2 extra bags at $35 each, and make sure it stays within my $800 budget?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — based on the live preview and baggage policy, UA113 stays within your $800 budget.\n\nUA113 final total estimate\n- Current ticket paid: $340\n- Medical-discounted change fee: $75\n- Fare difference: $20\n- 1 free checked bag included\n- 2 extra checked bags: 2 × $35 = $70\n\nTotal\n- $340 + $75 + $20 + $70 = $505\n\nBudget check\n- Estimated final total: $505\n- Your budget: $800\n- Remaining under budget: $295\n\nOne important note:\n- The update preview tool returned $435 for UA113, which matches $340 + $75 + $20.\n- That means the tool preview appears to reflect the ticket/change amount, while the baggage policy adds $70 for the 2 extra checked bags.\n- So the best supported combined total is $505.\n\nIf you want, I can now proceed to change BK-MS08 to UA113 on June 22 and add the 2 extra checked bags.",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS08"
+          },
+          "result": {
+            "booking_id": "BK-MS08",
+            "user_id": "user_002",
+            "flight_id": "UA100",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 340,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "ORD",
+            "destination": "SFO",
+            "departure_time": "2026-06-20T12:15:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please proceed with UA113 on June 22 and add the 2 extra checked bags. Just to confirm, the total is $505 and stays within my $800 budget."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — BK-MS08 has been changed to UA113 on June 22 with 2 extra checked bags.\n\nConfirmed total: $505\n- Under your $800 budget: yes\n\n",
+      "tool_calls": [
+        {
+          "name": "update_booking",
+          "arguments": {
+            "booking_id": "BK-MS08",
+            "flight_id": "UA113",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "paid_checked_bags": 2,
+            "change_reason": "medical",
+            "confirm": true
+          },
+          "result": {
+            "status": "updated",
+            "booking_id": "BK-MS08",
+            "changes_applied": [
+              "flight_id",
+              "paid_checked_bags",
+              "change_reason"
+            ],
+            "price_paid": 505,
+            "change_fee": 75,
+            "fare_difference": 20
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Can you summarize the final booking details one more time, including that BK-MS08 is now on UA113 for June 22 and the full charge breakdown for the flight change and the 2 extra checked bags together?"
+    },
+    {
+      "role": "assistant",
+      "content": "Final booking summary for BK-MS08:\n\n- Flight: UA113\n- Route: ORD → SFO\n- Date/time: June 22, 2026 at 1:00 PM\n- Cabin: Economy\n- Seat: Window\n- Meal: Vegetarian\n- Checked bags: 2 paid extra bags\n\nCharge breakdown:\n- Original ticket: $340\n- Medical change fee: $75\n- Fare difference: $20\n- 2 extra checked bags: $70\n- Total paid: $505\n\n",
+      "tool_calls": [
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-MS08"
+          },
+          "result": {
+            "booking_id": "BK-MS08",
+            "user_id": "user_002",
+            "flight_id": "UA113",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "window",
+            "meal_preference": "vegetarian",
+            "add_wifi": false,
+            "add_extra_legroom": false,
+            "add_insurance": false,
+            "price_paid": 505,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-05T10:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": 75,
+            "fare_difference": 20,
+            "delay_compensation": null,
+            "paid_checked_bags": 2,
+            "origin": "ORD",
+            "destination": "SFO",
+            "departure_time": "2026-06-22T13:00:00",
+            "route_type": "domestic"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 127402,
+    "cached_input_tokens": 0,
+    "output_tokens": 3894,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 131296,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 127402,
+  "cached_input_tokens": 0,
+  "output_tokens": 3894,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 131296,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-MS08": {
+          "price_paid": {
+            "old": 340,
+            "new": 505
+          },
+          "fare_difference": {
+            "old": null,
+            "new": 20
+          },
+          "paid_checked_bags": {
+            "old": 0,
+            "new": 2
+          },
+          "flight_id": {
+            "old": "UA100",
+            "new": "UA113"
+          },
+          "change_fee": {
+            "old": null,
+            "new": 75
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS08",
+      "field": "change_fee",
+      "expected_value": 75
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS08",
+      "field": "fare_difference",
+      "expected_value": 20
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS08",
+      "field": "flight_id",
+      "expected_value": "UA113"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS08",
+      "field": "paid_checked_bags",
+      "expected_value": 2
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-MS08",
+      "field": "price_paid",
+      "expected_value": 505
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 5,
+  "ux_tool_call_count": 10,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 2,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

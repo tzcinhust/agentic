@@ -1,0 +1,164 @@
+{
+  "task_id": "141-hard_cart_no_mutate_saved_readback",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** Customer shop_004 opens with: \"Audit my cart exactly as-is: item IDs, product IDs, names, quantities, gift-wrap flags, promo codes, loyalty points redeemed, shipping option/cost, subtotal, and total. Do not refresh or fix anything.\" Relevant catalog/policy surface: ClearGrip Case for Pixel 7 (SP-H107), 7-Port USB-C Hub (SP-H111). Final cart/account state should remain unchanged.\n\n**Challenge:** Complete state readback over seeded cart with promo, loyalty, and shipping must avoid cleanup writes. Primary pitfall: Omits internal IDs/discount fields, recomputes/changes promo or points, or gives a generic summary. Correct behavior: Provide a complete cart audit with all requested fields and no mutation. Novelty: No-action state-preservation task with concrete seeded cart. Family: cart_mutation.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "complete_cart_audit_fields",
+      "kind": "must",
+      "requirement": "Agent reported item IDs, product IDs, names, quantities, gift-wrap flags, promo codes, loyalty points redeemed, shipping option/cost, subtotal, and total.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The assistant reported all required audit fields from the cart: item IDs (CI-0001, CI-0002), product IDs (SP-H107, SP-H111), names, quantities, gift-wrap flags, promo codes (SAVE10), loyalty points redeemed (3900), shipping option/cost (express, $12), subtotal ($78), and total ($49)."
+    },
+    {
+      "id": "no_cart_cleanup",
+      "kind": "must_not",
+      "requirement": "Agent did not add, remove, update, apply/remove promo, redeem/cancel points, or set shipping.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls were read-only (get_cart, get_customer_account). There were no add/remove/update actions, no promo or loyalty changes, and no shipping changes."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.8,
+  "ux_reasoning": "The agent followed the user’s no-action request and only performed read-only lookups, then explicitly stated that no changes were made. It returned the requested cart fields with internal IDs, promo, loyalty, shipping, subtotal, and total in a clear audit format, so the user did not need to re-steer or correct anything. The response was slightly over-inclusive because it added loyalty discount and gift-wrap fee details the user did not ask for, but that did not materially hurt the experience.",
+  "turns": 1,
+  "tool_calls": 2,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Audit my cart exactly as-is: item IDs, product IDs, names, quantities, gift-wrap flags, promo codes, loyalty points redeemed, shipping option/cost, subtotal, and total. Do not refresh or fix anything."
+    },
+    {
+      "role": "assistant",
+      "content": "Here’s your cart audit exactly as-is:\n\n- Cart ID: CART-shop_004\n\nItems\n1. Cart item ID: CI-0001\n   - Product ID: SP-H107\n   - Name: ClearGrip Case for Pixel 7\n   - Quantity: 1\n   - Gift-wrap: false\n\n2. Cart item ID: CI-0002\n   - Product ID: SP-H111\n   - Name: 7-Port USB-C Hub\n   - Quantity: 1\n   - Gift-wrap: true\n\nDiscounts / codes\n- Applied promo codes: SAVE10\n- Loyalty points redeemed: 3900\n- Loyalty discount: $39\n\nShipping\n- Shipping option: express\n- Shipping cost: $12\n\nTotals\n- Subtotal: $78\n- Total: $49\n\nAlso present in the cart pricing:\n- Promo/discount amount: $7\n- Gift-wrap fee: $5\n\nNo changes made.",
+      "tool_calls": [
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-H107",
+                "product_name": "ClearGrip Case for Pixel 7",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 29,
+                "line_total": 29
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-H111",
+                "product_name": "7-Port USB-C Hub",
+                "quantity": 1,
+                "gift_wrap": true,
+                "unit_price": 49,
+                "line_total": 49
+              }
+            ],
+            "subtotal": 78,
+            "discount_amount": 7,
+            "gift_wrap_fee": 5,
+            "loyalty_discount": 39,
+            "loyalty_points_redeemed": 3900,
+            "shipping_option": "express",
+            "shipping_cost": 12,
+            "total": 49,
+            "applied_promo_codes": [
+              "SAVE10"
+            ]
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 0,
+            "purchase_history": []
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that covers everything I asked for, and I appreciate that you left the cart unchanged. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 8475,
+    "cached_input_tokens": 0,
+    "output_tokens": 310,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 8785,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 8475,
+  "cached_input_tokens": 0,
+  "output_tokens": 310,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 8785,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 2,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

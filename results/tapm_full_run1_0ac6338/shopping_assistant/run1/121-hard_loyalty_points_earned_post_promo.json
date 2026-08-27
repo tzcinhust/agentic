@@ -1,0 +1,221 @@
+{
+  "task_id": "121-hard_loyalty_points_earned_post_promo",
+  "user_id": "shop_003",
+  "task_summary": "**Task:** Customer shop_003 opens with: \"Before adding anything, compare how Gold points would be earned on the SlimBook with SAVE10 versus no promo. Do not add, ship, or redeem points yet.\" Relevant catalog/policy surface: SlimBook Air 13 (SP-H101). Final cart/account state should remain unchanged.\n\n**Challenge:** Read-only earned-points reasoning must not become an add/apply/redeem workflow. Primary pitfall: Adds the laptop, applies SAVE10, redeems points, or sets shipping before the customer chooses. Correct behavior: Explain Gold earning basis with and without SAVE10 and leave cart unchanged. Novelty: Earned-points disclosure with explicit no-redemption constraint. Family: loyalty_account.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "Task defines no required state changes and the saved state_diff is empty.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "compared_earning_basis",
+      "kind": "must",
+      "requirement": "Agent compared Gold points earned with SAVE10 versus without promo and explained points are earned after discount.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Assistant compared Gold points with and without SAVE10 and correctly stated points are calculated on the final total after discounts."
+    },
+    {
+      "id": "no_add_promo_redemption_or_shipping",
+      "kind": "must_not",
+      "requirement": "Agent did not add the laptop, apply promo, redeem points, or set shipping.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "No tool calls or conversation evidence shows adding the laptop, setting shipping, or redeeming points; SAVE10 was only validated/discussed, not applied."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 4.8,
+  "ux_reasoning": "The agent respected the no-action boundary and kept the interaction read-only throughout; no cart, shipping, or redemption changes were made. It also answered the follow-up by sourcing the exact loyalty policy and providing a clear side-by-side points comparison for SAVE10 vs no promo. User effort was very low because the agent found the needed policy without extra back-and-forth. Response density was good and concise, though the second answer slightly over-explained the derivation and included an unnecessary note about rounding.",
+  "turns": 2,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Before adding anything, compare how Gold points would be earned on the SlimBook with SAVE10 versus no promo. Do not add, ship, or redeem points yet."
+    },
+    {
+      "role": "assistant",
+      "content": "For your account, I can confirm:\n\n- You’re on Gold tier.\n- The SlimBook match is **SlimBook Air 13** at **$849**.\n- **SAVE10** is valid.\n- I should **not** add the item, set shipping, or redeem points yet.\n\nWhat I can compare with confidence from the available data:\n\n- **No promo:** price stays **$849**\n- **With SAVE10:** price would be about **$764.10**\n\nWhat I **can’t** determine exactly from the available policy/tool data:\n- the exact **Gold points earning rate**\n- the exact difference in **points earned** between SAVE10 and no promo\n\nSo the safe conclusion is:\n- **SAVE10 lowers the purchase price by about $84.90**\n- but I **can’t verify the exact Gold points earned** in either case from the current store policy data/tools\n\nIf you want, I can next:\n1. check whether there’s another policy source that explicitly states points earning, or\n2. just help you decide between lower price now vs saving the promo for later.",
+      "tool_calls": [
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_003"
+          },
+          "result": {
+            "customer_id": "shop_003",
+            "name": "Sam Chen",
+            "email": "sam.chen@example.com",
+            "tier": "gold",
+            "is_first_time": false,
+            "loyalty_points": 18500,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook",
+            "category": "electronics",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-H101",
+                "name": "SlimBook Air 13",
+                "brand": "Northstar",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.6,
+                "review_count": 1400,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_redemption"
+          },
+          "result": {
+            "topic": "loyalty_redemption",
+            "summary": "Loyalty points can be redeemed at checkout to offset part of the cart total. 100 points = $1.",
+            "rules": [
+              "Rate: 100 loyalty points = $1.00 off.",
+              "Cap: redemption cannot exceed 50% of the current cart total.",
+              "Minimum redemption: 500 points ($5).",
+              "Stacking: stacks with promo codes and category bundles.",
+              "Restriction: not combinable with the first-time welcome discount.",
+              "Points are debited from the customer's balance at redemption.",
+              "Agent action rule: do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points."
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_003",
+            "promo_code": "SAVE10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off eligible orders",
+            "estimated_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Please check whether there’s another policy source that explicitly states how Gold points are earned. I’m looking for the full comparison for both cases—SAVE10 and no promo—without changing anything in my cart or account."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — there is a policy that explicitly covers it.\n\nFor **Gold tier**, the rule is:\n\n- **Gold earns 2 points per dollar**\n- Points are calculated on the **final total after all discounts**\n\nUsing the **SlimBook Air 13** price of **$849**:\n\n- **No promo:**  \n  Final total = **$849**  \n  Gold points earned = **1,698 points**\n\n- **With SAVE10:**  \n  Final total = **$764.10**  \n  Gold points earned = **1,528.2 points**\n\n**Difference:**  \n- Using **SAVE10** would earn **169.8 fewer points** than paying full price\n\nI’m only reporting what the policies support; **no rounding rule is provided**. No changes were made to your cart or account.",
+      "tool_calls": [
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "loyalty_points"
+          },
+          "result": {
+            "topic": "loyalty_points",
+            "summary": "Loyalty points are earned on every purchase. Rate depends on membership tier.",
+            "rules": [
+              "Platinum: 3 points per dollar spent.",
+              "Gold: 2 points per dollar spent.",
+              "Standard: 1 point per dollar spent.",
+              "Calculation: applied to the final total after all discounts.",
+              "Disclosure: agents should mention points earned after any cart completion."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that’s the comparison I needed. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "token_usage": {
+    "input_tokens": 36264,
+    "cached_input_tokens": 0,
+    "output_tokens": 1548,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 37812,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 36264,
+  "cached_input_tokens": 0,
+  "output_tokens": 1548,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 37812,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 4,
+  "ux_base_score": 4.8,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 6,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
