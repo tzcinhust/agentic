@@ -164,6 +164,8 @@ class OpenCodeLLMClient(BaseLLMClient):
         conversation: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         max_tokens: int | None = None,
+        timeout_seconds: float | None = None,
+        max_retries: int | None = None,
     ) -> AgentCompletion:
         request: dict[str, Any] = {
             "model": self.model,
@@ -173,7 +175,15 @@ class OpenCodeLLMClient(BaseLLMClient):
         }
         if tools:
             request["tools"] = _chat_tools(tools)
-        response = self._client.chat.completions.create(**request)
+        api_client = self._client
+        if timeout_seconds is not None or max_retries is not None:
+            options: dict[str, Any] = {}
+            if timeout_seconds is not None:
+                options["timeout"] = timeout_seconds
+            if max_retries is not None:
+                options["max_retries"] = max_retries
+            api_client = self._client.with_options(**options)
+        response = api_client.chat.completions.create(**request)
         message = response.choices[0].message
         tool_calls = []
         for call in message.tool_calls or []:

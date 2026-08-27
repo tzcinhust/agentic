@@ -7,12 +7,14 @@ import math
 import os
 import re
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from state_bench.agents.base import AgentTurnResponse
 
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
+from agents.transition_aware_memory import TransitionAwareMemory
 
 WRITE_TOOL_NAMES = {
     "create_booking",
@@ -43,6 +45,15 @@ POLICY_FIELDS = (
     "refresh_after_mutation",
     "forbidden_actions",
 )
+
+
+@dataclass(frozen=True)
+class ObservedToolEvent:
+    sequence: int
+    message_index: int
+    name: str
+    arguments: dict[str, Any]
+    result: Any
 
 
 INTENT_HINTS = {
@@ -153,8 +164,23 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         self.verifier_min_confidence = float(
             os.environ.get("STATE_BENCH_VERIFIER_MIN_CONFIDENCE", "0.7")
         )
-        artifact = json.loads(self.memory_path.read_text(encoding="utf-8"))
+        self.tapm_mode = os.environ.get("STATE_BENCH_TAPM_MODE", "enforce")
+        if self.tapm_mode not in {"off", "monitor", "enforce"}:
+            raise ValueError("STATE_BENCH_TAPM_MODE must be off, monitor, or enforce")
+        self.tapm_max_revisions = int(
+            os.environ.get("STATE_BENCH_TAPM_MAX_REVISIONS", "1")
+        )
+        memory_path = Path(
+            os.environ.get("STATE_BENCH_MEMORY_PATH", str(self.memory_path))
+        )
+        artifact = json.loads(memory_path.read_text(encoding="utf-8"))
         domain = getattr(runtime_context, "domain", None)
+        self.transition_memory = TransitionAwareMemory(
+            domain=domain,
+            learned=os.environ.get("STATE_BENCH_TAPM_LEARNED", "on") == "on",
+            entity_aware=os.environ.get("STATE_BENCH_TAPM_ENTITY", "on") == "on",
+            value_aware=os.environ.get("STATE_BENCH_TAPM_VALUE", "on") == "on",
+        )
         self._cards = [item for item in artifact.get("cards", []) if item.get("domain") == domain]
         self._document_frequency = Counter(
             token for item in self._cards for token in set(item.get("tokens", []))
@@ -402,14 +428,42 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         return payload
 
     @staticmethod
-    def _seen_tool_events(conversation: list[dict[str, Any]]) -> list[tuple[int, str, dict[str, Any]]]:
-        events = []
-        for index, item in enumerate(conversation):
+    def _seen_tool_events(
+        conversation: list[dict[str, Any]],
+    ) -> list[ObservedToolEvent]:
+        events: list[ObservedToolEvent] = []
+        sequence = 0
+        for message_index, item in enumerate(conversation):
             if item.get("role") != "assistant":
                 continue
             for call in item.get("tool_calls") or []:
-                events.append((index, str(call.get("name", "")), call.get("arguments", {})))
+                events.append(
+                    ObservedToolEvent(
+                        sequence=sequence,
+                        message_index=message_index,
+                        name=str(call.get("name", "")),
+                        arguments=call.get("arguments") or {},
+                        result=call.get("result"),
+                    )
+                )
+                sequence += 1
         return events
+
+    def _has_required_evidence(
+        self,
+        *,
+        tool_name: str,
+        events: list[ObservedToolEvent],
+        candidate_arguments: dict[str, Any],
+    ) -> bool:
+        return any(
+            event.name == tool_name
+            and self.transition_memory.observation_succeeded(event.result)
+            and self.transition_memory.scope_matches(
+                event.arguments, event.result, candidate_arguments
+            )
+            for event in events
+        )
 
     @staticmethod
     def _unsupported_error_speculation(
@@ -561,6 +615,280 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             "compatible_with field before making the final compatibility conclusion."
         )
 
+    @staticmethod
+    def _explicit_user_constraint_feedback(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text:
+            return None
+        user_text = " ".join(
+            str(item.get("content", ""))
+            for item in conversation
+            if item.get("role") == "user"
+        ).lower()
+        forbids_alternatives = re.search(
+            r"\b(do not|don't|dont|no)\b.{0,40}\b(substitute|alternative|replacement)s?\b",
+            user_text,
+        )
+        suggests_alternatives = re.search(
+            r"\b(suggest|recommend|compare|try|find|choose|add|help with)\b.{0,45}"
+            r"\b(other|different|alternative|substitute|replacement)\b|"
+            r"\b(other|different|alternative|substitute|replacement)\b.{0,45}"
+            r"\b(product|item|accessory|dock|option)\b|"
+            r"\b(provide|use|try|supply|enter)\b.{0,45}"
+            r"\b(canonical|recognized|matching|supported)\b.{0,30}\b(device|name)\b",
+            response.text.lower(),
+        )
+        if forbids_alternatives and suggests_alternatives:
+            return (
+                "The user explicitly prohibited substitute or alternative suggestions. Remove the "
+                "offer, comparison, or recommendation of any different product and complete only the "
+                "requested read-only response."
+            )
+        return None
+
+    @staticmethod
+    def _budget_comparison_feedback(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text:
+            return None
+        user_text = " ".join(
+            str(item.get("content", ""))
+            for item in conversation
+            if item.get("role") == "user"
+        )
+        budgets = re.findall(r"\$([0-9][0-9,]*(?:\.[0-9]+)?)", user_text)
+        if not budgets or not re.search(
+            r"\b(above|over|exceeds?|outside|beyond)\b.{0,35}\bbudget\b|"
+            r"\bbudget\b.{0,35}\b(above|over|exceeds?|outside|beyond)\b",
+            response.text,
+            flags=re.IGNORECASE,
+        ):
+            return None
+        budget = float(budgets[-1].replace(",", ""))
+        values = [
+            float(value.replace(",", ""))
+            for value in re.findall(r"\$([0-9][0-9,]*(?:\.[0-9]+)?)", response.text)
+        ]
+        prices = [value for value in values if value > budget]
+        if not prices:
+            return None
+        price = max(prices)
+        overage = price - budget
+        overage_text = f"{overage:g}"
+        if re.search(
+            rf"\bby\s+\$?{re.escape(overage_text)}\b|"
+            rf"\$?{price:g}\s*[-\u2212]\s*\$?{budget:g}\s*=\s*\$?{overage_text}\b",
+            response.text.replace(",", ""),
+            flags=re.IGNORECASE,
+        ):
+            return None
+        return (
+            f"Make the budget violation numerically explicit before recommending the item: "
+            f"${price:g} exceeds the user's ${budget:g} budget by ${overage:g}."
+        )
+
+    @staticmethod
+    def _bundle_completeness_feedback(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text:
+            return None
+        item_terms = ("laptop", "backpack", "headphones", "webcam")
+        user_text = " ".join(
+            str(item.get("content", ""))
+            for item in conversation
+            if item.get("role") == "user"
+        ).lower()
+        requested = {term for term in item_terms if term in user_text}
+        if len(requested) < 3:
+            return None
+        grounded: set[str] = set()
+        for item in conversation:
+            if item.get("role") != "assistant":
+                continue
+            for call in item.get("tool_calls") or []:
+                if call.get("name") != "search_products":
+                    continue
+                query = str((call.get("arguments") or {}).get("query", "")).lower()
+                result = call.get("result") or {}
+                if not isinstance(result, dict) or not result.get("products"):
+                    continue
+                grounded.update(term for term in requested if term in query)
+        missing = requested - grounded
+        recommends = re.search(
+            r"\b(recommend|best|choose|choice|lean toward|go with|bundle)\b",
+            response.text,
+            flags=re.IGNORECASE,
+        )
+        if missing and recommends:
+            return (
+                "Do not recommend or commit to a partial bundle before grounding every requested item and "
+                f"computing the complete total. Missing catalog evidence for: {', '.join(sorted(missing))}. "
+                "Continue searching with broader terms and remove an incorrect category filter when needed."
+            )
+        return None
+
+    @staticmethod
+    def _loyalty_cap_feedback(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text or not re.search(
+            r"\b(maximum|max|50% cap|half)\b", response.text, flags=re.IGNORECASE
+        ):
+            return None
+        carts = []
+        has_half_cap_policy = False
+        for item in conversation:
+            if item.get("role") != "assistant":
+                continue
+            for call in item.get("tool_calls") or []:
+                name = str(call.get("name", ""))
+                result = call.get("result")
+                if name == "get_cart" and isinstance(result, dict):
+                    carts.append(result)
+                if name == "get_policies":
+                    policy_text = json.dumps(result, ensure_ascii=True, default=str).lower()
+                    has_half_cap_policy = has_half_cap_policy or "50%" in policy_text
+        if not carts or not has_half_cap_policy:
+            return None
+        cart = carts[-1]
+        subtotal = float(cart.get("subtotal", 0) or 0)
+        discount = float(cart.get("loyalty_discount", 0) or 0)
+        cap = subtotal * 0.5
+        if subtotal <= 0 or math.isclose(discount, cap):
+            return None
+        return (
+            f"The numeric loyalty claim is inconsistent with observed state: 50% of the "
+            f"${subtotal:g} subtotal is ${cap:g}, while the current loyalty discount is "
+            f"${discount:g}. Do not call the current discount the maximum; disclose the gap "
+            "and request approval before changing the redemption."
+        )
+
+    @staticmethod
+    def _redundant_quantity_confirmation_feedback(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text:
+            return None
+        latest_user = next(
+            (
+                str(item.get("content", "")).lower()
+                for item in reversed(conversation)
+                if item.get("role") == "user" and "[task_done]" not in str(item.get("content", "")).lower()
+            ),
+            "",
+        )
+        if not re.search(r"\b(cart|quantity|one|two|second|units?|laptops?)\b", latest_user):
+            return None
+        if not re.search(r"\b(add|change|increase|reduce|remove|set|update)\b", latest_user):
+            return None
+        candidate = response.text.lower()
+        repeats_quantity_confirmation = (
+            ("?" in candidate or re.search(r"\breply (with|to) [\"']?confirm", candidate))
+            and re.search(
+                r"\b(should i|please confirm|confirm that|do you want me to|reply (with|to) [\"']?confirm)\b",
+                candidate,
+            )
+            and re.search(r"\b(final quantity|quantity|set .*\bto\b|add .*back|remove)\b", candidate)
+        )
+        unresolved_choice = re.search(r"\b(which|what size|what color|choose|select|prefer)\b", candidate)
+        if repeats_quantity_confirmation and not unresolved_choice:
+            return (
+                "The user already gave an explicit cart quantity instruction and no material choice remains. "
+                "Do not ask for the same confirmation again; perform the authorized quantity update using "
+                "the live tool schema."
+            )
+        return None
+
+    @staticmethod
+    def _material_write_effect_appendix(
+        response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        if phase != "pre_final" or not response.text:
+            return None
+        calls: list[tuple[int, str, dict[str, Any], Any]] = []
+        order = 0
+        for item in conversation:
+            if item.get("role") != "assistant":
+                continue
+            for call in item.get("tool_calls") or []:
+                calls.append(
+                    (
+                        order,
+                        str(call.get("name", "")),
+                        call.get("arguments") or {},
+                        call.get("result"),
+                    )
+                )
+                order += 1
+        write_calls = [call for call in calls if call[1] in WRITE_TOOL_NAMES]
+        if not write_calls:
+            return None
+        write_order, write_name, _, write_result = write_calls[-1]
+        if not isinstance(write_result, dict):
+            return None
+
+        normalized_candidate = re.sub(r"[,$\s]", "", response.text.lower())
+        if write_result.get("loyalty_redemption_clamped"):
+            values = {
+                "previous loyalty discount": write_result.get("previous_loyalty_discount"),
+                "new loyalty discount": write_result.get("new_loyalty_discount"),
+                "refunded loyalty points": write_result.get("loyalty_points_refunded"),
+            }
+            missing = [
+                label
+                for label, value in values.items()
+                if value is not None and str(value).replace(",", "") not in normalized_candidate
+            ]
+            if missing:
+                return (
+                    f"For clarity, the successful {write_name} call automatically clamped the loyalty "
+                    f"discount from ${values['previous loyalty discount']} to "
+                    f"${values['new loyalty discount']} and refunded "
+                    f"{values['refunded loyalty points']} loyalty points."
+                )
+
+        carts_before = [call for call in calls if call[0] < write_order and call[1] == "get_cart"]
+        carts_after = [call for call in calls if call[0] > write_order and call[1] == "get_cart"]
+        if not carts_before or not carts_after:
+            return None
+        before = carts_before[-1][3]
+        after = carts_after[-1][3]
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            return None
+        subtotal_increased = float(after.get("subtotal", 0) or 0) > float(before.get("subtotal", 0) or 0)
+        old_discount = before.get("loyalty_discount")
+        new_discount = after.get("loyalty_discount")
+        sticky_discount = old_discount and old_discount == new_discount
+        if subtotal_increased and sticky_discount:
+            explains_non_restore = re.search(
+                r"\b(did not|didn't|not automatically|stayed|remained|still)\b",
+                response.text.lower(),
+            )
+            offers_action = re.search(
+                r"\b(redeem|re-redeem|apply|use)\b.{0,35}\b(points?|loyalty)\b|"
+                r"\b(points?|loyalty)\b.{0,35}\b(redeem|re-redeem|apply|use)\b",
+                response.text.lower(),
+            )
+            if not explains_non_restore or not offers_action:
+                return (
+                    f"The loyalty redemption did not automatically restore after the cart subtotal increased; "
+                    f"the current loyalty discount remains ${new_discount}. If you want, I can redeem "
+                    "additional points, but I will not change the redemption without your approval."
+                )
+        return None
+
+    @classmethod
+    def _material_write_effect_feedback(
+        cls, response: AgentTurnResponse, conversation: list[dict[str, Any]], phase: str
+    ) -> str | None:
+        appendix = cls._material_write_effect_appendix(response, conversation, phase)
+        if not appendix:
+            return None
+        return f"Add this material observed side effect to the response: {appendix}"
+
     def _deterministic_feedback(
         self,
         *,
@@ -575,12 +903,14 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             (index for index, item in enumerate(conversation) if item.get("role") == "user"),
             default=-1,
         )
-        recent_events = [event for event in events if event[0] > last_user_index]
+        recent_events = [
+            event for event in events if event.message_index > last_user_index
+        ]
         last_write_index = max(
-            (index for index, name, _ in events if name in WRITE_TOOL_NAMES),
+            (event.sequence for event in events if event.name in WRITE_TOOL_NAMES),
             default=-1,
         )
-        state_events = [event for event in events if event[0] > last_write_index]
+        state_events = [event for event in events if event.sequence > last_write_index]
 
         schema_feedback = self._schema_feedback(response, tools)
         if schema_feedback:
@@ -591,6 +921,36 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         )
         if compatibility_feedback:
             return compatibility_feedback
+
+        constraint_feedback = self._explicit_user_constraint_feedback(
+            response, conversation, phase
+        )
+        if constraint_feedback:
+            return constraint_feedback
+
+        budget_feedback = self._budget_comparison_feedback(response, conversation, phase)
+        if budget_feedback:
+            return budget_feedback
+
+        bundle_feedback = self._bundle_completeness_feedback(response, conversation, phase)
+        if bundle_feedback:
+            return bundle_feedback
+
+        loyalty_cap_feedback = self._loyalty_cap_feedback(response, conversation, phase)
+        if loyalty_cap_feedback:
+            return loyalty_cap_feedback
+
+        quantity_feedback = self._redundant_quantity_confirmation_feedback(
+            response, conversation, phase
+        )
+        if quantity_feedback:
+            return quantity_feedback
+
+        write_effect_feedback = self._material_write_effect_feedback(
+            response, conversation, phase
+        )
+        if write_effect_feedback:
+            return write_effect_feedback
 
         if phase == "pre_final" and self._unsupported_error_speculation(
             response, conversation
@@ -607,7 +967,9 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             if any(
                 json.dumps([old_name, old_arguments], sort_keys=True, ensure_ascii=True)
                 == signature
-                for _, old_name, old_arguments in recent_events
+                for old_name, old_arguments in (
+                    (event.name, event.arguments) for event in recent_events
+                )
             ):
                 return f"Do not repeat the already executed {name} call with identical arguments."
 
@@ -617,7 +979,6 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         if int(card.get("support", 0)) < 3 or float(card.get("mean_fitness", 0.0)) < 0.8:
             return None
         rules = [rule for rule in card.get("runtime_rules", []) if isinstance(rule, dict)]
-        seen_names = [name for _, name, _ in state_events]
         candidate_names = {name for name, _ in calls}
         for rule in rules:
             rule_phase = rule.get("phase")
@@ -630,19 +991,53 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             triggers = set(map(str, rule.get("trigger_tools", [])))
             if phase == "pre_write" and triggers and not (candidate_names & triggers):
                 continue
-            if rule.get("kind") == "require_tool" and required - set(seen_names):
-                missing = ", ".join(sorted(required - set(seen_names)))
-                return str(rule.get("feedback") or f"Call the required read tools first: {missing}.")
-            if phase == "pre_final" and rule.get("kind") == "refresh" and required:
-                write_positions = [index for index, name, _ in events if name in WRITE_TOOL_NAMES]
-                if not write_positions:
-                    continue
-                after_write = {
-                    name for index, name, _ in events if index > max(write_positions)
+            if rule.get("kind") == "require_tool" and required:
+                targets = [
+                    arguments
+                    for name, arguments in calls
+                    if not triggers or name in triggers
+                ]
+                missing = {
+                    tool_name
+                    for tool_name in required
+                    if any(
+                        not self._has_required_evidence(
+                            tool_name=tool_name,
+                            events=state_events,
+                            candidate_arguments=arguments,
+                        )
+                        for arguments in targets
+                    )
                 }
-                if required - after_write:
-                    missing = ", ".join(sorted(required - after_write))
-                    return str(rule.get("feedback") or f"Refresh state before replying: {missing}.")
+                if missing:
+                    names = ", ".join(sorted(missing))
+                    return str(
+                        rule.get("feedback")
+                        or f"Call the required read tools first: {names}."
+                    )
+            if phase == "pre_final" and rule.get("kind") == "refresh" and required:
+                writes = [event for event in events if event.name in WRITE_TOOL_NAMES]
+                if not writes:
+                    continue
+                last_write = max(writes, key=lambda event: event.sequence)
+                after_write = [
+                    event for event in events if event.sequence > last_write.sequence
+                ]
+                missing = {
+                    tool_name
+                    for tool_name in required
+                    if not self._has_required_evidence(
+                        tool_name=tool_name,
+                        events=after_write,
+                        candidate_arguments=last_write.arguments,
+                    )
+                }
+                if missing:
+                    names = ", ".join(sorted(missing))
+                    return str(
+                        rule.get("feedback")
+                        or f"Refresh state before replying: {names}."
+                    )
         return None
 
     def _semantic_verdict(
@@ -698,6 +1093,10 @@ Use revise only for a clear violation supported by the supplied policy and trace
                 conversation=[{"role": "user", "content": prompt}],
                 tools=[],
                 max_tokens=500,
+                timeout_seconds=float(
+                    os.environ.get("STATE_BENCH_VERIFIER_TIMEOUT_SECONDS", "60")
+                ),
+                max_retries=0,
             )
         except Exception:  # noqa: BLE001 - auxiliary verifier failures must not abort the benchmark
             return True, ""
@@ -749,11 +1148,57 @@ Use revise only for a clear violation supported by the supplied policy and trace
         conversation: list[dict[str, Any]],
         tools: list[dict[str, Any]],
     ) -> AgentTurnResponse:
+        generation_prompt = system_prompt
+        if self.tapm_mode != "off":
+            generation_prompt = (
+                f"{system_prompt}\n\n{self.transition_memory.prompt_context(conversation)}"
+            )
+        available_tools = [
+            str(tool.get("name") or tool.get("function", {}).get("name", ""))
+            for tool in tools
+        ]
+
+        def enforce_transition(
+            candidate: AgentTurnResponse,
+            candidate_context: list[dict[str, Any]],
+        ) -> AgentTurnResponse:
+            if self.tapm_mode != "enforce":
+                return candidate
+            for revision in range(self.tapm_max_revisions + 1):
+                candidate_calls = self._tool_calls(candidate)
+                tapm_feedback = self.transition_memory.feedback(
+                    candidate_calls=candidate_calls,
+                    conversation=conversation,
+                    available_tools=available_tools,
+                    final_response=not candidate_calls,
+                )
+                if not tapm_feedback:
+                    return candidate
+                if revision >= self.tapm_max_revisions:
+                    return AgentTurnResponse(
+                        text="Before making that change, I need to refresh the current state.",
+                        tool_calls=[],
+                    )
+                correction = {
+                    "role": "system",
+                    "content": (
+                        "The previous candidate was not executed. Transition-aware state checking found: "
+                        f"{tapm_feedback} Generate the minimal corrective next step."
+                    ),
+                }
+                candidate = super(ProcessWorkflowMemoryAgent, self).generate_next_turn(
+                    system_prompt=generation_prompt,
+                    conversation=[*candidate_context, correction],
+                    tools=tools,
+                )
+            return candidate
+
         response = super().generate_next_turn(
-            system_prompt=system_prompt,
+            system_prompt=generation_prompt,
             conversation=conversation,
             tools=tools,
         )
+        response = enforce_transition(response, conversation)
         if self.verifier_mode == "off" or not self._policy_payload():
             return response
 
@@ -767,13 +1212,14 @@ Use revise only for a clear violation supported by the supplied policy and trace
             else:
                 return response
 
-            feedback = self._deterministic_feedback(
+            deterministic_feedback = self._deterministic_feedback(
                 phase=phase,
                 response=response,
                 conversation=conversation,
                 tools=tools,
             )
-            allowed = feedback is None
+            feedback = deterministic_feedback
+            allowed = deterministic_feedback is None
             if allowed:
                 allowed, feedback = self._semantic_verdict(
                     phase=phase,
@@ -785,10 +1231,23 @@ Use revise only for a clear violation supported by the supplied policy and trace
                 return response
             if revision >= self.verifier_max_revisions:
                 if phase == "pre_write":
+                    if (
+                        deterministic_feedback is None
+                        and self._has_explicit_write_authorization(conversation)
+                    ):
+                        return response
                     return AgentTurnResponse(
                         text=response.text
                         or "Before I make that change, I need to verify the required details or confirmation.",
                         tool_calls=[],
+                    )
+                appendix = self._material_write_effect_appendix(
+                    response, conversation, phase
+                )
+                if appendix:
+                    return AgentTurnResponse(
+                        text=f"{response.text.rstrip()}\n\n{appendix}",
+                        tool_calls=response.tool_calls,
                     )
                 return response
 
@@ -800,9 +1259,11 @@ Use revise only for a clear violation supported by the supplied policy and trace
                     "do not claim the rejected action happened, and ask the user when confirmation is missing."
                 ),
             }
+            verifier_context = [*conversation, correction]
             response = super().generate_next_turn(
-                system_prompt=system_prompt,
-                conversation=[*conversation, correction],
+                system_prompt=generation_prompt,
+                conversation=verifier_context,
                 tools=tools,
             )
+            response = enforce_transition(response, verifier_context)
         return response

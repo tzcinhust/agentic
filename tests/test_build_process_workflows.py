@@ -13,6 +13,9 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 _parse_trace = MODULE._parse_trace
 _compile_runtime_rules = MODULE._compile_runtime_rules
+_assert_train_data_root = MODULE._assert_train_data_root
+_training_instance_literals = MODULE._training_instance_literals
+_validate_card = MODULE._validate_card
 
 
 def test_parse_trace_loads_only_matching_train_task_requirements(tmp_path) -> None:
@@ -81,3 +84,86 @@ def test_compile_structured_fields_into_runtime_rules() -> None:
     refresh = next(rule for rule in rules if rule["kind"] == "refresh")
     assert refresh["required_tools"] == ["get_cart"]
     assert refresh["enforcement"] == "deterministic"
+
+
+def test_llm_supplied_runtime_rules_are_recompiled_from_grounded_fields() -> None:
+    card = {
+        "preconditions": ["Read the latest cart with get_cart."],
+        "mandatory_disclosures": [],
+        "confirmation_gates": [],
+        "refresh_after_mutation": [],
+        "forbidden_actions": [],
+        "runtime_rules": [
+            {
+                "id": "hallucinated",
+                "phase": "pre_write",
+                "kind": "require_tool",
+                "trigger_tools": ["update_cart_item"],
+                "required_tools": ["search_products"],
+                "condition": "Always search first.",
+                "feedback": "Search first.",
+                "enforcement": "deterministic",
+            }
+        ],
+    }
+
+    rules = _compile_runtime_rules(
+        card,
+        observed_tools={"get_cart", "update_cart_item"},
+        allowed_tools={"get_cart", "search_products", "update_cart_item"},
+    )
+
+    assert len(rules) == 1
+    assert rules[0]["required_tools"] == ["get_cart"]
+    assert rules[0]["id"].startswith("compiled_")
+
+
+def test_card_with_training_instance_values_is_rejected(tmp_path) -> None:
+    trace_path = tmp_path / "trace.json"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "conversation": [
+                    {"role": "user", "content": "Return my order."},
+                    {
+                        "role": "assistant",
+                        "content": "Done.",
+                        "tool_calls": [
+                            {
+                                "name": "get_order",
+                                "arguments": {"order_id": "ORD-7512"},
+                                "result": {"order_id": "ORD-7512", "total_paid": 999},
+                            }
+                        ],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    record = _parse_trace(trace_path, "customer_support")
+    literals = _training_instance_literals([record])
+    card = {
+        "title": "Return ORD-7512",
+        "applies_when": "The order total is $999.",
+        "preconditions": [],
+        "steps": [],
+        "branches": [],
+        "avoid": [],
+        "keywords": [],
+    }
+
+    assert not _validate_card(
+        card,
+        {"get_order"},
+        forbidden_literals=literals,
+    )
+
+
+def test_test_trajectory_root_is_rejected() -> None:
+    try:
+        _assert_train_data_root(Path("datasets/test_task_trajectories"))
+    except ValueError as exc:
+        assert "train trajectories only" in str(exc)
+    else:
+        raise AssertionError("test trajectory root should be rejected")

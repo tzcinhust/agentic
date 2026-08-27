@@ -488,10 +488,6 @@ def _compile_runtime_rules(
     observed_tools: set[str],
     allowed_tools: set[str],
 ) -> list[dict[str, Any]]:
-    existing = card.get("runtime_rules")
-    if isinstance(existing, list) and existing:
-        return existing
-
     card_text = json.dumps(card, ensure_ascii=True).lower()
     write_triggers = sorted(
         name
@@ -502,7 +498,12 @@ def _compile_runtime_rules(
 
     def mentioned_tools(text: str) -> list[str]:
         lowered = text.lower()
-        return [name for name in read_tools if re.search(rf"\b{re.escape(name)}\b", lowered)]
+        return [
+            name
+            for name in read_tools
+            if name in observed_tools
+            and re.search(rf"\b{re.escape(name)}\b", lowered)
+        ]
 
     rules: list[dict[str, Any]] = []
 
@@ -572,8 +573,40 @@ def _compile_runtime_rules(
     return rules
 
 
+def _training_instance_literals(records: list[TraceRecord]) -> set[str]:
+    literals: set[str] = set()
+    amount_terms = ("amount", "cost", "fee", "price", "subtotal", "total")
+
+    def visit(value: Any, key: str = "") -> None:
+        if isinstance(value, dict):
+            for child_key, child in value.items():
+                visit(child, str(child_key).lower())
+        elif isinstance(value, list):
+            for child in value:
+                visit(child, key)
+        elif isinstance(value, str) and (key == "id" or key.endswith("_id")):
+            if len(value.strip()) >= 4:
+                literals.add(value.strip().lower())
+        elif (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and any(term in key for term in amount_terms)
+            and abs(float(value)) >= 2
+        ):
+            literals.add(f"${float(value):g}".lower())
+
+    for record in records:
+        for event in record.events:
+            visit(event.arguments)
+            visit(event.result)
+    return literals
+
+
 def _validate_card(
-    card: dict[str, Any], allowed_tools: set[str], structured: bool = False
+    card: dict[str, Any],
+    allowed_tools: set[str],
+    structured: bool = False,
+    forbidden_literals: set[str] | None = None,
 ) -> bool:
     required = {"title", "applies_when", "preconditions", "steps", "branches", "avoid", "keywords"}
     structured_required = {
@@ -609,6 +642,14 @@ def _validate_card(
             if not set(map(str, trigger_tools + required_tools)).issubset(allowed_tools):
                 return False
     text = json.dumps(card, ensure_ascii=True).lower()
+    if forbidden_literals:
+        for literal in forbidden_literals:
+            if literal.startswith("$"):
+                pattern = rf"{re.escape(literal)}(?![0-9.])"
+            else:
+                pattern = rf"(?<![a-z0-9_-]){re.escape(literal)}(?![a-z0-9_-])"
+            if re.search(pattern, text):
+                return False
     mentioned = set(re.findall(r"\b[a-z][a-z0-9]+(?:_[a-z0-9]+)+\b", text))
     suspicious = {
         token for token in mentioned
@@ -711,7 +752,14 @@ def _generate_cards_for_family(
     return cards
 
 
+def _assert_train_data_root(data_root: Path) -> None:
+    blocked_parts = {"test", "test_tasks", "test_task_trajectories"}
+    if blocked_parts & {part.lower() for part in data_root.parts}:
+        raise ValueError("Workflow memory must be built from train trajectories only")
+
+
 def build(args: argparse.Namespace) -> dict[str, Any]:
+    _assert_train_data_root(args.data_root)
     client = None
     if not args.no_llm:
         from openai import OpenAI
@@ -802,7 +850,13 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                     },
                     allowed_tools=allowed_tools,
                 )
-            if not _validate_card(card, allowed_tools, args.structured):
+            forbidden_literals = _training_instance_literals(family_records)
+            if not _validate_card(
+                card,
+                allowed_tools,
+                args.structured,
+                forbidden_literals=forbidden_literals,
+            ):
                 card = _fallback_card(family, process, family_records, args.structured)
                 if args.structured:
                     card["runtime_rules"] = _compile_runtime_rules(
@@ -812,7 +866,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                         },
                         allowed_tools=allowed_tools,
                     )
-                if not _validate_card(card, allowed_tools, args.structured):
+                if not _validate_card(
+                    card,
+                    allowed_tools,
+                    args.structured,
+                    forbidden_literals=forbidden_literals,
+                ):
                     raise ValueError(f"Invalid fallback workflow card for {domain}:{family}")
             source_tasks = [record.task_id for record in representatives]
             search_text = " ".join(
