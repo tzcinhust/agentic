@@ -1,0 +1,834 @@
+{
+  "domain": "shopping_assistant",
+  "source": "datasets\\train_task_trajectories\\shopping_assistant",
+  "trace_count": 100,
+  "view_tool": "get_cart",
+  "view_fields": [
+    "applied_promo_codes",
+    "cart_id",
+    "cart_item_id",
+    "customer_id",
+    "discount_amount",
+    "gift_wrap",
+    "gift_wrap_fee",
+    "items",
+    "line_total",
+    "loyalty_discount",
+    "loyalty_points_redeemed",
+    "product_id",
+    "product_name",
+    "quantity",
+    "shipping_cost",
+    "shipping_option",
+    "subtotal",
+    "total",
+    "unit_price",
+    "variant_id",
+    "variant_label"
+  ],
+  "policy_fetch_counts": {
+    "backorder": 4,
+    "brand_bundle": 2,
+    "loyalty_points": 3,
+    "loyalty_redemption": 7,
+    "price_alerts": 1,
+    "price_match": 2,
+    "promo_stacking": 6,
+    "quantity_limit": 6,
+    "returns": 2,
+    "shipping": 5,
+    "welcome_discount": 5
+  },
+  "probes": [
+    {
+      "topic": "backorder",
+      "provenance": "train_trajectory_tool_result",
+      "support": 4,
+      "witness_traces": [
+        "109-hard_shipping_deadline_backorder_conflict",
+        "36-oos_backorder_loyalty_compound",
+        "55-partial_add_failure_reporting",
+        "78-hard_reuse_oos_backorder_loyalty_compound"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [
+        {
+          "text": "product.in_stock is False AND product.backorder_available is True.",
+          "fields": [
+            "backorder_available",
+            "in_stock"
+          ],
+          "label": "eligibility"
+        }
+      ],
+      "trigger_fields": [
+        "backorder_available",
+        "in_stock",
+        "items",
+        "price"
+      ],
+      "latent_fields": [
+        "backorder_available",
+        "in_stock",
+        "price"
+      ],
+      "resolvers": {
+        "backorder_available": [
+          "get_product_details"
+        ],
+        "in_stock": [
+          "get_product_details",
+          "get_variants",
+          "search_products"
+        ],
+        "price": [
+          "get_product_details",
+          "search_products"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "say",
+          "text": "when a requested product is OOS, agent should check and offer backorder if available.",
+          "label": "proactive"
+        }
+      ],
+      "channels": [
+        "say"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "backorder"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "10%"
+        ]
+      },
+      "discharge_exemplars": [
+        "You’re right — the exact model exists:\n\n- GameForce Pro 16 2027 Edition\n- SKU: SP-2050\n- Price: $2,199\n- Rating: 4.8\n- Status: Sold out\n- Backorder: Available\n\nBackorder policy:\n- Eligible because it’s out of stock and marked backorder-available\n- Deposit: 10% ($219.90)\n- Restock ETA: about 2–4 weeks\n- Current shipping estimate: 21 business days standard\n- Deposit is refundable if restock fails\n\nI can confirm it’s backorderable, but I don’t have a tool here to place a reservation/backorder directly.",
+        "The SlimBook Air 13 (Previous Gen) is out of stock, but it is available for backorder:\n- Deposit: 10% ($69.90)\n- Restock estimate: 2–4 weeks\n- Deposit is refundable if restock doesn’t happen\n\nI’ve also gone ahead and added these to your cart with no gift wrap:\n- ProBook Laptop 13-inch — $999\n- SoundMax Wireless Headphones — $149\n\nCurrent cart total: $1,148\n\nIf you want, I can also help check whether there’s a promo that could apply.",
+        "For **SP-2050**:\n- **Price:** $2,199\n- **Stock:** **Out of stock**\n- **Variants:** None\n- **Backorder:** **Available**\n- **Estimated arrival:** about **2–4 weeks** / roughly **21 business days standard**\n- **Backorder deposit:** **10%** = **$219.90** refundable if restock fails\n\nSo I **can’t add it as an in-stock purchase right now**."
+      ],
+      "discharging_traces": [
+        "36-oos_backorder_loyalty_compound",
+        "55-partial_add_failure_reporting",
+        "78-hard_reuse_oos_backorder_loyalty_compound"
+      ],
+      "train_discharge_rate": 0.75
+    },
+    {
+      "topic": "brand_bundle",
+      "provenance": "train_trajectory_tool_result",
+      "support": 2,
+      "witness_traces": [
+        "149-hard_compound_swap_breaks_bundle_and_shipping",
+        "50-brand_bundle_hold_and_pivot"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [
+        {
+          "text": "2+ items sharing the same brand.",
+          "fields": [
+            "brand",
+            "items"
+          ],
+          "label": "eligibility"
+        }
+      ],
+      "trigger_fields": [
+        "brand",
+        "category",
+        "items",
+        "total"
+      ],
+      "latent_fields": [
+        "brand",
+        "category"
+      ],
+      "resolvers": {
+        "brand": [
+          "get_product_details",
+          "search_products"
+        ],
+        "category": [
+          "get_product_details",
+          "search_products"
+        ]
+      },
+      "item_threshold": 2,
+      "duties": [
+        {
+          "channel": "say",
+          "text": "agent surfaces this to the customer; the cart does not auto-apply it.",
+          "label": "informational"
+        },
+        {
+          "channel": "tool",
+          "text": "agent surfaces this to the customer; the cart does not auto-apply it.",
+          "label": "informational"
+        }
+      ],
+      "channels": [
+        "say",
+        "tool"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "bundle"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "3%"
+        ]
+      },
+      "discharge_exemplars": [
+        "- **Product:** ClearGrip Case for Pixel 7  \n- **Product ID:** SP-H107  \n- **Brand:** NovaShield  \n- **Price:** $29  \n- **Stock:** In stock  \n- **Compatibility:** Confirmed compatible with **Google Pixel 7**  \n- **Standard item ship estimate:** 1 business day\n\n### Brand-bundle effect\nRight now your cart has:\n- **ProBook Laptop 13** — Northstar\n- **ProBook USB-C Dock** — Northstar\n\nThat means your current cart **qualifies for the brand bundle**:\n- **Rule:** 2+ items of the same brand\n- **Discount:** **3% off each qualifying item’s line total**\n- **Important:** this is **not auto-applied in the cart**; it’s an informational discount we can surface\n\nSo with the laptop + dock, the qualifying Northstar total is:\n- $999 + $129 = **$1,128**\n- 3% of that = **$33.84** potential brand-bundle savings\n\nIf you swap the dock for the Pixel 7 case:\n- You’d have **one Northstar item** (the laptop)\n- The case is **NovaShield**, not Northstar\n- So the **brand bundle would no longer qualify**\n\n### Shipping effect\nYou currently have:\n- **Standard shipping selected**\n- **Shipping cost:** $6\n- **Current ETA:** 3 business days\n\nIf you swap the dock for the case, the shipping impact should be:\n\n- **Cost:** likely **no change**\n  - Standard remains **$6**\n  - Express **$12**\n  - Next-day **$15**\n  - You’re on **standard tier**, so no free express/next-day benefit\n- **ETA:** likely **still 3 business days**\n  - Laptop ships in **3 days**\n  - Dock ships in **2 days**\n  - Pixel 7 case ships in **1 day**\n  - The laptop is still the slowest item, so it should continue to set the overall standard ETA\n\n### Bottom line\nIf you replace the dock with the Pixel 7 case, you’d likely get:\n- **-$100** in item price before discounts/shipping\n- but you’d also **lose the current same-brand bundle eligibility** worth about **$33.84**\n- and **shipping should stay the same** at **$6 standard / 3 business days**\n\nIf you want, I can next estimate the **new expected total after the swap** without actually changing the cart.",
+        "Also, your cart currently shows:\n- Discount amount: $0\n- No promo codes applied\n\nIf you want, I can help you find:\n- another ProBook item, or\n- another AlpineGear item\n\nso you can qualify for the 3% same-brand bundle discount."
+      ],
+      "discharging_traces": [
+        "149-hard_compound_swap_breaks_bundle_and_shipping",
+        "50-brand_bundle_hold_and_pivot"
+      ],
+      "train_discharge_rate": 1.0
+    },
+    {
+      "topic": "loyalty_points",
+      "provenance": "train_trajectory_tool_result",
+      "support": 3,
+      "witness_traces": [
+        "47-progressive_reveal_aggregation",
+        "57-hold_correct_math_on_pushback",
+        "58-tier_claim_contradicts_account"
+      ],
+      "applicable_context": {},
+      "rule_count": 6,
+      "triggers": [],
+      "trigger_fields": [
+        "tier",
+        "total"
+      ],
+      "latent_fields": [
+        "tier"
+      ],
+      "resolvers": {
+        "tier": [
+          "get_customer_account"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "say",
+          "text": "agents should mention points earned after any cart completion.",
+          "label": "disclosure"
+        }
+      ],
+      "channels": [
+        "say"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "loyalty",
+          "points"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "1 point",
+          "2 points",
+          "3 points"
+        ]
+      },
+      "discharge_exemplars": [
+        "As a **Platinum** member, you earn **3 points per dollar** on the **final total after discounts**."
+      ],
+      "discharging_traces": [
+        "47-progressive_reveal_aggregation"
+      ],
+      "train_discharge_rate": 0.33
+    },
+    {
+      "topic": "loyalty_redemption",
+      "provenance": "train_trajectory_tool_result",
+      "support": 7,
+      "witness_traces": [
+        "116-hard_loyalty_minimum_decline_no_topoff",
+        "118-hard_loyalty_redemption_cap_preview",
+        "138-hard_remove_desk_keep_invalid_promo",
+        "47-progressive_reveal_aggregation",
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback",
+        "74-redemption_vs_welcome_non_combinable"
+      ],
+      "applicable_context": {},
+      "rule_count": 8,
+      "triggers": [],
+      "trigger_fields": [
+        "category",
+        "total"
+      ],
+      "latent_fields": [
+        "category"
+      ],
+      "resolvers": {
+        "category": [
+          "get_product_details",
+          "search_products"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "refuse",
+          "text": "redemption cannot exceed 50% of the current cart total.",
+          "label": "cap"
+        },
+        {
+          "channel": "refuse",
+          "text": "not combinable with the first-time welcome discount.",
+          "label": "restriction"
+        },
+        {
+          "channel": "ask",
+          "text": "do NOT call redeem_loyalty_points without an explicit customer-specified amount. You may discuss and recommend redemption in chat, but the write call must come AFTER the customer names a specific number of points.",
+          "label": "agent action rule"
+        }
+      ],
+      "channels": [
+        "ask",
+        "refuse"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "loyalty",
+          "redemption"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "$1",
+          "$1.00",
+          "$5",
+          "100 points",
+          "50%",
+          "500 points"
+        ]
+      },
+      "discharge_exemplars": [
+        "Your balance is 2,200 points, but the store’s minimum redemption is 500 points = $5 off.",
+        "- 80,000 points = **$800 off**\n  - Loyalty redemption is capped at **50% of the current cart total**\n  - On a $999 item, the max allowed is about **$499 off**, so **80,000 points exceeds the cap**\n  - You do have enough points overall: **104,000 points available**\n\n- **SAVE10 path:** **Allowed**\n  - SAVE10 is currently a valid promo\n  - On a $999 ProBook, that would be about **$99.90 off**\n\nImportant rule note:\n- These are **not mutually exclusive** under store rules.",
+        "Sure — **without applying SAVE10 or redeeming anything**, here’s the concrete cap for the **ProBook Laptop 13** at its current price:\n\n- **ProBook price / cart total (item only):** **$999.00**\n- **Loyalty redemption cap:** **50% of cart total**\n- **Max allowed loyalty discount:** **$499.50**\n- **Equivalent points at 100 points = $1:** **49,950 points**\n\nPractical note:\n- If you prefer a clean **100-point increment**, then **49,900 points = $499.00 off**\n- Either way, **80,000 points would be over the cap** on the ProBook alone\n\nSo the capped amount against this ProBook-only total is:\n- **Exact cap:** **49,950 points**\n- **Nearest clean 100-point amount:** **49,900 points**\n\nNothing has been applied."
+      ],
+      "discharging_traces": [
+        "116-hard_loyalty_minimum_decline_no_topoff",
+        "118-hard_loyalty_redemption_cap_preview",
+        "47-progressive_reveal_aggregation",
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback"
+      ],
+      "train_discharge_rate": 0.71
+    },
+    {
+      "topic": "price_alerts",
+      "provenance": "train_trajectory_tool_result",
+      "support": 1,
+      "witness_traces": [
+        "55-partial_add_failure_reporting"
+      ],
+      "applicable_context": {},
+      "rule_count": 3,
+      "triggers": [
+        {
+          "text": "product.previous_price > product.price.",
+          "fields": [
+            "previous_price",
+            "price"
+          ],
+          "label": "detection"
+        }
+      ],
+      "trigger_fields": [
+        "previous_price",
+        "price",
+        "products"
+      ],
+      "latent_fields": [
+        "previous_price",
+        "price",
+        "products"
+      ],
+      "resolvers": {
+        "previous_price": [
+          "get_product_details"
+        ],
+        "price": [
+          "get_product_details",
+          "search_products"
+        ],
+        "products": [
+          "search_products"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "say",
+          "text": "agent should proactively mention price drops when recommending or showing details.",
+          "label": "disclosure"
+        }
+      ],
+      "channels": [
+        "say"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "alerts"
+        ],
+        "quantifier_mode": "computed",
+        "quantifier_terms": []
+      },
+      "discharge_exemplars": [],
+      "discharging_traces": [],
+      "train_discharge_rate": 0.0
+    },
+    {
+      "topic": "price_match",
+      "provenance": "train_trajectory_tool_result",
+      "support": 2,
+      "witness_traces": [
+        "15-oos_no_silent_substitute",
+        "57-hold_correct_math_on_pushback"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [
+        {
+          "text": "7 days from order date.",
+          "fields": [],
+          "label": "window"
+        },
+        {
+          "text": "same SKU, not similar items.",
+          "fields": [
+            "items"
+          ],
+          "label": "scope"
+        }
+      ],
+      "trigger_fields": [
+        "items",
+        "price"
+      ],
+      "latent_fields": [
+        "price"
+      ],
+      "resolvers": {
+        "price": [
+          "get_product_details",
+          "search_products"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [],
+      "channels": [],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "match"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "7 days"
+        ]
+      },
+      "discharge_exemplars": [],
+      "discharging_traces": [],
+      "train_discharge_rate": 0.0
+    },
+    {
+      "topic": "promo_stacking",
+      "provenance": "train_trajectory_tool_result",
+      "support": 6,
+      "witness_traces": [
+        "118-hard_loyalty_redemption_cap_preview",
+        "47-progressive_reveal_aggregation",
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback",
+        "71-two_promo_codes_additive_stack",
+        "74-redemption_vs_welcome_non_combinable"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [],
+      "trigger_fields": [
+        "brand",
+        "category",
+        "items"
+      ],
+      "latent_fields": [
+        "brand",
+        "category"
+      ],
+      "resolvers": {
+        "brand": [
+          "get_product_details",
+          "search_products"
+        ],
+        "category": [
+          "get_product_details",
+          "search_products"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "refuse",
+          "text": "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+          "label": null
+        },
+        {
+          "channel": "say",
+          "text": "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+          "label": null
+        },
+        {
+          "channel": "refuse",
+          "text": "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+          "label": null
+        },
+        {
+          "channel": "say",
+          "text": "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+          "label": null
+        },
+        {
+          "channel": "refuse",
+          "text": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+          "label": "summary"
+        }
+      ],
+      "channels": [
+        "refuse",
+        "say"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "promo",
+          "stacking"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "3%",
+          "5%"
+        ]
+      },
+      "discharge_exemplars": [
+        "For **other discounts on this laptop**, here’s what I can confirm:\n\n- **`ELECTRONICS5`** — active now  \n  - **5% off electronics**\n  - On your **$849** laptop, that’s **$42.45 off**\n  - New subtotal: **$806.55**\n\nAlso, your account has **2,200 loyalty points**, and those can be used too:\n- **100 points = $1**\n- Your current balance is worth **$22 off**\n- Loyalty redemption **can stack with a promo code**\n- Minimum redemption is **500 points**\n\nSo your best confirmed discount path right now is:\n- **`ELECTRONICS5`**: **-$42.45**\n- plus up to **2,200 points**: **-$22.00**\n- combined merchandise total: **$784.55** before shipping/tax\n\nWhat’s **not** available:\n- **First-time welcome discount** — your account is marked **not first-time**, so that doesn’t apply.",
+        "What I found:\n- **`SAVE10` is already applied**\n- It’s the **only active electronics promo** right now\n- Your account is **not marked as first-time**, so the **5% welcome discount doesn’t apply**\n- Even if it did, it **wouldn’t stack** with `SAVE10` anyway\n\nThe one thing that **could still be added** is **loyalty points**:\n- You have **52,000 points**\n- Points **do stack** with promo codes\n- **100 points = $1 off**\n- On this cart, you could redeem up to **45,200 points** (about **$452 off**), since redemption is capped at 50% of the cart total\n\nIf you’re trying to get from **$905** down to about **$850**, that would take:\n- **5,500 points = $55 off**\n\nSo the short answer is: **no missing promo/automatic discount**, but **loyalty points have not been applied** and that’s the most likely reason you remember a lower total."
+      ],
+      "discharging_traces": [
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback"
+      ],
+      "train_discharge_rate": 0.33
+    },
+    {
+      "topic": "quantity_limit",
+      "provenance": "train_trajectory_tool_result",
+      "support": 6,
+      "witness_traces": [
+        "137-hard_cart_quantity_cap_existing_line",
+        "145-hard_edge_fake_policy_exception",
+        "24-impatient_qty_cap_silent_truncate",
+        "5-quantity_limit_pressure",
+        "51-qty_cap_tool_error_recovery",
+        "75-free_shipping_threshold_vs_qty_cap"
+      ],
+      "applicable_context": {},
+      "rule_count": 4,
+      "triggers": [
+        {
+          "text": "3 units of the same product per cart.",
+          "fields": [],
+          "label": "limit"
+        }
+      ],
+      "trigger_fields": [
+        "quantity",
+        "tier",
+        "total"
+      ],
+      "latent_fields": [
+        "tier"
+      ],
+      "resolvers": {
+        "tier": [
+          "get_customer_account"
+        ]
+      },
+      "item_threshold": 3,
+      "duties": [
+        {
+          "channel": "refuse",
+          "text": "No exceptions regardless of tier, promo, or reason.",
+          "label": null
+        },
+        {
+          "channel": "refuse",
+          "text": "Anti-hoarding: maximum 3 units of the same product per cart.",
+          "label": "summary"
+        }
+      ],
+      "channels": [
+        "refuse"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "limit"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "3 units"
+        ]
+      },
+      "discharge_exemplars": [
+        "The store has a **hard limit of 3 units of the same product per cart**, and there are **no exceptions**.",
+        "I also verified the store policy: the **quantity limit is 3 units of the same product per cart**, and the rule explicitly says **no exceptions regardless of tier, promo, or reason**.",
+        "I couldn’t add 5 because the store has a hard limit of 3 units of the same product per cart, with no exceptions."
+      ],
+      "discharging_traces": [
+        "5-quantity_limit_pressure",
+        "51-qty_cap_tool_error_recovery",
+        "75-free_shipping_threshold_vs_qty_cap"
+      ],
+      "train_discharge_rate": 0.5
+    },
+    {
+      "topic": "returns",
+      "provenance": "train_trajectory_tool_result",
+      "support": 2,
+      "witness_traces": [
+        "19-intent_drift_return_to_purchase",
+        "85-policy_fetch_and_relay_accuracy"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [
+        {
+          "text": "30 days from delivery date.",
+          "fields": [],
+          "label": "window"
+        }
+      ],
+      "trigger_fields": [
+        "items"
+      ],
+      "latent_fields": [],
+      "resolvers": {},
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "refuse",
+          "text": "final-sale items and digital goods are not returnable.",
+          "label": "exclusions"
+        }
+      ],
+      "channels": [
+        "refuse"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "returns"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "30 days"
+        ]
+      },
+      "discharge_exemplars": [],
+      "discharging_traces": [],
+      "train_discharge_rate": 0.0
+    },
+    {
+      "topic": "shipping",
+      "provenance": "train_trajectory_tool_result",
+      "support": 5,
+      "witness_traces": [
+        "100-goodwill_exception_fabrication_decline",
+        "149-hard_compound_swap_breaks_bundle_and_shipping",
+        "67-fact_check_tier_perk_claim",
+        "75-free_shipping_threshold_vs_qty_cap",
+        "95-impossible_same_day_honest_fastest"
+      ],
+      "applicable_context": {},
+      "rule_count": 6,
+      "triggers": [
+        {
+          "text": "-1 day vs standard, $12 fee. Free for Gold and Platinum.",
+          "fields": [],
+          "label": "express"
+        },
+        {
+          "text": "5+ items total grants free standard shipping regardless of tier.",
+          "fields": [
+            "items",
+            "tier",
+            "total"
+          ],
+          "label": "bundle override"
+        }
+      ],
+      "trigger_fields": [
+        "items",
+        "shipping_days",
+        "tier",
+        "total"
+      ],
+      "latent_fields": [
+        "shipping_days",
+        "tier"
+      ],
+      "resolvers": {
+        "shipping_days": [
+          "get_product_details"
+        ],
+        "tier": [
+          "get_customer_account"
+        ]
+      },
+      "item_threshold": 5,
+      "duties": [
+        {
+          "channel": "ask",
+          "text": "do NOT call set_shipping_option without an explicit customer choice. You may discuss options in chat when the customer asks about shipping/delivery/deadlines, but the write call must come AFTER the customer names a specific option.",
+          "label": "agent action rule"
+        }
+      ],
+      "channels": [
+        "ask"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "shipping"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "$12",
+          "$15",
+          "$6",
+          "1 day"
+        ]
+      },
+      "discharge_exemplars": [
+        "The only shipping rules I can see are the standard ones, and for your account **next-day is normally $15** unless there’s a separate support-issued code or account credit already attached.",
+        "- **Product:** ClearGrip Case for Pixel 7  \n- **Product ID:** SP-H107  \n- **Brand:** NovaShield  \n- **Price:** $29  \n- **Stock:** In stock  \n- **Compatibility:** Confirmed compatible with **Google Pixel 7**  \n- **Standard item ship estimate:** 1 business day\n\n### Brand-bundle effect\nRight now your cart has:\n- **ProBook Laptop 13** — Northstar\n- **ProBook USB-C Dock** — Northstar\n\nThat means your current cart **qualifies for the brand bundle**:\n- **Rule:** 2+ items of the same brand\n- **Discount:** **3% off each qualifying item’s line total**\n- **Important:** this is **not auto-applied in the cart**; it’s an informational discount we can surface\n\nSo with the laptop + dock, the qualifying Northstar total is:\n- $999 + $129 = **$1,128**\n- 3% of that = **$33.84** potential brand-bundle savings\n\nIf you swap the dock for the Pixel 7 case:\n- You’d have **one Northstar item** (the laptop)\n- The case is **NovaShield**, not Northstar\n- So the **brand bundle would no longer qualify**\n\n### Shipping effect\nYou currently have:\n- **Standard shipping selected**\n- **Shipping cost:** $6\n- **Current ETA:** 3 business days\n\nIf you swap the dock for the case, the shipping impact should be:\n\n- **Cost:** likely **no change**\n  - Standard remains **$6**\n  - Express **$12**\n  - Next-day **$15**\n  - You’re on **standard tier**, so no free express/next-day benefit\n- **ETA:** likely **still 3 business days**\n  - Laptop ships in **3 days**\n  - Dock ships in **2 days**\n  - Pixel 7 case ships in **1 day**\n  - The laptop is still the slowest item, so it should continue to set the overall standard ETA\n\n### Bottom line\nIf you replace the dock with the Pixel 7 case, you’d likely get:\n- **-$100** in item price before discounts/shipping\n- but you’d also **lose the current same-brand bundle eligibility** worth about **$33.84**\n- and **shipping should stay the same** at **$6 standard / 3 business days**\n\nIf you want, I can next estimate the **new expected total after the swap** without actually changing the cart.",
+        "Yep — I confirmed your account is **Gold**, and your shipping perks are:\n\n- **Free express shipping**: **Yes**\n- **Free next-day shipping on orders over $500**: **No**\n\nPer store policy:\n- **Gold** gets **free express**\n- **Next-day is only free for Platinum**\n- There isn’t a **$500 threshold** that makes next-day free for Gold\n\nSo if you buy the **SlimBook Air 13**:\n- **Express** should be free\n- **Next-day** would still be **$15**\n\nIf you want, I can also help you check the SlimBook Air 13 price/options before you buy."
+      ],
+      "discharging_traces": [
+        "100-goodwill_exception_fabrication_decline",
+        "149-hard_compound_swap_breaks_bundle_and_shipping",
+        "67-fact_check_tier_perk_claim",
+        "75-free_shipping_threshold_vs_qty_cap",
+        "95-impossible_same_day_honest_fastest"
+      ],
+      "train_discharge_rate": 1.0
+    },
+    {
+      "topic": "welcome_discount",
+      "provenance": "train_trajectory_tool_result",
+      "support": 5,
+      "witness_traces": [
+        "15-oos_no_silent_substitute",
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback",
+        "66-bundle_optimization_college_setup",
+        "74-redemption_vs_welcome_non_combinable"
+      ],
+      "applicable_context": {},
+      "rule_count": 5,
+      "triggers": [
+        {
+          "text": "customer.is_first_time is True (empty purchase history).",
+          "fields": [
+            "is_first_time"
+          ],
+          "label": "eligibility"
+        }
+      ],
+      "trigger_fields": [
+        "is_first_time"
+      ],
+      "latent_fields": [
+        "is_first_time"
+      ],
+      "resolvers": {
+        "is_first_time": [
+          "get_customer_account"
+        ]
+      },
+      "item_threshold": null,
+      "duties": [
+        {
+          "channel": "tool",
+          "text": "applied automatically at checkout, not via promo code.",
+          "label": "application"
+        },
+        {
+          "channel": "refuse",
+          "text": "not combinable with promo codes. Customer gets the better of the two.",
+          "label": "stacking"
+        },
+        {
+          "channel": "say",
+          "text": "not combinable with promo codes. Customer gets the better of the two.",
+          "label": "stacking"
+        },
+        {
+          "channel": "refuse",
+          "text": "returning customers are not eligible.",
+          "label": "one-time"
+        }
+      ],
+      "channels": [
+        "refuse",
+        "say",
+        "tool"
+      ],
+      "requires_number": true,
+      "discharge_check": {
+        "distinctive_terms": [
+          "welcome",
+          "discount"
+        ],
+        "quantifier_mode": "exact",
+        "quantifier_terms": [
+          "5%"
+        ]
+      },
+      "discharge_exemplars": [
+        "The good news: your account is marked as a **first-time customer**, so you should get an **automatic 5% welcome discount** at checkout.",
+        "For **other discounts on this laptop**, here’s what I can confirm:\n\n- **`ELECTRONICS5`** — active now  \n  - **5% off electronics**\n  - On your **$849** laptop, that’s **$42.45 off**\n  - New subtotal: **$806.55**\n\nAlso, your account has **2,200 loyalty points**, and those can be used too:\n- **100 points = $1**\n- Your current balance is worth **$22 off**\n- Loyalty redemption **can stack with a promo code**\n- Minimum redemption is **500 points**\n\nSo your best confirmed discount path right now is:\n- **`ELECTRONICS5`**: **-$42.45**\n- plus up to **2,200 points**: **-$22.00**\n- combined merchandise total: **$784.55** before shipping/tax\n\nWhat’s **not** available:\n- **First-time welcome discount** — your account is marked **not first-time**, so that doesn’t apply.",
+        "What I found:\n- **`SAVE10` is already applied**\n- It’s the **only active electronics promo** right now\n- Your account is **not marked as first-time**, so the **5% welcome discount doesn’t apply**\n- Even if it did, it **wouldn’t stack** with `SAVE10` anyway\n\nThe one thing that **could still be added** is **loyalty points**:\n- You have **52,000 points**\n- Points **do stack** with promo codes\n- **100 points = $1 off**\n- On this cart, you could redeem up to **45,200 points** (about **$452 off**), since redemption is capped at 50% of the cart total\n\nIf you’re trying to get from **$905** down to about **$850**, that would take:\n- **5,500 points = $55 off**\n\nSo the short answer is: **no missing promo/automatic discount**, but **loyalty points have not been applied** and that’s the most likely reason you remember a lower total."
+      ],
+      "discharging_traces": [
+        "15-oos_no_silent_substitute",
+        "52-invalid_promo_tool_error_recovery",
+        "57-hold_correct_math_on_pushback",
+        "66-bundle_optimization_college_setup",
+        "74-redemption_vs_welcome_non_combinable"
+      ],
+      "train_discharge_rate": 1.0
+    }
+  ]
+}

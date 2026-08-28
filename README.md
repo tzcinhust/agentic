@@ -4,6 +4,26 @@ This branch archives the cross-domain Process Workflow Memory experiment run
 on STATE-Bench 0.8.1 at upstream commit
 `5644b1838d96bc4483da29642d058ecaa6f80f7f`.
 
+## Policy-Guard Extension
+
+This development branch adds the post-archive policy-obligation and verification
+experiments without replacing the recovered PWM implementation. The main added
+agent is `LoyaltyVerifiedPolicyAgent`, which combines process workflow memory,
+retrieved policy obligations, and a narrow pre-commit verifier for loyalty
+mutations. The additional agent modules preserve the intermediate ablation arms
+used to evaluate late-bound policy injection, post-tool review, obligation
+ledgers, and broader write verification.
+
+Policy obligations are mined from the fixed training trajectories with
+`scripts/mine_policy_obligations.py` and stored at
+`artifacts/statebench_cross_domain_pwm/memory/policy_obligations.json`. The
+evaluation relay helper is available at `tools/eval_shim.py`; it changes only
+transport routing and does not modify benchmark prompts, task definitions, or
+protocol files.
+
+No API credentials are committed. Configure provider credentials through local
+environment variables before replaying an experiment.
+
 ## Archived Result
 
 The completed evidence is one 50-task test run per domain:
