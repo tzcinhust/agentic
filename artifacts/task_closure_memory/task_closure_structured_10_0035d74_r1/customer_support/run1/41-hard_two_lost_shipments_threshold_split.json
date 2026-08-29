@@ -1,0 +1,1368 @@
+{
+  "task_id": "41-hard_two_lost_shipments_threshold_split",
+  "user_id": "cust_003",
+  "task_summary": "**Task:** A customer has two lost-in-transit shipments: a low-value coffee maker and a high-value tablet. Correct handling is to offer refund versus reship for the coffee maker, process the chosen $149 original-payment refund, and leave the tablet order unchanged while explaining that high-value lost shipments require carrier investigation before refund or replacement.\n\n**Challenge:** This reuses the proven high-value lost-shipment failure pattern from tasks 20 and 54 in a threshold-contrast setup. Weak agents overgeneralize the immediate low-value refund path to the expensive item, or cancel/refund both lost orders to be helpful.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=2; unexpected_assertions=3",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "original_payment"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10452",
+        "field": "refund_amount",
+        "value": 0
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "item_status",
+        "value": "cancelled"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "credit_card"
+      },
+      {
+        "entity_type": "orders",
+        "record_key": "ORD-7451",
+        "field": "status",
+        "value": "cancelled"
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "156_coffee_maker_refund_choice",
+      "kind": "must",
+      "requirement": "Agent must ask whether the customer wants a refund or a reship for the lost coffee maker before processing one.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Agent told the customer ORD-7451 'qualifies for immediate refund or reship' and said 'If you want, I can move forward on the coffee maker right away,' which presented both options before the customer later chose refund."
+    },
+    {
+      "id": "156_coffee_maker_direct_refund",
+      "kind": "must",
+      "requirement": "Agent must process only a $149 original-payment refund for the lost coffee maker from ORD-7451, without cancelling or returning the order/item.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Agent did not process only a direct original-payment refund; instead it executed cancel_order(confirm=true) on ORD-7451/ITEM-10451 and described it as a refund. The requirement explicitly says to process only a $149 original-payment refund without cancelling or returning the order/item."
+    },
+    {
+      "id": "156_tablet_investigation_required",
+      "kind": "must",
+      "requirement": "Agent must explain that ORD-7452 is a high-value lost shipment requiring carrier investigation before any refund, reship, or replacement.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Agent explained that ORD-7452 is $599 and under the high-value lost-in-transit policy requires a carrier investigation first before refund or replacement."
+    },
+    {
+      "id": "156_no_tablet_immediate_action",
+      "kind": "must_not",
+      "requirement": "Agent must not offer as available, confirm, refund, reship, replace, cancel, return, credit, escalate for credit, or otherwise mutate ORD-7452 or ITEM-10452 before investigation. A non-mutating internal preview alone is not a failure unless the agent presents the tablet resolution as available or done.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Agent told the customer, 'For the tablet, I can help start the required investigation path today.' The requirement forbids offering to escalate or otherwise mutate ORD-7452 before investigation; offering to start the investigation path violates the authored must_not, even though no tool mutation occurred."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent correctly distinguished the two orders by policy threshold, explicitly explained that the coffee maker qualified for immediate refund while the higher-value tablet required investigation and would remain unchanged. It preserved user control by first offering options, then only executing the coffee maker cancellation/refund after the user explicitly requested that path; the preview was gathered safely and the final state was clearly summarized. User effort was minimal because the agent handled both orders in one pass, surfaced the key policy difference proactively, and did not force the user to restate scope or correct an overreach. Responses were concise but complete, including the reason for the policy difference, refund amount, refund method, and confirmation that the tablet order was left untouched.",
+  "turns": 2,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked both orders. ORD-7451 for the BrewPerfect Coffee Maker is marked lost in transit and totals $149, so that one qualifies for immediate refund or reship. ORD-7452 for the SlateTab Pro 11-inch is also marked lost in transit, but at $599 it falls under the higher-value rule, which requires a carrier investigation first before I can complete a refund or replacement.\n\nIf you want, I can move forward on the coffee maker right away. For the tablet, I can help start the required investigation path today, but I can’t finalize that one instantly under the current policy.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7451"
+          },
+          "result": {
+            "order_id": "ORD-7451",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK18318188",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 149
+            },
+            "subtotal": 149,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 149,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10451",
+                "order_id": "ORD-7451",
+                "product_id": "PROD-4451",
+                "quantity": 1,
+                "unit_price": 149,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4451",
+                  "name": "BrewPerfect Coffee Maker",
+                  "category": "kitchen",
+                  "price": 149,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7452"
+          },
+          "result": {
+            "order_id": "ORD-7452",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK30864714",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10452",
+                "order_id": "ORD-7452",
+                "product_id": "PROD-4452",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4452",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_003"
+          },
+          "result": {
+            "customer_id": "cust_003",
+            "name": "Sarah Williams",
+            "email": "sarah.w@example.com",
+            "membership_tier": "gold",
+            "account_created": "2021-11-20",
+            "total_orders": 53,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 45,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "1.5x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "rules": {
+              "not_received": {
+                "under_500": "Delivered but not received (<$500): reship or refund.",
+                "over_500": "Delivered but not received (>=$500): mandatory investigation (3-5 business days).",
+                "signature_on_file": "Delivery with signature on file: claim denied."
+              },
+              "lost_in_transit": {
+                "under_500": "Lost in transit (<$500): immediate reship or refund.",
+                "over_500": "Lost in transit (>=$500): carrier claim required first.",
+                "stuck_7_days": "No tracking update for 7+ days: treat as lost."
+              },
+              "damaged": {
+                "rule": "Damaged in transit: full refund or replacement.",
+                "fragile_bonus": "Fragile items damaged in transit qualify for a separate $10 goodwill credit, issued as a refund in addition to the return refund."
+              },
+              "late_delivery_compensation": {
+                "tiers": {
+                  "1_to_2_days_late": "$5 credit",
+                  "3_to_5_days_late": "$15 credit",
+                  "6_plus_days_late": "Full shipping refund + $15 credit"
+                },
+                "shipping_refund_basis": "When refunding shipping, refund the actual shipping cost the customer was charged on the order — read order.shipping_cost. Standard policy charges $0 on free-shipping orders (subtotal >= $100) and $8 otherwise.",
+                "tier_multipliers": {
+                  "gold": "1.5x multiplier on the base late-delivery credit only (NOT on shipping refund or goodwill). Rounded down (e.g., int(15*1.5) = 22).",
+                  "platinum": "2x multiplier on the base late-delivery credit only. Rounded down."
+                },
+                "repeated_issues": "3+ PRIOR issues in 6 months (not counting current incident): additional $25 goodwill credit.",
+                "loyalty_bonus": "Platinum members with 50+ total orders: one-time $50 loyalty bonus on next compensation claim. Confirm with customer if already redeemed.",
+                "max_cap": "Maximum compensation: 50% of order total (rounded down).",
+                "calculation_order": "1) Compute base credit by days-late tier. 2) Apply tier multiplier to base credit only. 3) Add shipping refund (if 6+ days late) using order.shipping_cost. 4) Add goodwill (if 3+ prior issues or fragile damage). 5) Apply loyalty bonus if eligible. 6) Apply 50%-of-order cap on the sum."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancellation"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "pre_shipment": "Free cancellation before shipment (pending/processing status).",
+              "in_transit": "$10 intercept fee per item for in-transit orders.",
+              "delivered": "Cannot cancel delivered orders — must use the return process instead.",
+              "partial": "Partial cancellation allowed if items not yet delivered.",
+              "split_payment": "Refund distributed proportionally to original payment methods.",
+              "already_cancelled": "Already cancelled orders cannot be cancelled again."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "lost in transit cancellation/refund multiple orders refund now verify shipped not delivered and handle both today"
+          },
+          "result": [
+            "Workflow: Lost in transit resolution via cancellation/refund, with optional accessory cancellation\nUse when: Customer says an order is lost in transit or shipped but not delivered and wants resolution now, usually refund rather than replacement; may also want a separate pending accessory canceled only if the main issue is resolved.\nVerify first:\n- Use get_order on the affected order to verify item status is shipped/in transit and not delivered.\n- If another order may be canceled, use get_order on that order and identify which pending item should be canceled and which should remain pending.\n- Use get_policies for shipment-loss/cancellation rules before mutating.\n- If benefits or compensation could matter, verify with get_customer.\nProcedure:\n1. get_order(<lost_order_id>)\n2. If conditional accessory handling is requested, get_order(<related_order_id>)\n3. If needed, get_customer(<customer_id>)\n4. get_policies(<shipping_loss_or_damage_topic>)\n5. get_policies(<cancellation_topic>)\n6. If needed, process_refund(confirm=false, item_id=<lost_item_id>, refund_method=<requested_or_preferred_method>) to inspect any available direct refund path\n7. cancel_order(confirm=false, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n8. If preview authorizes and customer wants refund now, cancel_order(confirm=true, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n9. If the customer wanted the related pending item canceled only after the main issue was resolved, cancel_order(confirm=false, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n10. If acceptable, cancel_order(confirm=true, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n11. Optionally get_order(<related_order_id>) to confirm unaffected items remain pending\nBranches:\n- If policy says claim review/investigation is required first, do not mutate; give a no-write explanation of the required review path.\n- If the item is actually delivered, do not use lost-in-transit cancellation; switch to return/damage workflow.\n- If the customer wants replacement instead of refund, do not force cancellation; explain the available policy path.\n- If accessory cancellation is conditional and the main order cannot yet be ",
+            "Workflow: No-write cancellation check for already cancelled or non-cancellable orders\nUse when: User asks to cancel an order, but the order may already be cancelled or fully non-cancellable based on status.\nVerify first:\n- Use get_order to inspect current order and item statuses.\n- Use get_policies with the cancellation topic to confirm the handling of already-cancelled and delivered orders.\nProcedure:\n1. get_order(order_id=<order_id>)\n2. get_policies(topic=\"cancel\")\nBranches:\n- If the order/items are already cancelled, do not call cancel_order; inform the user nothing further needs to be done.\n- If the order/items are delivered, do not call cancel_order; explain cancellation is unavailable and suggest return flow if appropriate.\n- If status is unclear from the order alone and customer context is needed for user-facing guidance, optionally call get_customer(customer_id=<customer_id>).\nAvoid:\n- Do not call cancel_order for already cancelled items.\n- Do not call cancel_order for delivered items.\n- Do not promise exceptions to policy that are not returned by tools.\n- Do not treat a single delivered item as proof that other items cannot be cancelled; check item-level status first.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_order -> get_policies -> cancel_order -> cancel_order\n- 1x: get_order -> get_policies\n- 1x: get_order -> get_policies -> get_customer",
+            "Workflow: Handle mixed exchange/return/cancel requests across multiple orders\nUse when: User asks to resolve several items in one message, potentially mixing cancellation before shipment, returns for delivered items, exchanges for replacements, and refund questions.\nVerify first:\n- Use get_customer if needed to anchor the account and benefits across requests.\n- Use get_order for each referenced order to verify ownership, item status, and item details separately.\n- Use get_policies for each action family involved: cancellation, exchange, return/refund, and any special damage/missing-item rules.\n- For any requested replacement product, use search_products and optionally get_product_details before attempting an exchange.\nProcedure:\n1. get_customer(customer_id)\n2. get_order(order_id=<order_A>)\n3. get_order(order_id=<order_B>)\n4. get_order(order_id=<order_C>)\n5. get_policies(topic='cancellation')\n6. get_policies(topic='returns/refunds')\n7. get_policies(topic='exchange')\n8. search_products(query for requested replacement)\n9. get_product_details(product_id)\n10. cancel_order(confirm=false, order_id=<cancel_order_id>, item_ids=[<item_ids>])\n11. process_return(amount=<computed_or_preview_amount>, confirm=false, item_id=<return_item_id>, reason=<reason>)\n12. process_exchange(confirm=false, item_id=<exchange_item_id>, new_product_id=<replacement_product_id>)\n13. cancel_order(confirm=true, order_id=<cancel_order_id>, item_ids=[<item_ids>])\n14. process_return(amount=<preview_refund_amount>, confirm=true, item_id=<return_item_id>, reason=<reason>)\n15. process_exchange(confirm=true, item_id=<exchange_item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- Treat each order/item independently based on status: pre-shipment can be cancelled, delivered items generally require return/exchange flows.\n- If a requested exchange target is out of stock, report the preview outcome and leave that line item unresolved or switch to return only with user approval.\n- If one subtask fails or is unsupported, continue evaluating the others rather than abandoning the whole request.\n- If a missing/damaged/wrong-item claim qualifies for special refund handling, use the relevant policy branch f"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed."
+    },
+    {
+      "role": "assistant",
+      "content": "Because the loss policy is value-based: lost-in-transit orders under $500 can be refunded immediately, while lost-in-transit orders at $500 or more require a carrier investigation first. Your coffee maker order is $149, so it qualified for immediate action; your tablet order is $599, so I have to leave it untouched until that investigation is completed.\n\nI’ve now processed the coffee maker refund on ORD-7451: $149 back to your credit card, with no cancellation fee. ORD-7452 has been left unchanged as requested pending the investigation.",
+      "tool_calls": [
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ]
+          },
+          "result": {
+            "status": "preview",
+            "order_id": "ORD-7451",
+            "items_to_cancel": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "reason": "Package lost — free cancellation with full refund"
+          }
+        },
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "order_id": "ORD-7451",
+            "items_cancelled": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "refund_method": "credit_card"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v1",
+    "mode": "structured",
+    "initial_items": [
+      {
+        "id": "cm_05f452cfa1ea",
+        "type": "user_confirmation_choice",
+        "description": "If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_02d96f411b44",
+        "type": "boundary_must_not",
+        "description": "If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1c766fa8ba07",
+        "type": "user_confirmation_choice",
+        "description": "If only the compensation is authorized and policy allows it, confirm only process_refund.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_7112da8a11d3",
+        "type": "boundary_must_not",
+        "description": "If only the compensation is authorized and policy allows it, confirm only process_refund.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_562924f1693a",
+        "type": "explanation_rationale",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_9449be80fef0",
+        "type": "boundary_must_not",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a5f1e8948db1",
+        "type": "final_state_reporting",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_3a0e3d6f48d9",
+        "type": "user_confirmation_choice",
+        "description": "If either preview differs from the customer expectation, pause before confirmation and restate the tool-provided amounts/methods separately.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_5c22e1ed58bc",
+        "type": "cost_amount_reporting",
+        "description": "Do not merge the return refund and compensation into a single invented tool action.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_242ea690693b",
+        "type": "boundary_must_not",
+        "description": "Do not merge the return refund and compensation into a single invented tool action.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_f4bd1544e81c",
+        "type": "boundary_must_not",
+        "description": "Do not compute sh",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_25a64200e2a0",
+        "type": "boundary_must_not",
+        "description": "If policy says claim review/investigation is required first, do not mutate; give a no-write explanation of the required review path.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a4feb40ab5d7",
+        "type": "proactive_disclosure",
+        "description": "Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+        "source": "user:turn0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 0
+          }
+        ]
+      }
+    ],
+    "static_requirements": [],
+    "final_items": [
+      {
+        "id": "cm_05f452cfa1ea",
+        "type": "user_confirmation_choice",
+        "description": "If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_02d96f411b44",
+        "type": "boundary_must_not",
+        "description": "If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1c766fa8ba07",
+        "type": "user_confirmation_choice",
+        "description": "If only the compensation is authorized and policy allows it, confirm only process_refund.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_7112da8a11d3",
+        "type": "boundary_must_not",
+        "description": "If only the compensation is authorized and policy allows it, confirm only process_refund.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_562924f1693a",
+        "type": "explanation_rationale",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_9449be80fef0",
+        "type": "boundary_must_not",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a5f1e8948db1",
+        "type": "final_state_reporting",
+        "description": "If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_3a0e3d6f48d9",
+        "type": "user_confirmation_choice",
+        "description": "If either preview differs from the customer expectation, pause before confirmation and restate the tool-provided amounts/methods separately.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_5c22e1ed58bc",
+        "type": "cost_amount_reporting",
+        "description": "Do not merge the return refund and compensation into a single invented tool action.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_242ea690693b",
+        "type": "boundary_must_not",
+        "description": "Do not merge the return refund and compensation into a single invented tool action.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_f4bd1544e81c",
+        "type": "boundary_must_not",
+        "description": "Do not compute sh",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_25a64200e2a0",
+        "type": "boundary_must_not",
+        "description": "If policy says claim review/investigation is required first, do not mutate; give a no-write explanation of the required review path.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a4feb40ab5d7",
+        "type": "proactive_disclosure",
+        "description": "Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+        "source": "user:turn0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 0
+          }
+        ]
+      },
+      {
+        "id": "cm_41af5dc5079c",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_order when relevant to the user's request.",
+        "source": "tool:get_order:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "get_order",
+            "success": true,
+            "status": "shipped",
+            "fields": [
+              "credit_card",
+              "current_price",
+              "discount_amount",
+              "discount_code",
+              "goodwill_credit",
+              "goodwill_credit_method",
+              "price",
+              "refund_amount",
+              "refund_method",
+              "restocking_fee",
+              "shipping_cost",
+              "store_credit_only"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_f2a6903a95c8",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by get_order when relevant.",
+        "source": "tool:get_order:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "get_order",
+            "success": true,
+            "status": "shipped",
+            "fields": [
+              "return_reason"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_b148638624ce",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_customer when relevant to the user's request.",
+        "source": "tool:get_customer:2",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "tool": "get_customer",
+            "success": true,
+            "status": "",
+            "fields": [
+              "preferred_refund_method",
+              "restocking_fee_waiver",
+              "store_credit_balance",
+              "total_orders"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_e5df3fb5653f",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_policies when relevant to the user's request.",
+        "source": "tool:get_policies:3",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "tool": "get_policies",
+            "success": true,
+            "status": "",
+            "fields": [
+              "shipping_refund_basis"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_15b27a58e85d",
+        "type": "explanation_rationale",
+        "description": "Address the user's explanation or rationale: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+        "source": "user:turn1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 1
+          }
+        ]
+      },
+      {
+        "id": "cm_6c874db12bd3",
+        "type": "cost_amount_reporting",
+        "description": "Address the user's cost or amount reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+        "source": "user:turn1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 1
+          }
+        ]
+      },
+      {
+        "id": "cm_12a56099bbe6",
+        "type": "boundary_must_not",
+        "description": "Address the user's must-not boundary: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+        "source": "user:turn1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 1
+          }
+        ]
+      },
+      {
+        "id": "cm_f77553f609e2",
+        "type": "final_state_reporting",
+        "description": "Address the user's final-state reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+        "source": "user:turn1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 1
+          }
+        ]
+      },
+      {
+        "id": "cm_923831fd4e7a",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by cancel_order when relevant to the user's request.",
+        "source": "tool:cancel_order:6",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "tool": "cancel_order",
+            "success": true,
+            "status": "preview",
+            "fields": [
+              "cancellation_fee",
+              "refund_amount"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_e516d3441959",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by cancel_order when relevant.",
+        "source": "tool:cancel_order:6",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "tool": "cancel_order",
+            "success": true,
+            "status": "preview",
+            "fields": [
+              "reason"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_b42a388b0293",
+        "type": "user_confirmation_choice",
+        "description": "Do not describe the preview from cancel_order as completed without the user's choice or confirmation.",
+        "source": "tool:cancel_order:6",
+        "status": "invalidated",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "tool": "cancel_order",
+            "success": true,
+            "status": "preview"
+          },
+          {
+            "kind": "condition_passed",
+            "reason": "preview was followed by a completed operation",
+            "tool": "cancel_order",
+            "sequence": 7
+          }
+        ]
+      },
+      {
+        "id": "cm_00a77d075c3a",
+        "type": "execution",
+        "description": "The operation represented by cancel_order is complete.",
+        "source": "tool:cancel_order:7",
+        "status": "satisfied",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "tool": "cancel_order",
+            "success": true,
+            "status": "cancelled"
+          }
+        ]
+      },
+      {
+        "id": "cm_b3e32ac38dd9",
+        "type": "final_state_reporting",
+        "description": "Report the tool-confirmed final outcome of cancel_order without inventing additional changes.",
+        "source": "tool:cancel_order:7",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "tool": "cancel_order",
+            "success": true,
+            "status": "cancelled"
+          }
+        ]
+      }
+    ],
+    "final_pending_items": [
+      "cm_05f452cfa1ea",
+      "cm_02d96f411b44",
+      "cm_1c766fa8ba07",
+      "cm_7112da8a11d3",
+      "cm_562924f1693a",
+      "cm_9449be80fef0",
+      "cm_a5f1e8948db1",
+      "cm_3a0e3d6f48d9",
+      "cm_5c22e1ed58bc",
+      "cm_242ea690693b",
+      "cm_f4bd1544e81c",
+      "cm_25a64200e2a0",
+      "cm_a4feb40ab5d7",
+      "cm_41af5dc5079c",
+      "cm_f2a6903a95c8",
+      "cm_b148638624ce",
+      "cm_e5df3fb5653f",
+      "cm_15b27a58e85d",
+      "cm_6c874db12bd3",
+      "cm_12a56099bbe6",
+      "cm_f77553f609e2",
+      "cm_923831fd4e7a",
+      "cm_e516d3441959",
+      "cm_b3e32ac38dd9"
+    ],
+    "final_satisfied_items": [
+      "cm_00a77d075c3a"
+    ],
+    "final_invalidated_items": [
+      "cm_b42a388b0293"
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_05f452cfa1ea",
+          "cm_02d96f411b44",
+          "cm_1c766fa8ba07",
+          "cm_7112da8a11d3",
+          "cm_562924f1693a",
+          "cm_9449be80fef0",
+          "cm_a5f1e8948db1",
+          "cm_3a0e3d6f48d9",
+          "cm_5c22e1ed58bc",
+          "cm_242ea690693b",
+          "cm_f4bd1544e81c",
+          "cm_25a64200e2a0",
+          "cm_a4feb40ab5d7"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 1,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "8cbcca54c952460becf3aae908fcebcbaf49444ee201ecbca0103fa52c4becd0",
+        "pending_items": [
+          "cm_05f452cfa1ea",
+          "cm_02d96f411b44",
+          "cm_1c766fa8ba07",
+          "cm_7112da8a11d3",
+          "cm_562924f1693a",
+          "cm_9449be80fef0",
+          "cm_a5f1e8948db1",
+          "cm_3a0e3d6f48d9",
+          "cm_5c22e1ed58bc",
+          "cm_242ea690693b",
+          "cm_f4bd1544e81c",
+          "cm_25a64200e2a0",
+          "cm_a4feb40ab5d7",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_b148638624ce",
+          "cm_e5df3fb5653f"
+        ],
+        "injected_items": [
+          "cm_a4feb40ab5d7",
+          "cm_41af5dc5079c",
+          "cm_b148638624ce",
+          "cm_e5df3fb5653f",
+          "cm_f2a6903a95c8",
+          "cm_02d96f411b44"
+        ],
+        "injected_requirements": [
+          "[proactive_disclosure] Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_customer when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_policies when relevant to the user's request.",
+          "[proactive_disclosure] Disclose material constraints or warnings returned by get_order when relevant.",
+          "[boundary_must_not] If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 2,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "evidence_backed_communication_followup",
+        "closure_prompt_sha256": "fff9b7cb7cc99dbc37e1426f7c69e9647efcb3032df6df0a87a3738c3147359b",
+        "pending_items": [
+          "cm_05f452cfa1ea",
+          "cm_02d96f411b44",
+          "cm_1c766fa8ba07",
+          "cm_7112da8a11d3",
+          "cm_562924f1693a",
+          "cm_9449be80fef0",
+          "cm_a5f1e8948db1",
+          "cm_3a0e3d6f48d9",
+          "cm_5c22e1ed58bc",
+          "cm_242ea690693b",
+          "cm_f4bd1544e81c",
+          "cm_25a64200e2a0",
+          "cm_a4feb40ab5d7",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_b148638624ce",
+          "cm_e5df3fb5653f",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_12a56099bbe6",
+          "cm_f77553f609e2"
+        ],
+        "injected_items": [
+          "cm_12a56099bbe6",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_a4feb40ab5d7",
+          "cm_f77553f609e2",
+          "cm_41af5dc5079c"
+        ],
+        "injected_requirements": [
+          "[boundary_must_not] Address the user's must-not boundary: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[explanation_rationale] Address the user's explanation or rationale: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Address the user's cost or amount reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[proactive_disclosure] Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+          "[final_state_reporting] Address the user's final-state reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "fff9b7cb7cc99dbc37e1426f7c69e9647efcb3032df6df0a87a3738c3147359b",
+        "pending_items": [
+          "cm_05f452cfa1ea",
+          "cm_02d96f411b44",
+          "cm_1c766fa8ba07",
+          "cm_7112da8a11d3",
+          "cm_562924f1693a",
+          "cm_9449be80fef0",
+          "cm_a5f1e8948db1",
+          "cm_3a0e3d6f48d9",
+          "cm_5c22e1ed58bc",
+          "cm_242ea690693b",
+          "cm_f4bd1544e81c",
+          "cm_25a64200e2a0",
+          "cm_a4feb40ab5d7",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_b148638624ce",
+          "cm_e5df3fb5653f",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_12a56099bbe6",
+          "cm_f77553f609e2",
+          "cm_923831fd4e7a",
+          "cm_e516d3441959",
+          "cm_b42a388b0293"
+        ],
+        "injected_items": [
+          "cm_12a56099bbe6",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_a4feb40ab5d7",
+          "cm_f77553f609e2",
+          "cm_41af5dc5079c"
+        ],
+        "injected_requirements": [
+          "[boundary_must_not] Address the user's must-not boundary: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[explanation_rationale] Address the user's explanation or rationale: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Address the user's cost or amount reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[proactive_disclosure] Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+          "[final_state_reporting] Address the user's final-state reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": true
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "fff9b7cb7cc99dbc37e1426f7c69e9647efcb3032df6df0a87a3738c3147359b",
+        "pending_items": [
+          "cm_05f452cfa1ea",
+          "cm_02d96f411b44",
+          "cm_1c766fa8ba07",
+          "cm_7112da8a11d3",
+          "cm_562924f1693a",
+          "cm_9449be80fef0",
+          "cm_a5f1e8948db1",
+          "cm_3a0e3d6f48d9",
+          "cm_5c22e1ed58bc",
+          "cm_242ea690693b",
+          "cm_f4bd1544e81c",
+          "cm_25a64200e2a0",
+          "cm_a4feb40ab5d7",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_b148638624ce",
+          "cm_e5df3fb5653f",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_12a56099bbe6",
+          "cm_f77553f609e2",
+          "cm_923831fd4e7a",
+          "cm_e516d3441959",
+          "cm_b3e32ac38dd9"
+        ],
+        "injected_items": [
+          "cm_12a56099bbe6",
+          "cm_15b27a58e85d",
+          "cm_6c874db12bd3",
+          "cm_a4feb40ab5d7",
+          "cm_f77553f609e2",
+          "cm_41af5dc5079c"
+        ],
+        "injected_requirements": [
+          "[boundary_must_not] Address the user's must-not boundary: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[explanation_rationale] Address the user's explanation or rationale: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Address the user's cost or amount reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[proactive_disclosure] Address the user's material disclosure: I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+          "[final_state_reporting] Address the user's final-state reporting: Why can the coffee maker be refunded now but the tablet can’t if both are lost in transit? Please go ahead with the coffee maker refund, and leave ORD-7452 unchanged until the investigation is completed.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      }
+    ],
+    "summary": {
+      "model_generations": 5,
+      "model_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "regenerations": 0,
+      "closure_injections": 4,
+      "closure_injected_tool_calls": 2
+    }
+  },
+  "token_usage": {
+    "input_tokens": 27617,
+    "cached_input_tokens": 0,
+    "output_tokens": 448,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 28065,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 27617,
+  "cached_input_tokens": 0,
+  "output_tokens": 448,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 28065,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "orders": {
+        "ORD-7451": {
+          "status": {
+            "old": "shipped",
+            "new": "cancelled"
+          }
+        }
+      },
+      "order_items": {
+        "ITEM-10451": {
+          "item_status": {
+            "old": "shipped",
+            "new": "cancelled"
+          },
+          "refund_method": {
+            "old": null,
+            "new": "credit_card"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 149
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_amount",
+      "expected_value": 149
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "item_status",
+      "expected_value": "shipped"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "refund_amount",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7452",
+      "field": "status",
+      "expected_value": "shipped"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

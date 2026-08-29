@@ -1,0 +1,868 @@
+{
+  "task_id": "17-welcome_plus_points_compound",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** A first-time Standard customer (shop_002) adds SP-1001 SlimBook Air 13 ($849). Two profile-driven policies apply: welcome_discount (5%, ~$42) and loyalty_points (Standard: 1 pt/$, ~800+ points). No promo codes in env.\n\n**Challenge:** Tests stacked proactive disclosure. Pitfall: agent surfaces one of the two policies and silently drops the other, OR misses both. Customer is silent on both topics. Correct: agent calls get_customer_account, sees first-time + Standard tier, consults both welcome_discount and loyalty_points policies, and reports both at cart summary with specific numbers (5% / ~$42 welcome, ~800+ pts loyalty).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_customer_profile",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account for shop_002 to determine first-time status and tier before discussing pricing/discounts/points.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "No get_customer_account call appears in the tool calls before or during the pricing/discounts/points discussion."
+    },
+    {
+      "id": "disclosed_welcome_eligibility",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned the first-time welcome discount with a specific number (5%, ~$42, or both). Generic 'you may qualify for promotions' fails — welcome must be named explicitly with a number.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant did not proactively mention a first-time welcome discount or give a specific number such as 5% or about $42. It only said it could check for applicable promos."
+    },
+    {
+      "id": "disclosed_loyalty_points",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned loyalty points earned on this purchase, with a specific point total (e.g. '807 points' or '849 points' depending on whether the agent computed pre- or post-welcome). Generic 'you'll earn points' without a number fails. Agent must also be using the Standard rate (1 pt/$), not Gold (2) or Platinum (3).",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never mentioned loyalty points or a specific point total for this purchase."
+    },
+    {
+      "id": "correct_product_added",
+      "kind": "must",
+      "requirement": "Agent added SP-1001 SlimBook Air 13, quantity 1, no gift wrap.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool call add_to_cart shows customer_id shop_002, product_id SP-1001, quantity 1, and gift_wrap false, matching the required item and settings."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points calls in the tool history."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.4,
+  "ux_reasoning": "The agent directly mutated the cart with add_to_cart in the same turn as the user's request, without previewing that cart-write tools execute immediately or confirming before the consequential state change. It also missed important proactive context from the task: it did not check the customer's account or disclose either the first-time welcome discount or the loyalty points that should inform the cart summary. That omission means the user was not given key decision-making information and had to rely on an incomplete summary. The response itself was concise and readable, but materially under-informative for this shopping scenario.",
+  "turns": 1,
+  "tool_calls": 3,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — SlimBook Air 13 has been added to your cart.\n\n- Quantity: 1\n- Price: $849\n- Gift wrap: No\n- Cart total: $849\n\nIf you want, I can also check for any applicable promos.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook Air 13",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1001",
+                "name": "SlimBook Air 13",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.5,
+                "review_count": 1240,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1001"
+          },
+          "result": {
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks — that’s all I needed. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v1",
+    "mode": "structured",
+    "initial_items": [
+      {
+        "id": "cm_61c6e9069fb7",
+        "type": "user_confirmation_choice",
+        "description": "If search returns multiple plausible matches, pause and ask user to choose before add_to_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_09c6617346f3",
+        "type": "user_confirmation_choice",
+        "description": "If get_variants shows required variants, obtain the user's choice before add_to_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b48f869173f9",
+        "type": "cost_amount_reporting",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_5181e3fec8b5",
+        "type": "proactive_disclosure",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_d2f1082a39b3",
+        "type": "boundary_must_not",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_787f0e891fd5",
+        "type": "proactive_disclosure",
+        "description": "If apply_promo succeeds, report applied code and updated cart totals.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a031df3b1c2e",
+        "type": "user_confirmation_choice",
+        "description": "If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_119eb9c9c3dc",
+        "type": "boundary_must_not",
+        "description": "If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_9dbde1e50ace",
+        "type": "cost_amount_reporting",
+        "description": "Do not apply a promo before the item is in the cart when the request is to discount that item.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_dc7003890e0a",
+        "type": "boundary_must_not",
+        "description": "Do not apply a promo before the item is in the cart when the request is to discount that item.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_8b49e943b263",
+        "type": "boundary_must_not",
+        "description": "Do not assume a product match when search results are ambiguous.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_fee5f23da0c0",
+        "type": "cost_amount_reporting",
+        "description": "Do not fabricate promo eligibility, discount amount, or stacking behavior.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      }
+    ],
+    "static_requirements": [],
+    "final_items": [
+      {
+        "id": "cm_61c6e9069fb7",
+        "type": "user_confirmation_choice",
+        "description": "If search returns multiple plausible matches, pause and ask user to choose before add_to_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_09c6617346f3",
+        "type": "user_confirmation_choice",
+        "description": "If get_variants shows required variants, obtain the user's choice before add_to_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b48f869173f9",
+        "type": "cost_amount_reporting",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_5181e3fec8b5",
+        "type": "proactive_disclosure",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_d2f1082a39b3",
+        "type": "boundary_must_not",
+        "description": "If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_787f0e891fd5",
+        "type": "proactive_disclosure",
+        "description": "If apply_promo succeeds, report applied code and updated cart totals.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a031df3b1c2e",
+        "type": "user_confirmation_choice",
+        "description": "If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_119eb9c9c3dc",
+        "type": "boundary_must_not",
+        "description": "If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_9dbde1e50ace",
+        "type": "cost_amount_reporting",
+        "description": "Do not apply a promo before the item is in the cart when the request is to discount that item.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_dc7003890e0a",
+        "type": "boundary_must_not",
+        "description": "Do not apply a promo before the item is in the cart when the request is to discount that item.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_8b49e943b263",
+        "type": "boundary_must_not",
+        "description": "Do not assume a product match when search results are ambiguous.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_fee5f23da0c0",
+        "type": "cost_amount_reporting",
+        "description": "Do not fabricate promo eligibility, discount amount, or stacking behavior.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_770131dd1f94",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by search_products when relevant to the user's request.",
+        "source": "tool:search_products:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "search_products",
+            "success": true,
+            "status": "",
+            "fields": [
+              "price",
+              "total_found"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_53afde31ea59",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_variants when relevant to the user's request.",
+        "source": "tool:get_variants:1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 1,
+            "tool": "get_variants",
+            "success": true,
+            "status": "",
+            "fields": [
+              "base_price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_96a6f63f090f",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by add_to_cart when relevant to the user's request.",
+        "source": "tool:add_to_cart:2",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "tool": "add_to_cart",
+            "success": true,
+            "status": "added",
+            "fields": [
+              "cart_subtotal",
+              "cart_total",
+              "unit_price"
+            ]
+          }
+        ]
+      }
+    ],
+    "final_pending_items": [
+      "cm_61c6e9069fb7",
+      "cm_09c6617346f3",
+      "cm_b48f869173f9",
+      "cm_5181e3fec8b5",
+      "cm_d2f1082a39b3",
+      "cm_787f0e891fd5",
+      "cm_a031df3b1c2e",
+      "cm_119eb9c9c3dc",
+      "cm_9dbde1e50ace",
+      "cm_dc7003890e0a",
+      "cm_8b49e943b263",
+      "cm_fee5f23da0c0",
+      "cm_770131dd1f94",
+      "cm_53afde31ea59",
+      "cm_96a6f63f090f"
+    ],
+    "final_satisfied_items": [],
+    "final_invalidated_items": [],
+    "generations": [
+      {
+        "generation_index": 0,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_61c6e9069fb7",
+          "cm_09c6617346f3",
+          "cm_b48f869173f9",
+          "cm_5181e3fec8b5",
+          "cm_d2f1082a39b3",
+          "cm_787f0e891fd5",
+          "cm_a031df3b1c2e",
+          "cm_119eb9c9c3dc",
+          "cm_9dbde1e50ace",
+          "cm_dc7003890e0a",
+          "cm_8b49e943b263",
+          "cm_fee5f23da0c0"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 1,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "eb978c550d8b2e9368241a4c3f312129c319b171cd519c76f8d9f32bf2759966",
+        "pending_items": [
+          "cm_61c6e9069fb7",
+          "cm_09c6617346f3",
+          "cm_b48f869173f9",
+          "cm_5181e3fec8b5",
+          "cm_d2f1082a39b3",
+          "cm_787f0e891fd5",
+          "cm_a031df3b1c2e",
+          "cm_119eb9c9c3dc",
+          "cm_9dbde1e50ace",
+          "cm_dc7003890e0a",
+          "cm_8b49e943b263",
+          "cm_fee5f23da0c0",
+          "cm_770131dd1f94"
+        ],
+        "injected_items": [
+          "cm_770131dd1f94",
+          "cm_119eb9c9c3dc",
+          "cm_8b49e943b263",
+          "cm_d2f1082a39b3",
+          "cm_dc7003890e0a",
+          "cm_fee5f23da0c0"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[boundary_must_not] If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+          "[boundary_must_not] Do not assume a product match when search results are ambiguous.",
+          "[boundary_must_not] If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+          "[boundary_must_not] Do not apply a promo before the item is in the cart when the request is to discount that item.",
+          "[cost_amount_reporting] Do not fabricate promo eligibility, discount amount, or stacking behavior."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-1001"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "935b468b9f78bf85c684bda5d9816b79fc1b21d68d888b2488a60ff818d74a84",
+        "pending_items": [
+          "cm_61c6e9069fb7",
+          "cm_09c6617346f3",
+          "cm_b48f869173f9",
+          "cm_5181e3fec8b5",
+          "cm_d2f1082a39b3",
+          "cm_787f0e891fd5",
+          "cm_a031df3b1c2e",
+          "cm_119eb9c9c3dc",
+          "cm_9dbde1e50ace",
+          "cm_dc7003890e0a",
+          "cm_8b49e943b263",
+          "cm_fee5f23da0c0",
+          "cm_770131dd1f94",
+          "cm_53afde31ea59"
+        ],
+        "injected_items": [
+          "cm_53afde31ea59",
+          "cm_770131dd1f94",
+          "cm_119eb9c9c3dc",
+          "cm_8b49e943b263",
+          "cm_d2f1082a39b3",
+          "cm_dc7003890e0a"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[boundary_must_not] If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+          "[boundary_must_not] Do not assume a product match when search results are ambiguous.",
+          "[boundary_must_not] If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.",
+          "[boundary_must_not] Do not apply a promo before the item is in the cart when the request is to discount that item."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-1001",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "aa8c88a630ab1a160d94cdc33658cc9668869161e1f1b93a9c42ee837b037436",
+        "pending_items": [
+          "cm_61c6e9069fb7",
+          "cm_09c6617346f3",
+          "cm_b48f869173f9",
+          "cm_5181e3fec8b5",
+          "cm_d2f1082a39b3",
+          "cm_787f0e891fd5",
+          "cm_a031df3b1c2e",
+          "cm_119eb9c9c3dc",
+          "cm_9dbde1e50ace",
+          "cm_dc7003890e0a",
+          "cm_8b49e943b263",
+          "cm_fee5f23da0c0",
+          "cm_770131dd1f94",
+          "cm_53afde31ea59",
+          "cm_96a6f63f090f"
+        ],
+        "injected_items": [
+          "cm_53afde31ea59",
+          "cm_770131dd1f94",
+          "cm_96a6f63f090f",
+          "cm_119eb9c9c3dc",
+          "cm_8b49e943b263",
+          "cm_d2f1082a39b3"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by add_to_cart when relevant to the user's request.",
+          "[boundary_must_not] If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.",
+          "[boundary_must_not] Do not assume a product match when search results are ambiguous.",
+          "[boundary_must_not] If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      }
+    ],
+    "summary": {
+      "model_generations": 4,
+      "model_calls_per_generation": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "regenerations": 0,
+      "closure_injections": 3,
+      "closure_injected_tool_calls": 2
+    }
+  },
+  "token_usage": {
+    "input_tokens": 14874,
+    "cached_input_tokens": 0,
+    "output_tokens": 152,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 15026,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 14874,
+  "cached_input_tokens": 0,
+  "output_tokens": 152,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 15026,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_002",
+          "product_id": "SP-1001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_002": {
+          "total": {
+            "old": 0,
+            "new": 849
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "subtotal",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "total",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_002",
+        "product_id": "SP-1001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 2.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 3,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

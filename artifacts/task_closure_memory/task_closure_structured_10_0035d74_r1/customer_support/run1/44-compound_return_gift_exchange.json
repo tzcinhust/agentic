@@ -1,0 +1,1301 @@
+{
+  "task_id": "44-compound_return_gift_exchange",
+  "user_id": "cust_003",
+  "task_summary": "**Task:** The customer wants to turn a gifted blender into store credit they can use toward a coffee maker later. The correct handling is to return the gift at the current product price and issue that value as store credit rather than sending money back to the gift buyer or another payment method.\n\n**Challenge:** Gift-return valuation and refund-method discipline both matter here. Weak agents use the original purchase price, push cash back to a card, or imply a same-flow purchase action that the support backend does not perform.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "44_compound_return_gift_exchange_agent_must_issue_69_store_credit",
+      "kind": "must",
+      "requirement": "Agent must state that the gift return is issued as $69 store credit based on the current product price (not the original $89).",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent explicitly stated the gift return would be issued as $69 in store credit based on the current product price, contrasting it with the original $89. Tool preview and confirmed return also show refund_amount 69 and refund_method store_credit."
+    },
+    {
+      "id": "44_compound_return_gift_exchange_agent_must_not_issue_extra_credit",
+      "kind": "must_not",
+      "requirement": "Agent must not issue, promise, or apply any additional refund, store credit, or purchase credit beyond the $69 gift-return store credit.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent did not issue or promise any additional refund or extra credit beyond the $69 gift-return store credit. Mentioning the pre-existing $45 balance and resulting $114 total was informational only, not additional newly issued credit."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled the gift return correctly by previewing the outcome first, clearly stating the store-credit-only method and the current-price valuation before asking for confirmation. It waited for explicit user approval before executing the consequential return, then summarized the completed state change and confirmed the credit was kept on account rather than applied to a new purchase. The interaction was smooth with no need for user correction or re-steering, and the responses were concise while still including the critical details of amount, method, and resulting balance. This is a clean, user-preferred trajectory across all three dimensions.",
+  "turns": 2,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked it for you: the blender from order ORD-6046 is eligible to be returned, and because it was a gift the refund would be issued as store credit. The preview shows you’d receive **$69 in store credit** for the return; your current store credit balance is **$45**, so you’d have **$114 total** after it’s processed.\n\nA couple of important notes: the blender was originally **$89**, but gift returns are credited at the **current product price**, which is why the return preview is **$69**. If you want, I can go ahead and process that return now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-6046"
+          },
+          "result": {
+            "order_id": "ORD-6046",
+            "customer_id": "cust_003",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK91650272",
+            "delivery_date": "2026-06-03T14:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 97
+            },
+            "subtotal": 89,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 97,
+            "is_gift": true,
+            "gift_sender": "Aunt Mary",
+            "items": [
+              {
+                "item_id": "ITEM-9325",
+                "order_id": "ORD-6046",
+                "product_id": "PROD-2325",
+                "quantity": 1,
+                "unit_price": 89,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-2325",
+                  "name": "PowerBlend Pro Blender",
+                  "category": "kitchen",
+                  "price": 89,
+                  "current_price": 69,
+                  "return_window_days": 30,
+                  "warranty_months": 6,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_003"
+          },
+          "result": {
+            "customer_id": "cust_003",
+            "name": "Sarah Williams",
+            "email": "sarah.w@example.com",
+            "membership_tier": "gold",
+            "account_created": "2021-11-20",
+            "total_orders": 53,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 45,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "1.5x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "return delivered gifted item for store credit toward another product preview before processing"
+          },
+          "result": [
+            "Workflow: Exchange an order item for a different product variant with no refund preview/commit\nUse when: User wants an exchange rather than a refund, often for size/color/variant changes, and may explicitly ask to confirm there will be no refund or store credit before processing.\nVerify first:\n- Use get_order to verify the order exists and identify the target item and its current product.\n- Verify from the order that the item is in a status that can be exchanged under current tool outputs.\n- Use get_policies on exchange/refund rules to confirm whether exchanges require a different product and how cheaper/same-price/more-expensive exchanges are handled.\n- If the replacement product is not already known, use search_products to find a candidate replacement.\n- Use get_product_details for the original and/or candidate replacement to confirm product identity, stock, and relevant attributes such as price or return window when needed.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange_or_returns')\n3. search_products(query_for_requested_variant_or_replacement)\n4. get_product_details(product_id_of_original_or_candidate_if_needed)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If the user only wants confirmation of outcome/cost, stop after the preview process_exchange call and report the preview without committing.\n- If search results are ambiguous or include the original product, use product details to ensure the replacement is a different product when policy requires that.\n- If the preview shows same price, communicate that no charge and no refund/store credit will occur.\n- If the preview shows the replacement is cheaper, communicate that the difference is handled as store credit if policy says so; do not promise an original-payment refund unless the tool/policy says that.\n- If the preview shows the replacement is more expensive, communicate the amount the customer must pay before committing.\n- If no suitable in-stock replacement is found, return a no-write outcome and ask the user to choose from availabl",
+            "Workflow: Exchange to a different product or variant\nUse when: User wants to swap an item from an order for another product or size/color variant, and may want a preview before finalizing.\nVerify first:\n- Use get_order to identify the correct item, its status, and delivery date.\n- If needed, use search_products and get_product_details to identify the requested replacement product and check stock/price/return window.\n- Use get_policies to confirm exchange rules such as different-product requirement, price-difference handling, and whether exchanges follow the item return window.\n- Optionally use get_customer only if customer benefits may affect eligibility or fees.\nProcedure:\n1. get_order(order_id)\n2. If replacement is not uniquely identified: search_products(query)\n3. get_product_details(product_id)\n4. get_policies(topic='exchange')\n5. If user wants a preview or eligibility check: process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. If preview is acceptable and exchange is allowed: process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If process_exchange preview shows same-price or in-stock exchange allowed, present preview and finalize only on user confirmation.\n- If replacement is more expensive, explain customer pays the difference per policy; preview can confirm amount.\n- If replacement is cheaper, explain any difference is store credit per policy; preview can confirm amount.\n- If requested replacement is out of stock, process_exchange may offer store credit for the original item instead of creating a replacement; preview this outcome and confirm no replacement ships before finalizing.\n- If process_exchange rejects due to outside exchange window or other policy reason, provide the rejection reason as a no-write outcome.\n- If user only asks whether an exchange is possible, stop after read-only checks or preview and do not finalize.\nAvoid:\n- Do not treat a self-swap or same product as a valid exchange unless the replacement is a distinct product/variant recognized by the tools.\n- Do not promise stock, prices, or credits without tool confirmation.\n- Do not finalize before ",
+            "Workflow: Preview and complete exchange for a replacement product\nUse when: User wants to exchange an already ordered item for a different product or size variant, and may ask about stock, price difference, or refund method for the difference.\nVerify first:\n- Use get_order to verify the order/item exists and identify the original item and product.\n- Use get_policies to verify exchange rules, especially different-product requirement and how cheaper/more-expensive exchanges are settled.\n- If the replacement is not uniquely identified, use search_products and optionally get_product_details to find the candidate product and confirm stock/details.\n- If needed for customer-facing explanation, use get_customer to confirm preferred refund method or benefits, but do not assume it overrides policy.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange')\n3. search_products(query for requested replacement)\n4. get_product_details(product_id)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If search results are ambiguous, stop after search_products/get_product_details and ask the user to choose; do not mutate.\n- If the requested replacement is out of stock, do not force the exchange; offer fallback options supported by the preview/policy, such as return or store credit, and only proceed after user consent.\n- If the exchange preview shows a cheaper replacement, explain that the difference goes to store credit if policy says so; do not promise refund to original payment unless the tool/policy supports it.\n- If the exchange preview shows a more expensive replacement, explain the added amount the customer must pay.\n- If user only wants confirmation, provide the preview outcome and wait; do not finalize until explicit confirmation.\n- If the replacement is effectively the same product and policy disallows self-swap, do not submit an invalid exchange.\nAvoid:\n- Do not invent restock dates or stock guarantees; only report current tool output.\n- Do not convert exchange price differences into a card refund when policy says s"
+          ]
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-9325",
+            "return_eligible": true,
+            "reason": "changed_mind",
+            "refund_amount": 69,
+            "refund_method": "store_credit",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": false,
+            "shipping_refund": false,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please go ahead and process the gift return as **store credit for $69**. I just want the credit kept on my account for later, not applied to a coffee maker now."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I processed the return for the blender and issued **$69 in store credit** to your account. It’s been kept on your account for later and not applied to any coffee maker purchase.\n\nYour credit from before was **$45**, so you should now have **$114 total** in store credit.",
+      "tool_calls": [
+        {
+          "name": "process_return",
+          "arguments": {
+            "confirm": true,
+            "amount": 69,
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind"
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-9325",
+            "refund_amount": 69,
+            "policy_computed_amount": 69,
+            "refund_method": "store_credit",
+            "restocking_fee": 0,
+            "return_label_issued": false,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v1",
+    "mode": "structured",
+    "initial_items": [
+      {
+        "id": "cm_99db2ee5160b",
+        "type": "cost_amount_reporting",
+        "description": "If the customer has not yet approved processing, provide a no-write outcome after the preview: confirm restocking fee, label status, refund amount, and refund method from tool output.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_83cfd48d248e",
+        "type": "user_confirmation_choice",
+        "description": "If the customer has not yet approved processing, provide a no-write outcome after the preview: confirm restocking fee, label status, refund amount, and refund method from tool output.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_4c160e4c7805",
+        "type": "cost_amount_reporting",
+        "description": "If the order has multiple items, return/refund only the affected line item and leave other lines unchanged.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_cde7824dcf19",
+        "type": "boundary_must_not",
+        "description": "If the order has multiple items, return/refund only the affected line item and leave other lines unchanged.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_354418443915",
+        "type": "cost_amount_reporting",
+        "description": "If the customer wants store credit or another method instead of the default return refund method, use process_refund after the return to preview and then apply the refund-method update when supported by the tool.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_70a223fa32f8",
+        "type": "final_state_reporting",
+        "description": "If the customer wants store credit or another method instead of the default return refund method, use process_refund after the return to preview and then apply the refund-method update when supported by the tool.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b623eafe15a6",
+        "type": "explanation_rationale",
+        "description": "If the customer requests separate goodwill or other supplemental compensation, verify policy basis first, then preview and confirm the separate process_refund.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_58c20468d99c",
+        "type": "user_confirmation_choice",
+        "description": "If the customer requests separate goodwill or other supplemental compensation, verify policy basis first, then preview and confirm the separate process_refund.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_3b30ccbdfc63",
+        "type": "explanation_rationale",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1b2b9e532e40",
+        "type": "cost_amount_reporting",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_fb7d89c58e70",
+        "type": "boundary_must_not",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1eee98d20618",
+        "type": "final_state_reporting",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_db2d1bd4a35b",
+        "type": "cost_amount_reporting",
+        "description": "Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+        "source": "user:turn0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 0
+          }
+        ]
+      }
+    ],
+    "static_requirements": [],
+    "final_items": [
+      {
+        "id": "cm_99db2ee5160b",
+        "type": "cost_amount_reporting",
+        "description": "If the customer has not yet approved processing, provide a no-write outcome after the preview: confirm restocking fee, label status, refund amount, and refund method from tool output.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_83cfd48d248e",
+        "type": "user_confirmation_choice",
+        "description": "If the customer has not yet approved processing, provide a no-write outcome after the preview: confirm restocking fee, label status, refund amount, and refund method from tool output.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_4c160e4c7805",
+        "type": "cost_amount_reporting",
+        "description": "If the order has multiple items, return/refund only the affected line item and leave other lines unchanged.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_cde7824dcf19",
+        "type": "boundary_must_not",
+        "description": "If the order has multiple items, return/refund only the affected line item and leave other lines unchanged.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_354418443915",
+        "type": "cost_amount_reporting",
+        "description": "If the customer wants store credit or another method instead of the default return refund method, use process_refund after the return to preview and then apply the refund-method update when supported by the tool.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_70a223fa32f8",
+        "type": "final_state_reporting",
+        "description": "If the customer wants store credit or another method instead of the default return refund method, use process_refund after the return to preview and then apply the refund-method update when supported by the tool.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b623eafe15a6",
+        "type": "explanation_rationale",
+        "description": "If the customer requests separate goodwill or other supplemental compensation, verify policy basis first, then preview and confirm the separate process_refund.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_58c20468d99c",
+        "type": "user_confirmation_choice",
+        "description": "If the customer requests separate goodwill or other supplemental compensation, verify policy basis first, then preview and confirm the separate process_refund.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_3b30ccbdfc63",
+        "type": "explanation_rationale",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1b2b9e532e40",
+        "type": "cost_amount_reporting",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_fb7d89c58e70",
+        "type": "boundary_must_not",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_1eee98d20618",
+        "type": "final_state_reporting",
+        "description": "If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_db2d1bd4a35b",
+        "type": "cost_amount_reporting",
+        "description": "Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+        "source": "user:turn0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 0
+          }
+        ]
+      },
+      {
+        "id": "cm_41af5dc5079c",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_order when relevant to the user's request.",
+        "source": "tool:get_order:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "get_order",
+            "success": true,
+            "status": "delivered",
+            "fields": [
+              "credit_card",
+              "current_price",
+              "discount_amount",
+              "discount_code",
+              "goodwill_credit",
+              "goodwill_credit_method",
+              "price",
+              "refund_amount",
+              "refund_method",
+              "restocking_fee",
+              "shipping_cost",
+              "store_credit_only"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_f2a6903a95c8",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by get_order when relevant.",
+        "source": "tool:get_order:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "get_order",
+            "success": true,
+            "status": "delivered",
+            "fields": [
+              "return_reason"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_a628bbdf4849",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_customer when relevant to the user's request.",
+        "source": "tool:get_customer:1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 1,
+            "tool": "get_customer",
+            "success": true,
+            "status": "",
+            "fields": [
+              "preferred_refund_method",
+              "restocking_fee_waiver",
+              "store_credit_balance",
+              "total_orders"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_045237a08356",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_policies when relevant to the user's request.",
+        "source": "tool:get_policies:2",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "tool": "get_policies",
+            "success": true,
+            "status": "",
+            "fields": [
+              "agent_computes_amount",
+              "amount",
+              "no_discount_code",
+              "restocking_fee",
+              "return_shipping_fee",
+              "store_credit_grace",
+              "tier_discount"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_5869e09d705c",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by get_policies when relevant.",
+        "source": "tool:get_policies:2",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "tool": "get_policies",
+            "success": true,
+            "status": "",
+            "fields": [
+              "eligibility"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_42d61f9bdd3d",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by process_return when relevant to the user's request.",
+        "source": "tool:process_return:5",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "tool": "process_return",
+            "success": true,
+            "status": "preview",
+            "fields": [
+              "discount_adjustment",
+              "paid_return_shipping_fee",
+              "refund_amount",
+              "refund_method",
+              "restocking_discount",
+              "restocking_fee",
+              "shipping_refund"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_1f3bc4f125c6",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by process_return when relevant.",
+        "source": "tool:process_return:5",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "tool": "process_return",
+            "success": true,
+            "status": "preview",
+            "fields": [
+              "reason",
+              "return_eligible"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_6f2e75eed04d",
+        "type": "user_confirmation_choice",
+        "description": "Do not describe the preview from process_return as completed without the user's choice or confirmation.",
+        "source": "tool:process_return:5",
+        "status": "satisfied",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "tool": "process_return",
+            "success": true,
+            "status": "preview"
+          },
+          {
+            "kind": "user_confirmation",
+            "conversation_index": 2,
+            "bound_preview_source": "tool:process_return:5",
+            "text": "Yes, please go ahead and process the gift return as **store credit for $69**. I just want the credit kept on my accou..."
+          }
+        ]
+      },
+      {
+        "id": "cm_19460dbdf2d9",
+        "type": "cost_amount_reporting",
+        "description": "Address the user's cost or amount reporting: Yes, please go ahead and process the gift return as **store credit for $69**. I just want the credit kept on my account for later, not applied to a coffee maker now.",
+        "source": "user:turn1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "user_request",
+            "turn": 1
+          }
+        ]
+      },
+      {
+        "id": "cm_e0b0ecc3c16b",
+        "type": "execution",
+        "description": "The operation represented by process_return is complete.",
+        "source": "tool:process_return:6",
+        "status": "satisfied",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "tool": "process_return",
+            "success": true,
+            "status": "returned"
+          }
+        ]
+      },
+      {
+        "id": "cm_2569ce4b8010",
+        "type": "final_state_reporting",
+        "description": "Report the tool-confirmed final outcome of process_return without inventing additional changes.",
+        "source": "tool:process_return:6",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "tool": "process_return",
+            "success": true,
+            "status": "returned"
+          }
+        ]
+      }
+    ],
+    "final_pending_items": [
+      "cm_99db2ee5160b",
+      "cm_83cfd48d248e",
+      "cm_4c160e4c7805",
+      "cm_cde7824dcf19",
+      "cm_354418443915",
+      "cm_70a223fa32f8",
+      "cm_b623eafe15a6",
+      "cm_58c20468d99c",
+      "cm_3b30ccbdfc63",
+      "cm_1b2b9e532e40",
+      "cm_fb7d89c58e70",
+      "cm_1eee98d20618",
+      "cm_db2d1bd4a35b",
+      "cm_41af5dc5079c",
+      "cm_f2a6903a95c8",
+      "cm_a628bbdf4849",
+      "cm_045237a08356",
+      "cm_5869e09d705c",
+      "cm_42d61f9bdd3d",
+      "cm_1f3bc4f125c6",
+      "cm_19460dbdf2d9",
+      "cm_2569ce4b8010"
+    ],
+    "final_satisfied_items": [
+      "cm_6f2e75eed04d",
+      "cm_e0b0ecc3c16b"
+    ],
+    "final_invalidated_items": [],
+    "generations": [
+      {
+        "generation_index": 0,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_99db2ee5160b",
+          "cm_83cfd48d248e",
+          "cm_4c160e4c7805",
+          "cm_cde7824dcf19",
+          "cm_354418443915",
+          "cm_70a223fa32f8",
+          "cm_b623eafe15a6",
+          "cm_58c20468d99c",
+          "cm_3b30ccbdfc63",
+          "cm_1b2b9e532e40",
+          "cm_fb7d89c58e70",
+          "cm_1eee98d20618",
+          "cm_db2d1bd4a35b"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 1,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "afaeea15fbf303822fb59ca90f626f77941838987fe4bca008147b891d476784",
+        "pending_items": [
+          "cm_99db2ee5160b",
+          "cm_83cfd48d248e",
+          "cm_4c160e4c7805",
+          "cm_cde7824dcf19",
+          "cm_354418443915",
+          "cm_70a223fa32f8",
+          "cm_b623eafe15a6",
+          "cm_58c20468d99c",
+          "cm_3b30ccbdfc63",
+          "cm_1b2b9e532e40",
+          "cm_fb7d89c58e70",
+          "cm_1eee98d20618",
+          "cm_db2d1bd4a35b",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_a628bbdf4849",
+          "cm_045237a08356",
+          "cm_5869e09d705c"
+        ],
+        "injected_items": [
+          "cm_db2d1bd4a35b",
+          "cm_045237a08356",
+          "cm_41af5dc5079c",
+          "cm_a628bbdf4849",
+          "cm_5869e09d705c",
+          "cm_f2a6903a95c8"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+          "[cost_amount_reporting] Report material amounts returned by get_policies when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_customer when relevant to the user's request.",
+          "[proactive_disclosure] Disclose material constraints or warnings returned by get_policies when relevant.",
+          "[proactive_disclosure] Disclose material constraints or warnings returned by get_order when relevant."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "8750e9bb9ae232b75ee64b2286cb8a19544099d9b2546253662a6d92560d24ba",
+        "pending_items": [
+          "cm_99db2ee5160b",
+          "cm_83cfd48d248e",
+          "cm_4c160e4c7805",
+          "cm_cde7824dcf19",
+          "cm_354418443915",
+          "cm_70a223fa32f8",
+          "cm_b623eafe15a6",
+          "cm_58c20468d99c",
+          "cm_3b30ccbdfc63",
+          "cm_1b2b9e532e40",
+          "cm_fb7d89c58e70",
+          "cm_1eee98d20618",
+          "cm_db2d1bd4a35b",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_a628bbdf4849",
+          "cm_045237a08356",
+          "cm_5869e09d705c",
+          "cm_42d61f9bdd3d",
+          "cm_1f3bc4f125c6",
+          "cm_6f2e75eed04d"
+        ],
+        "injected_items": [
+          "cm_db2d1bd4a35b",
+          "cm_045237a08356",
+          "cm_41af5dc5079c",
+          "cm_42d61f9bdd3d",
+          "cm_a628bbdf4849",
+          "cm_1f3bc4f125c6"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+          "[cost_amount_reporting] Report material amounts returned by get_policies when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by process_return when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_customer when relevant to the user's request.",
+          "[proactive_disclosure] Disclose material constraints or warnings returned by process_return when relevant."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 3,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "evidence_backed_communication_followup",
+        "closure_prompt_sha256": "068176f13f9fc1c16baf5324a8d25a482dadeb620782e19d52d6c0b7e4b3c31a",
+        "pending_items": [
+          "cm_99db2ee5160b",
+          "cm_83cfd48d248e",
+          "cm_4c160e4c7805",
+          "cm_cde7824dcf19",
+          "cm_354418443915",
+          "cm_70a223fa32f8",
+          "cm_b623eafe15a6",
+          "cm_58c20468d99c",
+          "cm_3b30ccbdfc63",
+          "cm_1b2b9e532e40",
+          "cm_fb7d89c58e70",
+          "cm_1eee98d20618",
+          "cm_db2d1bd4a35b",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_a628bbdf4849",
+          "cm_045237a08356",
+          "cm_5869e09d705c",
+          "cm_42d61f9bdd3d",
+          "cm_1f3bc4f125c6",
+          "cm_19460dbdf2d9"
+        ],
+        "injected_items": [
+          "cm_19460dbdf2d9",
+          "cm_db2d1bd4a35b",
+          "cm_045237a08356",
+          "cm_41af5dc5079c",
+          "cm_42d61f9bdd3d",
+          "cm_a628bbdf4849"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Address the user's cost or amount reporting: Yes, please go ahead and process the gift return as **store credit for $69**. I just want the credit kept on my account for later, not applied to a coffee maker now.",
+          "[cost_amount_reporting] Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+          "[cost_amount_reporting] Report material amounts returned by get_policies when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by process_return when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_customer when relevant to the user's request."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "confirm": true,
+              "amount": 69,
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "068176f13f9fc1c16baf5324a8d25a482dadeb620782e19d52d6c0b7e4b3c31a",
+        "pending_items": [
+          "cm_99db2ee5160b",
+          "cm_83cfd48d248e",
+          "cm_4c160e4c7805",
+          "cm_cde7824dcf19",
+          "cm_354418443915",
+          "cm_70a223fa32f8",
+          "cm_b623eafe15a6",
+          "cm_58c20468d99c",
+          "cm_3b30ccbdfc63",
+          "cm_1b2b9e532e40",
+          "cm_fb7d89c58e70",
+          "cm_1eee98d20618",
+          "cm_db2d1bd4a35b",
+          "cm_41af5dc5079c",
+          "cm_f2a6903a95c8",
+          "cm_a628bbdf4849",
+          "cm_045237a08356",
+          "cm_5869e09d705c",
+          "cm_42d61f9bdd3d",
+          "cm_1f3bc4f125c6",
+          "cm_19460dbdf2d9",
+          "cm_2569ce4b8010"
+        ],
+        "injected_items": [
+          "cm_19460dbdf2d9",
+          "cm_db2d1bd4a35b",
+          "cm_045237a08356",
+          "cm_41af5dc5079c",
+          "cm_42d61f9bdd3d",
+          "cm_a628bbdf4849"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Address the user's cost or amount reporting: Yes, please go ahead and process the gift return as **store credit for $69**. I just want the credit kept on my account for later, not applied to a coffee maker now.",
+          "[cost_amount_reporting] Address the user's cost or amount reporting: I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+          "[cost_amount_reporting] Report material amounts returned by get_policies when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_order when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by process_return when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_customer when relevant to the user's request."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      }
+    ],
+    "summary": {
+      "model_generations": 5,
+      "model_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "regenerations": 0,
+      "closure_injections": 4,
+      "closure_injected_tool_calls": 2
+    }
+  },
+  "token_usage": {
+    "input_tokens": 28629,
+    "cached_input_tokens": 0,
+    "output_tokens": 375,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 29004,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 28629,
+  "cached_input_tokens": 0,
+  "output_tokens": 375,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 29004,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "orders": {
+        "ORD-6046": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      },
+      "order_items": {
+        "ITEM-9325": {
+          "return_reason": {
+            "old": null,
+            "new": "changed_mind"
+          },
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "store_credit_only": {
+            "old": false,
+            "new": true
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_method": {
+            "old": null,
+            "new": "store_credit"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 69
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "refund_amount",
+      "expected_value": 69
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "refund_method",
+      "expected_value": "store_credit"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "return_reason",
+      "expected_value": "changed_mind"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "store_credit_only",
+      "expected_value": true
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-6046",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

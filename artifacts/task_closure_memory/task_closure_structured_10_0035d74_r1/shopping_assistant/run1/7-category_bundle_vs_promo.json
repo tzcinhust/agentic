@@ -1,0 +1,1585 @@
+{
+  "task_id": "7-category_bundle_vs_promo",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning customer (shop_004) wants to buy 3 kitchen items — PowerBlend Pro Blender (SP-3001, $229), CasaGrande Cast-Iron Skillet (SP-3007, $89), HomeBrew Pour-Over Coffee Set (SP-3008, $59). Subtotal $377. The customer has the KITCHEN10 promo code (10% off kitchen) and wants it applied.\n\n**Challenge:** 3+ same-category items activate the `category_bundle` policy (5% off qualifying items' line totals). The customer also has KITCHEN10 (10% off). Per `category_bundle` and `promo_stacking` policies: category_bundle does NOT stack with promo codes on the same items — customer gets the better. The correct behavior is to (a) recognize the 3-item same-category qualifier, (b) compute both discounts (category_bundle 5% = ~$18, KITCHEN10 10% = $37), (c) explain non-stacking, (d) apply KITCHEN10 as the larger discount. Pitfalls: agent silently applies KITCHEN10 without surfacing the category-bundle alternative (missed disclosure), agent tries to stack both in conversation (policy violation + customer mistrust), or agent applies category_bundle instead and misses KITCHEN10 (under-discount).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "recognized_category_bundle_eligibility",
+      "kind": "must",
+      "requirement": "Agent verbalized that 3+ same-category items qualify for the category_bundle policy (5% off). Evidence: the agent mentioned the category bundle or same-category bonus before or during the discount decision. Silently applying KITCHEN10 without ever mentioning category_bundle fails this requirement.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent never mentioned that 3+ same-category kitchen items qualify for a category_bundle 5% discount; it only discussed and applied KITCHEN10."
+    },
+    {
+      "id": "explained_non_stacking_rule",
+      "kind": "must",
+      "requirement": "Agent explicitly explained that category_bundle and promo codes do NOT stack — customer gets the better of the two. Language like 'they can't combine, so I'll apply whichever saves you more' is sufficient. Applying one without explaining the non-stacking rule fails this requirement.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The conversation contains no explanation that category_bundle and promo codes do not stack or that the better discount would be chosen."
+    },
+    {
+      "id": "applied_better_discount",
+      "kind": "must",
+      "requirement": "Agent applied KITCHEN10 via apply_promo (10% = $37 discount), NOT category_bundle (5% = ~$18). At cart summary, discount_amount=$37 and applied_promo_codes=['KITCHEN10']. The larger discount must win.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show apply_promo with promo_code KITCHEN10, and the final cart has discount_amount 37 and applied_promo_codes [\"KITCHEN10\"], which matches the required better discount."
+    },
+    {
+      "id": "no_stacking_claim",
+      "kind": "must_not",
+      "requirement": "Agent must NOT claim in conversation that both KITCHEN10 and the category bundle are applied simultaneously, or that the customer is getting 15% off, or otherwise mislead about combined discounts. Category bundle does not stack with promo codes per policy — any such claim is a disclosure failure.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent did not claim that both discounts were applied together or that the customer received 15% off."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points tool calls."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.3,
+  "ux_reasoning": "The agent did wait for explicit confirmation before making cart changes and then clearly summarized the resulting cart state, so control over the actual mutation was mostly preserved. However, it failed to surface the qualifying 3-item kitchen bundle discount and the non-stacking rule before applying KITCHEN10, which denied the user an important comparison that should have informed consent. User effort suffers materially because the agent missed key policy context it should have anticipated on its own in this exact scenario, even though the final discount chosen happened to be the better one. Response length was generally concise and readable, aside from an obvious duplicated first message and the omission of the critical discount-comparison explanation.",
+  "turns": 2,
+  "tool_calls": 17,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use."
+    },
+    {
+      "role": "assistant",
+      "content": "I found all three kitchen items and confirmed they’re in stock:\n\n- PowerBlend Pro Blender — $229\n- CasaGrande Cast-Iron Skillet 12\" — $89\n- HomeBrew Pour-Over Coffee Set — $59\n\nKITCHEN10 is valid for your account and is described as 10% off any kitchen-category purchase. Since your cart is currently empty, the pre-add validation shows an estimated discount of $0 right now; once the items are added, I can apply it to the cart.\n\nBefore I make the cart changes: do you want me to add 1 of each with no gift wrap and then apply KITCHEN10?I found all three kitchen items and confirmed they’re in stock:\n\n- PowerBlend Pro Blender — $229\n- CasaGrande Cast-Iron Skillet 12\" — $89\n- HomeBrew Pour-Over Coffee Set — $59\n\nKITCHEN10 is valid for your account and is described as 10% off any kitchen-category purchase. Since your cart is currently empty, the pre-add validation shows an estimated discount of $0 right now; once the items are added, I can apply it to the cart.\n\nBefore I make the cart changes: do you want me to add 1 of each with no gift wrap and then apply KITCHEN10?",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "PowerBlend Pro Blender",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "CasaGrande Cast-Iron Skillet",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3007",
+                "name": "CasaGrande Cast-Iron Skillet 12\"",
+                "brand": "CasaGrande",
+                "category": "kitchen",
+                "subcategory": "cookware",
+                "price": 89,
+                "rating": 4.6,
+                "review_count": 820,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "query": "HomeBrew Pour-Over Coffee Set",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3008",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "HomeBrew",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 460,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 2200,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "name": "PowerBlend Pro Blender",
+            "category": "kitchen",
+            "subcategory": "blender",
+            "brand": "PowerBlend",
+            "price": 229,
+            "rating": 4.6,
+            "review_count": 1580,
+            "description": "Pro-grade countertop blender.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-3007"
+          },
+          "result": {
+            "product_id": "SP-3007",
+            "name": "CasaGrande Cast-Iron Skillet 12\"",
+            "category": "kitchen",
+            "subcategory": "cookware",
+            "brand": "CasaGrande",
+            "price": 89,
+            "rating": 4.6,
+            "review_count": 820,
+            "description": "Pre-seasoned 12-inch cast-iron skillet. Oven- and induction-safe.",
+            "specs": {
+              "diameter_in": 12,
+              "weight_lb": 8.0
+            },
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 30,
+            "shipping_days": 4,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "4 business days (standard)"
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-3008"
+          },
+          "result": {
+            "product_id": "SP-3008",
+            "name": "HomeBrew Pour-Over Coffee Set",
+            "category": "kitchen",
+            "subcategory": "coffee",
+            "brand": "HomeBrew",
+            "price": 59,
+            "rating": 4.4,
+            "review_count": 460,
+            "description": "Ceramic pour-over dripper, glass carafe, and reusable stainless filter.",
+            "specs": {
+              "capacity_cups": 4
+            },
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "base_price": 229,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3007"
+          },
+          "result": {
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "base_price": 89,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3008"
+          },
+          "result": {
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "base_price": 59,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off any kitchen-category purchase.",
+            "estimated_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please add 1 of each with no gift wrap and apply KITCHEN10."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added all 3 items and applied KITCHEN10.\n\nCart:\n- PowerBlend Pro Blender ×1 — $229\n- CasaGrande Cast-Iron Skillet 12\" ×1 — $89\n- HomeBrew Pour-Over Coffee Set ×1 — $59\n\nTotals:\n- Subtotal: $377\n- Promo discount: $37\n- Gift wrap: $0\n- Total: $340\n\nApplied promo:\n- KITCHEN10\n\nIf you want, I can also help you check shipping options next.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 229,
+            "cart_subtotal": 229,
+            "cart_total": 229
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 89,
+            "cart_subtotal": 318,
+            "cart_total": 318
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 59,
+            "cart_subtotal": 377,
+            "cart_total": 377
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "KITCHEN10",
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ],
+            "discount_amount": 37,
+            "cart_subtotal": 377,
+            "cart_total": 340
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-3001",
+                "product_name": "PowerBlend Pro Blender",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 229,
+                "line_total": 229
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-3007",
+                "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 89
+              },
+              {
+                "cart_item_id": "CI-0003",
+                "product_id": "SP-3008",
+                "product_name": "HomeBrew Pour-Over Coffee Set",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 59,
+                "line_total": 59
+              }
+            ],
+            "subtotal": 377,
+            "discount_amount": 37,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 340,
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v1",
+    "mode": "structured",
+    "initial_items": [
+      {
+        "id": "cm_f5414ca9e2eb",
+        "type": "explanation_rationale",
+        "description": "If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_0ca5c2120704",
+        "type": "boundary_must_not",
+        "description": "If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_abcdf1d4bbf6",
+        "type": "cost_amount_reporting",
+        "description": "If multiple candidate codes are available in get_promotions, prefer the one that yields the larger valid discount for the current item/cart conditions.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_46f4793f64e5",
+        "type": "comparison",
+        "description": "If one code is invalid, inactive, category-restricted, or below minimum purchase, exclude it and use the valid better alternative if requested.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_435fb35284b1",
+        "type": "cost_amount_reporting",
+        "description": "If none of the provided codes are valid, do not apply any; offer to add at regular price or ask whether to continue.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a01fc678c6d3",
+        "type": "boundary_must_not",
+        "description": "If none of the provided codes are valid, do not apply any; offer to add at regular price or ask whether to continue.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_6e32c5083142",
+        "type": "comparison",
+        "description": "If the user explicitly chooses one code after comparison, apply that chosen code rather than re-optimizing.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_2de1f12397b0",
+        "type": "boundary_must_not",
+        "description": "Do not claim two promos can stack unless current tool-backed policy says so.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_2606450632ff",
+        "type": "comparison",
+        "description": "Do not compare promos using assumptions not supported by get_promotions/get_policies.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_2abb6e50b023",
+        "type": "boundary_must_not",
+        "description": "Do not compare promos using assumptions not supported by get_promotions/get_policies.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_58e9dd3e0239",
+        "type": "boundary_must_not",
+        "description": "Do not apply an unverified code just because the us",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_e7634be7d5ae",
+        "type": "user_confirmation_choice",
+        "description": "If search results are ambiguous or empty, stop after read-only tools and ask the user to clarify or refine; do not add anything.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      }
+    ],
+    "static_requirements": [],
+    "final_items": [
+      {
+        "id": "cm_f5414ca9e2eb",
+        "type": "explanation_rationale",
+        "description": "If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_0ca5c2120704",
+        "type": "boundary_must_not",
+        "description": "If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_abcdf1d4bbf6",
+        "type": "cost_amount_reporting",
+        "description": "If multiple candidate codes are available in get_promotions, prefer the one that yields the larger valid discount for the current item/cart conditions.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_46f4793f64e5",
+        "type": "comparison",
+        "description": "If one code is invalid, inactive, category-restricted, or below minimum purchase, exclude it and use the valid better alternative if requested.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_435fb35284b1",
+        "type": "cost_amount_reporting",
+        "description": "If none of the provided codes are valid, do not apply any; offer to add at regular price or ask whether to continue.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_a01fc678c6d3",
+        "type": "boundary_must_not",
+        "description": "If none of the provided codes are valid, do not apply any; offer to add at regular price or ask whether to continue.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_6e32c5083142",
+        "type": "comparison",
+        "description": "If the user explicitly chooses one code after comparison, apply that chosen code rather than re-optimizing.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_2de1f12397b0",
+        "type": "boundary_must_not",
+        "description": "Do not claim two promos can stack unless current tool-backed policy says so.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_2606450632ff",
+        "type": "comparison",
+        "description": "Do not compare promos using assumptions not supported by get_promotions/get_policies.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_2abb6e50b023",
+        "type": "boundary_must_not",
+        "description": "Do not compare promos using assumptions not supported by get_promotions/get_policies.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_58e9dd3e0239",
+        "type": "boundary_must_not",
+        "description": "Do not apply an unverified code just because the us",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_e7634be7d5ae",
+        "type": "user_confirmation_choice",
+        "description": "If search results are ambiguous or empty, stop after read-only tools and ask the user to clarify or refine; do not add anything.",
+        "source": "workflow:rank2:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 2,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_770131dd1f94",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by search_products when relevant to the user's request.",
+        "source": "tool:search_products:0",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 0,
+            "tool": "search_products",
+            "success": true,
+            "status": "",
+            "fields": [
+              "price",
+              "total_found"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_86f21918ceb6",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_cart when relevant to the user's request.",
+        "source": "tool:get_cart:3",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "tool": "get_cart",
+            "success": true,
+            "status": "",
+            "fields": [
+              "discount_amount",
+              "gift_wrap_fee",
+              "loyalty_discount",
+              "loyalty_points_redeemed",
+              "shipping_cost",
+              "subtotal",
+              "total"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_1418cc03a38c",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_customer_account when relevant to the user's request.",
+        "source": "tool:get_customer_account:4",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "tool": "get_customer_account",
+            "success": true,
+            "status": "",
+            "fields": [
+              "loyalty_points"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_6ac8384ab89d",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_product_details when relevant to the user's request.",
+        "source": "tool:get_product_details:5",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "tool": "get_product_details",
+            "success": true,
+            "status": "",
+            "fields": [
+              "previous_price",
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_b7f41cb99cd2",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_variants when relevant to the user's request.",
+        "source": "tool:get_variants:8",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 8,
+            "tool": "get_variants",
+            "success": true,
+            "status": "",
+            "fields": [
+              "base_price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_18e13b108a82",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by validate_promo when relevant to the user's request.",
+        "source": "tool:validate_promo:11",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 11,
+            "tool": "validate_promo",
+            "success": true,
+            "status": "",
+            "fields": [
+              "estimated_discount"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_92ec3a4e19f5",
+        "type": "proactive_disclosure",
+        "description": "Disclose material constraints or warnings returned by validate_promo when relevant.",
+        "source": "tool:validate_promo:11",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 11,
+            "tool": "validate_promo",
+            "success": true,
+            "status": "",
+            "fields": [
+              "reason"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_f9dc9bc5fcef",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by add_to_cart when relevant to the user's request.",
+        "source": "tool:add_to_cart:12",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 12,
+            "tool": "add_to_cart",
+            "success": true,
+            "status": "added",
+            "fields": [
+              "cart_subtotal",
+              "cart_total",
+              "unit_price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_a6687f1ccc0a",
+        "type": "execution",
+        "description": "The operation represented by apply_promo is complete.",
+        "source": "tool:apply_promo:15",
+        "status": "satisfied",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 15,
+            "tool": "apply_promo",
+            "success": true,
+            "status": "applied"
+          }
+        ]
+      },
+      {
+        "id": "cm_193e041539c7",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by apply_promo when relevant to the user's request.",
+        "source": "tool:apply_promo:15",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 15,
+            "tool": "apply_promo",
+            "success": true,
+            "status": "applied",
+            "fields": [
+              "cart_subtotal",
+              "cart_total",
+              "discount_amount"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_e583a62e57ce",
+        "type": "final_state_reporting",
+        "description": "Report the tool-confirmed final outcome of apply_promo without inventing additional changes.",
+        "source": "tool:apply_promo:15",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 15,
+            "tool": "apply_promo",
+            "success": true,
+            "status": "applied"
+          }
+        ]
+      }
+    ],
+    "final_pending_items": [
+      "cm_f5414ca9e2eb",
+      "cm_0ca5c2120704",
+      "cm_abcdf1d4bbf6",
+      "cm_46f4793f64e5",
+      "cm_435fb35284b1",
+      "cm_a01fc678c6d3",
+      "cm_6e32c5083142",
+      "cm_2de1f12397b0",
+      "cm_2606450632ff",
+      "cm_2abb6e50b023",
+      "cm_58e9dd3e0239",
+      "cm_e7634be7d5ae",
+      "cm_770131dd1f94",
+      "cm_86f21918ceb6",
+      "cm_1418cc03a38c",
+      "cm_6ac8384ab89d",
+      "cm_b7f41cb99cd2",
+      "cm_18e13b108a82",
+      "cm_92ec3a4e19f5",
+      "cm_f9dc9bc5fcef",
+      "cm_193e041539c7",
+      "cm_e583a62e57ce"
+    ],
+    "final_satisfied_items": [
+      "cm_a6687f1ccc0a"
+    ],
+    "final_invalidated_items": [],
+    "generations": [
+      {
+        "generation_index": 0,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 1,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "e5507e21f8985db88afe821502d25aaaf8ce9791dde5be5a5c6da5a32ed53f14",
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c"
+        ],
+        "injected_items": [
+          "cm_1418cc03a38c",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_0ca5c2120704",
+          "cm_2abb6e50b023",
+          "cm_2de1f12397b0"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_customer_account when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_cart when relevant to the user's request.",
+          "[boundary_must_not] If only one promo code can be used per cart per get_policies, explain that both cannot be applied and select one valid code only if the user agrees.",
+          "[boundary_must_not] Do not compare promos using assumptions not supported by get_promotions/get_policies.",
+          "[boundary_must_not] Do not claim two promos can stack unless current tool-backed policy says so."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          },
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "SP-3007"
+            }
+          },
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "SP-3008"
+            }
+          },
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          },
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3007"
+            }
+          },
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3008"
+            }
+          },
+          {
+            "name": "validate_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "43c7c4fd144269ec6260b200f3c01bab9c8d50bbd4368f43f134ce865e92f6ff",
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c",
+          "cm_6ac8384ab89d",
+          "cm_b7f41cb99cd2",
+          "cm_18e13b108a82",
+          "cm_92ec3a4e19f5"
+        ],
+        "injected_items": [
+          "cm_1418cc03a38c",
+          "cm_18e13b108a82",
+          "cm_6ac8384ab89d",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_b7f41cb99cd2"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_customer_account when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by validate_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_cart when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 3,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c",
+          "cm_6ac8384ab89d",
+          "cm_b7f41cb99cd2",
+          "cm_18e13b108a82",
+          "cm_92ec3a4e19f5"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 4,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "43c7c4fd144269ec6260b200f3c01bab9c8d50bbd4368f43f134ce865e92f6ff",
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c",
+          "cm_6ac8384ab89d",
+          "cm_b7f41cb99cd2",
+          "cm_18e13b108a82",
+          "cm_92ec3a4e19f5",
+          "cm_f9dc9bc5fcef"
+        ],
+        "injected_items": [
+          "cm_1418cc03a38c",
+          "cm_18e13b108a82",
+          "cm_6ac8384ab89d",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_b7f41cb99cd2"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_customer_account when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by validate_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_cart when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "apply_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 5,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "98a5da37f67e575b9ba8240b17630ffec18e092ea2689ebec34b19fce4f0bec0",
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c",
+          "cm_6ac8384ab89d",
+          "cm_b7f41cb99cd2",
+          "cm_18e13b108a82",
+          "cm_92ec3a4e19f5",
+          "cm_f9dc9bc5fcef",
+          "cm_193e041539c7",
+          "cm_e583a62e57ce"
+        ],
+        "injected_items": [
+          "cm_1418cc03a38c",
+          "cm_18e13b108a82",
+          "cm_193e041539c7",
+          "cm_6ac8384ab89d",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_customer_account when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by validate_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by apply_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_cart when relevant to the user's request."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "get_cart",
+            "arguments": {
+              "customer_id": "shop_004"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 6,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "98a5da37f67e575b9ba8240b17630ffec18e092ea2689ebec34b19fce4f0bec0",
+        "pending_items": [
+          "cm_f5414ca9e2eb",
+          "cm_0ca5c2120704",
+          "cm_abcdf1d4bbf6",
+          "cm_46f4793f64e5",
+          "cm_435fb35284b1",
+          "cm_a01fc678c6d3",
+          "cm_6e32c5083142",
+          "cm_2de1f12397b0",
+          "cm_2606450632ff",
+          "cm_2abb6e50b023",
+          "cm_58e9dd3e0239",
+          "cm_e7634be7d5ae",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6",
+          "cm_1418cc03a38c",
+          "cm_6ac8384ab89d",
+          "cm_b7f41cb99cd2",
+          "cm_18e13b108a82",
+          "cm_92ec3a4e19f5",
+          "cm_f9dc9bc5fcef",
+          "cm_193e041539c7",
+          "cm_e583a62e57ce"
+        ],
+        "injected_items": [
+          "cm_1418cc03a38c",
+          "cm_18e13b108a82",
+          "cm_193e041539c7",
+          "cm_6ac8384ab89d",
+          "cm_770131dd1f94",
+          "cm_86f21918ceb6"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_customer_account when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by validate_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by apply_promo when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_cart when relevant to the user's request."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      }
+    ],
+    "summary": {
+      "model_generations": 7,
+      "model_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "regenerations": 0,
+      "closure_injections": 5,
+      "closure_injected_tool_calls": 3
+    }
+  },
+  "token_usage": {
+    "input_tokens": 35339,
+    "cached_input_tokens": 0,
+    "output_tokens": 881,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 36220,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 35339,
+  "cached_input_tokens": 0,
+  "output_tokens": 881,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 36220,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-3001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-3007",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_004",
+          "product_id": "SP-3008",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "total": {
+            "old": 0,
+            "new": 340
+          },
+          "applied_promo_codes": {
+            "old": [],
+            "new": [
+              "KITCHEN10"
+            ]
+          },
+          "discount_amount": {
+            "old": 0,
+            "new": 37
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 377
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001",
+              "CI-0002",
+              "CI-0003"
+            ]
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "applied_promo_codes",
+      "expected_value": [
+        "KITCHEN10"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "discount_amount",
+      "expected_value": 37
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 377
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 340
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3007",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3008",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.1,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 17,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 5,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

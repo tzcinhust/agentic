@@ -1,0 +1,985 @@
+{
+  "task_id": "16-welcome_discount_proactive",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** A first-time Standard customer (shop_002) adds SP-3001 PowerBlend Pro Blender ($229). Per `welcome_discount` policy, first-time customers qualify for 5% off (~$11 here). No promo codes in env — welcome is the only discount in play and it's profile-driven.\n\n**Challenge:** Pitfall is silent completion — agent adds the blender, summarizes cart at $229, and never mentions welcome eligibility. Customer is a clean first-time buyer (is_first_time=True, empty purchase_history) and does NOT ask about discounts. Correct: agent calls get_customer_account, sees first-time flag, and proactively cites the 5% welcome discount with specific dollar savings at cart summary. Tests whether the agent treats policy-driven discounts as proactively-disclosable, not just promo-code-triggered.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_customer_profile",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account for shop_002 to determine first-time status before discussing pricing/discounts.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "No get_customer_account call for shop_002 is present before pricing/discount discussion."
+    },
+    {
+      "id": "disclosed_welcome_eligibility",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned that the customer qualifies for the welcome (first-time) discount, WITHOUT the customer asking. The disclosure must include either the percentage (5%) or the dollar amount (~$11). Generic 'we have discounts available' or 'you qualify for promotions' fails — the specific welcome discount must be named.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant mentioned only adding the blender at $229 with no gift wrap; it did not proactively mention the welcome/first-time discount or 5%/$11 savings."
+    },
+    {
+      "id": "correct_product_added",
+      "kind": "must",
+      "requirement": "Agent added SP-3001 PowerBlend Pro Blender to the cart, quantity 1, no gift wrap.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "add_to_cart was called for customer shop_002 with product SP-3001, quantity 1, and gift_wrap false; result shows the blender was added."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "No set_shipping_option or redeem_loyalty_points tool calls appear in the conversation."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 2,
+  "ux_score": 2.4,
+  "ux_reasoning": "The agent handled the cart add after the user clarified no gift wrap, but it never surfaced the policy-driven welcome discount despite the customer being first-time eligible. That is a material control/consent issue because the user was left with a cart total that omitted an important expected savings and no proactive choice about it. The interaction also required an extra turn to restate gift-wrap preference, which was avoidable given the user’s initial request and the available account context. Responses were fairly concise and readable, so density was decent, but the omitted discount disclosure dominated the UX.",
+  "turns": 2,
+  "tool_calls": 5,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "I found the PowerBlend Pro Blender at $229, and it’s in stock.\n\nBefore I add it: would you like gift wrap? It’s available for this item. If yes, I can add it wrapped; otherwise I’ll add it without gift wrap.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add requested specific product to cart; need to verify product, resolve variants if any, then add for customer shop_002."
+          },
+          "result": [
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies",
+            "Workflow: Add requested product/variant to cart and confirm cart\nUse when: User wants a specific product added to cart, possibly with quantity, variant attributes, and gift-wrap preference, and the product can be identified via catalog search.\nVerify first:\n- Identify the intended product from catalog results.\n- Verify variant requirements and whether a variant_id is needed.\n- If the user requested a specific quantity or variant, verify stock/availability from search and variant data before writing when possible.\nProcedure:\n1. search_products(query, optional filters)\n2. get_variants(product_id)\n3. add_to_cart(customer_id, product_id, variant_id or null, quantity, gift_wrap)\n4. get_cart(customer_id)\nBranches:\n- If initial search returns no match, refine and repeat search_products with relaxed or adjusted filters; if still no match, stop with a no-write outcome.\n- If get_variants shows no variants, use null variant_id in add_to_cart.\n- If the requested variant exists and appears available, add the requested quantity; then use get_cart to confirm resulting cart contents and totals.\n- If the user only asked for availability and not to add unless conditions are met, stop before add_to_cart when those conditions are not satisfied.\nAvoid:\n- Do not invent product_ids, variant_ids, prices, or stock counts.\n- Do not skip get_variants when the product may have variants.\n- Do not claim cart totals without reading get_cart after a write.\n- Do not add a partial quantity when the user explicitly forbids partial fulfillment.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: search_products -> search_products -> search_products -> get_variants\n- 1x: search_products -> get_variants -> add_to_cart -> get_policies -> get_customer_account -> add_to_cart -> get_cart",
+            "Workflow: Search item, resolve variant, and add to cart\nUse when: User wants one or more specific products added to cart and the exact cart-ready product/variant is not yet fully resolved from the request alone.\nVerify first:\n- Identify the intended product(s) from the user's wording or provided product identifier.\n- Verify the selected catalog item exists via search_products or get_product_details.\n- Check whether a variant_id is required via get_variants.\n- If the user mentioned compatibility-sensitive context, verify with get_product_details and optionally check_compatibility before adding.\nProcedure:\n1. search_products(query=<requested item>, category=<if known>, in_stock_only=<if user requires>)\n2. get_variants(product_id=<selected product>)\n3. get_product_details(product_id=<selected product>)\n4. check_compatibility(device_name=<user device>, product_id=<selected product>)\n5. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<resolved variant or null>, quantity=<requested qty>, gift_wrap=<requested flag>)\nBranches:\n- If the user provides an exact product_id and intent is clear, you may skip search_products and start with get_variants or get_product_details.\n- If get_variants shows no variants, add with variant_id=null.\n- If variants exist and the user did not specify one, do not add yet; ask for the needed option.\n- If product details show out of stock, do not assume it is addable; check get_policies(topic=<out_of_stock/backorder>) and offer the available no-write option if policy/details allow.\n- If compatibility is relevant and check_compatibility indicates incompatible or unknown, warn the user; if they explicitly still want it, add_to_cart is allowed.\n- If the user requests multiple items, repeat the resolve-and-add sequence per item.\nAvoid:\n- Do not invent variant choices or compatibility outcomes.\n- Do not promise restock, backorder, deposits, or timelines without get_product_details/get_policies confirmation.\n- Do not treat a search hit as sufficient when a variant may be required.\n- Do not block an explicit override solely because of a compatibility warning if the tool-confirmed item can still be added.\nProcess support: "
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "PowerBlend Pro Blender",
+            "category": "kitchen",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "base_price": 229,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "name": "PowerBlend Pro Blender",
+            "category": "kitchen",
+            "subcategory": "blender",
+            "brand": "PowerBlend",
+            "price": 229,
+            "rating": 4.6,
+            "review_count": 1580,
+            "description": "Pro-grade countertop blender.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No gift wrap, please—just add the blender to my cart."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — added 1 PowerBlend Pro Blender to your cart at $229, no gift wrap.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 229,
+            "cart_subtotal": 229,
+            "cart_total": 229
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "ProcessWorkflowMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v1",
+    "mode": "structured",
+    "initial_items": [
+      {
+        "id": "cm_25ff82c2aa08",
+        "type": "user_confirmation_choice",
+        "description": "If the user wants to choose after reviewing options, present options first and wait; no write outcome.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_4de22dc2cad6",
+        "type": "comparison",
+        "description": "If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_80dd425b5ba5",
+        "type": "cost_amount_reporting",
+        "description": "If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_54fc7b773d62",
+        "type": "cost_amount_reporting",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b85ff1877803",
+        "type": "proactive_disclosure",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_2b7e1e0e1e9e",
+        "type": "boundary_must_not",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_46dd1180ea38",
+        "type": "cost_amount_reporting",
+        "description": "If promotions are relevant to checkout readiness, get_promotions can be used for informational purposes, but shipping availability/cost should still come from get_shipping_options and cart totals from write results/get_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_11ec06c27d9c",
+        "type": "boundary_must_not",
+        "description": "Do not infer free shipping eligibility without get_shipping_options.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_090f5cc230cb",
+        "type": "user_confirmation_choice",
+        "description": "Do not preserve an old shipping choice if the user clearly requests a different one.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_4a25d7594842",
+        "type": "boundary_must_not",
+        "description": "Do not preserve an old shipping choice if the user clearly requests a different one.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_58ddd770599e",
+        "type": "cost_amount_reporting",
+        "description": "Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_682e8e0c251f",
+        "type": "boundary_must_not",
+        "description": "Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      }
+    ],
+    "static_requirements": [],
+    "final_items": [
+      {
+        "id": "cm_25ff82c2aa08",
+        "type": "user_confirmation_choice",
+        "description": "If the user wants to choose after reviewing options, present options first and wait; no write outcome.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_4de22dc2cad6",
+        "type": "comparison",
+        "description": "If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_80dd425b5ba5",
+        "type": "cost_amount_reporting",
+        "description": "If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_54fc7b773d62",
+        "type": "cost_amount_reporting",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_b85ff1877803",
+        "type": "proactive_disclosure",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_2b7e1e0e1e9e",
+        "type": "boundary_must_not",
+        "description": "If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_46dd1180ea38",
+        "type": "cost_amount_reporting",
+        "description": "If promotions are relevant to checkout readiness, get_promotions can be used for informational purposes, but shipping availability/cost should still come from get_shipping_options and cart totals from write results/get_cart.",
+        "source": "workflow:rank1:branches",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "branches"
+          }
+        ]
+      },
+      {
+        "id": "cm_11ec06c27d9c",
+        "type": "boundary_must_not",
+        "description": "Do not infer free shipping eligibility without get_shipping_options.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_090f5cc230cb",
+        "type": "user_confirmation_choice",
+        "description": "Do not preserve an old shipping choice if the user clearly requests a different one.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_4a25d7594842",
+        "type": "boundary_must_not",
+        "description": "Do not preserve an old shipping choice if the user clearly requests a different one.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_58ddd770599e",
+        "type": "cost_amount_reporting",
+        "description": "Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_682e8e0c251f",
+        "type": "boundary_must_not",
+        "description": "Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+        "source": "workflow:rank1:avoid",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "learned_workflow",
+            "rank": 1,
+            "section": "avoid"
+          }
+        ]
+      },
+      {
+        "id": "cm_9e65cd95c509",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by search_products when relevant to the user's request.",
+        "source": "tool:search_products:1",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 1,
+            "tool": "search_products",
+            "success": true,
+            "status": "",
+            "fields": [
+              "price",
+              "total_found"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_6cc6a4779ec3",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_variants when relevant to the user's request.",
+        "source": "tool:get_variants:2",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "tool": "get_variants",
+            "success": true,
+            "status": "",
+            "fields": [
+              "base_price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_85aaf60ab641",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by get_product_details when relevant to the user's request.",
+        "source": "tool:get_product_details:3",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "tool": "get_product_details",
+            "success": true,
+            "status": "",
+            "fields": [
+              "previous_price",
+              "price"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cm_80c07288e767",
+        "type": "cost_amount_reporting",
+        "description": "Report material amounts returned by add_to_cart when relevant to the user's request.",
+        "source": "tool:add_to_cart:4",
+        "status": "pending",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "tool": "add_to_cart",
+            "success": true,
+            "status": "added",
+            "fields": [
+              "cart_subtotal",
+              "cart_total",
+              "unit_price"
+            ]
+          }
+        ]
+      }
+    ],
+    "final_pending_items": [
+      "cm_25ff82c2aa08",
+      "cm_4de22dc2cad6",
+      "cm_80dd425b5ba5",
+      "cm_54fc7b773d62",
+      "cm_b85ff1877803",
+      "cm_2b7e1e0e1e9e",
+      "cm_46dd1180ea38",
+      "cm_11ec06c27d9c",
+      "cm_090f5cc230cb",
+      "cm_4a25d7594842",
+      "cm_58ddd770599e",
+      "cm_682e8e0c251f",
+      "cm_9e65cd95c509",
+      "cm_6cc6a4779ec3",
+      "cm_85aaf60ab641",
+      "cm_80c07288e767"
+    ],
+    "final_satisfied_items": [],
+    "final_invalidated_items": [],
+    "generations": [
+      {
+        "generation_index": 0,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 1,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "eead1ddfe40718e184ed4cda6bc82d38851727b8514aa79375bb73d4696fe0ef",
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f"
+        ],
+        "injected_items": [
+          "cm_11ec06c27d9c",
+          "cm_2b7e1e0e1e9e",
+          "cm_4a25d7594842",
+          "cm_682e8e0c251f",
+          "cm_4de22dc2cad6",
+          "cm_46dd1180ea38"
+        ],
+        "injected_requirements": [
+          "[boundary_must_not] Do not infer free shipping eligibility without get_shipping_options.",
+          "[boundary_must_not] If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+          "[boundary_must_not] Do not preserve an old shipping choice if the user clearly requests a different one.",
+          "[boundary_must_not] Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+          "[comparison] If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one.",
+          "[cost_amount_reporting] If promotions are relevant to checkout readiness, get_promotions can be used for informational purposes, but shipping availability/cost should still come from get_shipping_options and cart totals from write results/get_cart."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "search_products",
+            "arguments": {
+              "query": "PowerBlend Pro Blender",
+              "category": "kitchen",
+              "in_stock_only": true,
+              "sort_by": "relevance"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "6aa660857f12e468305a37cda50cd7b0b1dffb1a9aa3e20e0fca4d42436a062d",
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f",
+          "cm_9e65cd95c509"
+        ],
+        "injected_items": [
+          "cm_9e65cd95c509",
+          "cm_11ec06c27d9c",
+          "cm_2b7e1e0e1e9e",
+          "cm_4a25d7594842",
+          "cm_682e8e0c251f",
+          "cm_4de22dc2cad6"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[boundary_must_not] Do not infer free shipping eligibility without get_shipping_options.",
+          "[boundary_must_not] If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+          "[boundary_must_not] Do not preserve an old shipping choice if the user clearly requests a different one.",
+          "[boundary_must_not] Do not claim checkout total until confirmed by set_shipping_option or get_cart.",
+          "[comparison] If multiple shipping options satisfy the user's deadline or price preference, ask which one to apply unless they already named one."
+        ],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": [
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          },
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "87c79470086753ce6edb0084cde97187b38f8d886102040497a360d0daef3ce8",
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f",
+          "cm_9e65cd95c509",
+          "cm_6cc6a4779ec3",
+          "cm_85aaf60ab641"
+        ],
+        "injected_items": [
+          "cm_6cc6a4779ec3",
+          "cm_85aaf60ab641",
+          "cm_9e65cd95c509",
+          "cm_11ec06c27d9c",
+          "cm_2b7e1e0e1e9e",
+          "cm_4a25d7594842"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[boundary_must_not] Do not infer free shipping eligibility without get_shipping_options.",
+          "[boundary_must_not] If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead.",
+          "[boundary_must_not] Do not preserve an old shipping choice if the user clearly requests a different one."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 4,
+        "model_calls_for_generation": 1,
+        "closure_injected": false,
+        "closure_gate_reason": null,
+        "closure_prompt_sha256": null,
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f",
+          "cm_9e65cd95c509",
+          "cm_6cc6a4779ec3",
+          "cm_85aaf60ab641"
+        ],
+        "injected_items": [],
+        "injected_requirements": [],
+        "output_type": "tool_call",
+        "tool_calls_after_closure": []
+      },
+      {
+        "generation_index": 5,
+        "model_calls_for_generation": 1,
+        "closure_injected": true,
+        "closure_gate_reason": "post_tool_with_valid_evidence",
+        "closure_prompt_sha256": "d05bb2a28a4d7688f8c5fa30686bce98a6074823a63d2fcda158f21faa35b470",
+        "pending_items": [
+          "cm_25ff82c2aa08",
+          "cm_4de22dc2cad6",
+          "cm_80dd425b5ba5",
+          "cm_54fc7b773d62",
+          "cm_b85ff1877803",
+          "cm_2b7e1e0e1e9e",
+          "cm_46dd1180ea38",
+          "cm_11ec06c27d9c",
+          "cm_090f5cc230cb",
+          "cm_4a25d7594842",
+          "cm_58ddd770599e",
+          "cm_682e8e0c251f",
+          "cm_9e65cd95c509",
+          "cm_6cc6a4779ec3",
+          "cm_85aaf60ab641",
+          "cm_80c07288e767"
+        ],
+        "injected_items": [
+          "cm_6cc6a4779ec3",
+          "cm_80c07288e767",
+          "cm_85aaf60ab641",
+          "cm_9e65cd95c509",
+          "cm_11ec06c27d9c",
+          "cm_2b7e1e0e1e9e"
+        ],
+        "injected_requirements": [
+          "[cost_amount_reporting] Report material amounts returned by get_variants when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by add_to_cart when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by get_product_details when relevant to the user's request.",
+          "[cost_amount_reporting] Report material amounts returned by search_products when relevant to the user's request.",
+          "[boundary_must_not] Do not infer free shipping eligibility without get_shipping_options.",
+          "[boundary_must_not] If no available option meets the requested delivery window or price constraint, do not set one automatically; report the valid options instead."
+        ],
+        "output_type": "final_text",
+        "tool_calls_after_closure": []
+      }
+    ],
+    "summary": {
+      "model_generations": 6,
+      "model_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "regenerations": 0,
+      "closure_injections": 4,
+      "closure_injected_tool_calls": 2
+    }
+  },
+  "token_usage": {
+    "input_tokens": 29230,
+    "cached_input_tokens": 0,
+    "output_tokens": 259,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 29489,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 29230,
+  "cached_input_tokens": 0,
+  "output_tokens": 259,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 29489,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_002",
+          "product_id": "SP-3001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_002": {
+          "total": {
+            "old": 0,
+            "new": 229
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 229
+          },
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "subtotal",
+      "expected_value": 229
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "total",
+      "expected_value": 229
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_002",
+        "product_id": "SP-3001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 2.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 5,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
