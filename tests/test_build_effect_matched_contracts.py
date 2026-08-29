@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,7 @@ from scripts.build_effect_matched_contracts import (
     analyze_pair_availability,
     build_artifact,
     build_contrast_set,
+    induce_one,
     load_traces,
     merge_contracts,
     normalize_payload,
@@ -269,13 +271,13 @@ def test_marker_only_terminal_model_label_is_deterministically_protocol_only() -
     assert len(normalize_payload(valid_payload(), contrast)) == 1
 
 
-def test_protocol_only_label_cannot_hide_semantic_terminal_feedback() -> None:
+def test_protocol_only_label_with_semantic_feedback_abstains() -> None:
     contrast = build_contrast_set(trace_with_same_effect())
     payload = valid_payload()
     payload["terminal_assessment"]["label"] = "protocol_only"
 
-    with pytest.raises(ValueError, match="semantic user feedback"):
-        normalize_payload(payload, contrast)
+    assert resolved_terminal_label(payload, contrast) == "ambiguous"
+    assert normalize_payload(payload, contrast) == []
 
 
 def test_positive_terminal_label_cannot_hide_explicit_ordering_violation() -> None:
@@ -307,6 +309,43 @@ def test_contract_must_be_observably_discharged_at_terminal_boundary() -> None:
 
     with pytest.raises(ValueError, match="machine-checkable"):
         normalize_payload(valid_payload(), contrast)
+
+
+def test_unrepresentable_contract_is_cached_as_auditable_abstention(tmp_path) -> None:
+    contrast = build_contrast_set(trace_with_same_effect())
+    payload = valid_payload()
+    payload["contracts"][0]["obligations"][0][
+        "requirement"
+    ] = "Tell BK-TRAIN that the exact fee is $50."
+
+    class Completions:
+        def __init__(self):
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=json.dumps(payload))
+                    )
+                ]
+            )
+
+    completions = Completions()
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    result = induce_one(client, "model", contrast, tmp_path, retries=1)
+
+    assert result.contracts == ()
+    assert result.abstention_reason == "unrepresentable_machine_checkable_contract"
+    assert completions.calls[0]["response_format"] == {"type": "json_object"}
+    cache = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
+    assert cache["status"] == "abstained"
+
+    cached = induce_one(
+        SimpleNamespace(chat=None), "model", contrast, tmp_path, retries=1
+    )
+    assert cached == result
 
 
 def test_terminal_assessment_is_required() -> None:

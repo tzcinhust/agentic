@@ -210,6 +210,11 @@ class ContrastSet:
 class InductionResult:
     terminal_label: str
     contracts: tuple[dict[str, Any], ...]
+    abstention_reason: str | None = None
+
+
+class UnrepresentableContractError(ValueError):
+    """A repair signal exists but cannot be encoded by the safe contract DSL."""
 
 
 def load_traces(root: Path, limit: int | None = None) -> list[TrainTrace]:
@@ -1118,7 +1123,12 @@ def resolved_terminal_label(payload: dict[str, Any], contrast: ContrastSet) -> s
     if not terminal_feedback:
         return "protocol_only"
     if terminal_label == "protocol_only":
-        raise ValueError("protocol_only terminal contains semantic user feedback")
+        # The model cannot erase semantic feedback by calling it protocol-only.
+        # Without an independently reliable acceptance label, abstain instead of
+        # turning courtesy or conditional language into a positive anchor.
+        if ADVERSE_TERMINAL.search(terminal_feedback):
+            return "qualified_or_adverse"
+        return "ambiguous"
     if terminal_label in {"explicit_acceptance", "protocol_only"} and (
         ADVERSE_TERMINAL.search(terminal_feedback)
     ):
@@ -1154,10 +1164,19 @@ def normalize_payload(
         if (item := normalize_contract(raw, contrast, labels, index)) is not None
     ]
     if "closure_repair" in labels.values() and not normalized:
-        raise ValueError(
+        raise UnrepresentableContractError(
             "closure-repair candidates produced no valid machine-checkable contract"
         )
     return normalized
+
+
+def write_induction_cache(cache_path: Path, payload: dict[str, Any]) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_temporary = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    cache_temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    cache_temporary.replace(cache_path)
 
 
 def induce_one(
@@ -1175,6 +1194,14 @@ def induce_one(
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             if cached.get("prompt_version") == PROMPT_VERSION:
                 payload = cached.get("payload", {})
+                if cached.get("status") == "abstained":
+                    return InductionResult(
+                        terminal_label=resolved_terminal_label(payload, contrast),
+                        contracts=(),
+                        abstention_reason=str(
+                            cached.get("abstention_reason", "unrepresentable_contract")
+                        ),
+                    )
                 return InductionResult(
                     terminal_label=resolved_terminal_label(payload, contrast),
                     contracts=tuple(normalize_payload(payload, contrast)),
@@ -1184,6 +1211,9 @@ def induce_one(
             # atomically replace it.
             pass
     last_error: Exception | None = None
+    last_payload: dict[str, Any] | None = None
+    abstention_payload: dict[str, Any] | None = None
+    abstention_error: UnrepresentableContractError | None = None
     for attempt in range(retries):
         try:
             prompt = induction_prompt(contrast)
@@ -1198,36 +1228,58 @@ def induce_one(
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
                 temperature=0,
                 max_tokens=5000,
             )
             payload = parse_json_object(response.choices[0].message.content or "")
+            last_payload = payload
             contracts = normalize_payload(payload, contrast)
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_temporary = cache_path.with_suffix(cache_path.suffix + ".tmp")
-            cache_temporary.write_text(
-                json.dumps(
-                    {
-                        "prompt_version": PROMPT_VERSION,
-                        "model": model,
-                        "source_sha256": contrast.trace.source_sha256,
-                        "contrast_id": contrast.id,
-                        "payload": payload,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
+            write_induction_cache(
+                cache_path,
+                {
+                    "status": "accepted",
+                    "prompt_version": PROMPT_VERSION,
+                    "model": model,
+                    "source_sha256": contrast.trace.source_sha256,
+                    "contrast_id": contrast.id,
+                    "payload": payload,
+                },
             )
-            cache_temporary.replace(cache_path)
             return InductionResult(
                 terminal_label=resolved_terminal_label(payload, contrast),
                 contracts=tuple(contracts),
             )
         except Exception as error:
             last_error = error
+            if (
+                isinstance(error, UnrepresentableContractError)
+                and last_payload is not None
+            ):
+                abstention_payload = last_payload
+                abstention_error = error
             if attempt + 1 < retries:
                 time.sleep(min(2 ** attempt, 8))
+    if abstention_payload is not None and abstention_error is not None:
+        reason = "unrepresentable_machine_checkable_contract"
+        write_induction_cache(
+            cache_path,
+            {
+                "status": "abstained",
+                "abstention_reason": reason,
+                "validation_error": compact(abstention_error, 500),
+                "prompt_version": PROMPT_VERSION,
+                "model": model,
+                "source_sha256": contrast.trace.source_sha256,
+                "contrast_id": contrast.id,
+                "payload": abstention_payload,
+            },
+        )
+        return InductionResult(
+            terminal_label=resolved_terminal_label(abstention_payload, contrast),
+            contracts=(),
+            abstention_reason=reason,
+        )
     raise RuntimeError(
         f"contrast induction failed for {contrast.trace.domain}/{contrast.trace.task_id}: {last_error}"
     )
@@ -1776,6 +1828,7 @@ def build_artifact(
     contrast_count: int | None = None,
     candidate_checkpoint_count: int | None = None,
     terminal_assessment_counts: dict[str, int] | None = None,
+    induction_abstention_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     train_candidates = [
         item
@@ -1832,6 +1885,7 @@ def build_artifact(
             "effect_match": "equal cumulative realized-mutation fingerprint at two checkpoints within one trajectory",
             "structural_constants": "typed numeric selectors observed in non-failed tool results and supported by distinct train tasks",
             "terminal_assessments": dict(terminal_assessment_counts or {}),
+            "induction_abstentions": dict(induction_abstention_counts or {}),
             "terminal_contract_discharge_required": True,
         },
         "split": {
@@ -1857,6 +1911,7 @@ def build_artifact(
             "effect_matched_trajectories": contrast_count,
             "candidate_checkpoints": candidate_checkpoint_count,
             "raw_contracts": len(raw_contracts),
+            "induction_abstentions": sum((induction_abstention_counts or {}).values()),
             "train_candidates": len(train_candidates),
             "validation_candidates": len(validation_candidates),
             "merged_contracts": len(contracts),
@@ -1992,6 +2047,7 @@ def main() -> None:
         )
     raw_contracts: list[dict[str, Any]] = []
     terminal_assessment_counts: Counter[str] = Counter()
+    induction_abstention_counts: Counter[str] = Counter()
     failures: list[str] = []
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
         futures = {
@@ -2006,6 +2062,8 @@ def main() -> None:
                 result = future.result()
                 raw_contracts.extend(result.contracts)
                 terminal_assessment_counts[result.terminal_label] += 1
+                if result.abstention_reason:
+                    induction_abstention_counts[result.abstention_reason] += 1
             except Exception as error:
                 failure = f"{contrast.trace.domain}/{contrast.trace.task_id}: {error}"
                 failures.append(failure)
@@ -2018,7 +2076,9 @@ def main() -> None:
             if completed % 10 == 0 or completed == len(futures):
                 print(
                     f"induced {completed}/{len(futures)} contrasts; "
-                    f"contracts={len(raw_contracts)} failures={len(failures)}",
+                    f"contracts={len(raw_contracts)} "
+                    f"abstentions={sum(induction_abstention_counts.values())} "
+                    f"failures={len(failures)}",
                     flush=True,
                 )
     if failures:
@@ -2043,6 +2103,7 @@ def main() -> None:
         contrast_count=len(contrasts),
         candidate_checkpoint_count=sum(len(item.candidates) for item in contrasts),
         terminal_assessment_counts=dict(terminal_assessment_counts),
+        induction_abstention_counts=dict(induction_abstention_counts),
     )
     if artifact["validation"]["coverage"] < args.min_validation_coverage:
         raise RuntimeError(
