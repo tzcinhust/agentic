@@ -7,10 +7,13 @@ task summaries, hidden task requirements, state scores, or test trajectories.
 from __future__ import annotations
 
 import argparse
+import copy
+import fnmatch
 import hashlib
 import json
 import os
 import re
+import statistics
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,13 +29,14 @@ from agents.effect_matched_contracts import (
     compact,
     effect_signatures,
     normalize_retrieval_query,
+    result_failed,
     stable_hash,
     tokens,
     tool_events,
 )
 
 
-PROMPT_VERSION = "effect_matched_contrastive_closure_v3_20260830"
+PROMPT_VERSION = "effect_matched_contrastive_closure_v4_20260830"
 DEADLINES = {"before_claim", "before_action", "before_final"}
 TYPES = {
     "comparison",
@@ -321,6 +325,112 @@ def build_contrast_set(
     return ContrastSet(trace=trace, terminal=terminal, candidates=tuple(selected))
 
 
+def _distribution(values: list[int]) -> dict[str, float | int]:
+    if not values:
+        return {"min": 0, "median": 0.0, "mean": 0.0, "max": 0}
+    return {
+        "min": min(values),
+        "median": round(float(statistics.median(values)), 4),
+        "mean": round(float(statistics.mean(values)), 4),
+        "max": max(values),
+    }
+
+
+def analyze_pair_availability(
+    traces: list[TrainTrace],
+    *,
+    terminal_marker: str = "[TASK_DONE]",
+    max_candidates: int = 8,
+    validation_percent: int = 20,
+) -> dict[str, Any]:
+    domains: dict[str, dict[str, Any]] = {}
+    selected_counts: list[int] = []
+    uncapped_counts: list[int] = []
+    terminal_trajectories = 0
+    marker_only_terminals = 0
+    pairable_train = 0
+    pairable_validation = 0
+
+    for trace in traces:
+        domain = domains.setdefault(
+            trace.domain,
+            {
+                "trajectories": 0,
+                "terminal_trajectories": 0,
+                "pairable_trajectories": 0,
+                "selected_candidate_checkpoints": 0,
+                "uncapped_candidate_checkpoints": 0,
+                "marker_only_terminals": 0,
+            },
+        )
+        domain["trajectories"] += 1
+        points = checkpoints(trace, terminal_marker)
+        terminal = next((item for item in reversed(points) if item.terminal), None)
+        if terminal is None or not terminal.assistant_text:
+            continue
+        terminal_trajectories += 1
+        domain["terminal_trajectories"] += 1
+        semantic_feedback = terminal.following_user_text.replace(
+            terminal_marker, ""
+        ).strip()
+        if not semantic_feedback:
+            marker_only_terminals += 1
+            domain["marker_only_terminals"] += 1
+        eligible = [
+            item
+            for item in points
+            if item.assistant_index < terminal.assistant_index
+            and not item.terminal
+            and item.assistant_text
+            and item.following_user_text
+            and item.effect_signature == terminal.effect_signature
+            and item.assistant_text != terminal.assistant_text
+        ]
+        if not eligible:
+            continue
+        contrast = build_contrast_set(
+            trace, terminal_marker=terminal_marker, max_candidates=max_candidates,
+        )
+        if contrast is None:
+            continue
+        selected = len(contrast.candidates)
+        uncapped = len(eligible)
+        selected_counts.append(selected)
+        uncapped_counts.append(uncapped)
+        domain["pairable_trajectories"] += 1
+        domain["selected_candidate_checkpoints"] += selected
+        domain["uncapped_candidate_checkpoints"] += uncapped
+        if split_is_validation(trace.task_id, validation_percent):
+            pairable_validation += 1
+        else:
+            pairable_train += 1
+
+    pairable = len(selected_counts)
+    return {
+        "mode": "analyze_only",
+        "effect_definition": "equal cumulative realized-mutation fingerprint within one trajectory",
+        "trajectories": len(traces),
+        "terminal_trajectories": terminal_trajectories,
+        "marker_only_terminals": marker_only_terminals,
+        "marker_only_terminal_rate": round(
+            marker_only_terminals / max(terminal_trajectories, 1), 4
+        ),
+        "pairable_trajectories": pairable,
+        "pairable_trajectory_rate": round(pairable / max(len(traces), 1), 4),
+        "selected_candidate_checkpoints": sum(selected_counts),
+        "uncapped_candidate_checkpoints": sum(uncapped_counts),
+        "selected_candidates_per_pairable_trajectory": _distribution(selected_counts),
+        "uncapped_candidates_per_pairable_trajectory": _distribution(uncapped_counts),
+        "split": {
+            "validation_percent": validation_percent,
+            "pairable_train_trajectories": pairable_train,
+            "pairable_validation_trajectories": pairable_validation,
+        },
+        "domains": {key: domains[key] for key in sorted(domains)},
+        "api_calls": 0,
+    }
+
+
 def induction_prompt(contrast: ContrastSet) -> str:
     selector_schema = {
         "source": "user_text|assistant_text|tool_argument|tool_result",
@@ -330,6 +440,11 @@ def induction_prompt(contrast: ContrastSet) -> str:
         "quantifier": "any|all|consistent matching facts",
         "outcome": "any|success|preview|failure (tool sources only)",
         "value": "optional generalized value",
+        "value_kind": "structural_constant only for a numeric policy threshold",
+        "value_evidence": {
+            "tool": "non-failed authoritative tool-result glob containing the threshold",
+            "path": "exact/glob result path containing the same numeric threshold",
+        },
         "values": ["optional generalized alternatives"],
     }
     schema = {
@@ -402,7 +517,8 @@ def induction_prompt(contrast: ContrastSet) -> str:
     return f"""Learn latent interaction-closure contracts from one effect-matched contrast.
 
 The terminal response and every candidate below have the exact same cumulative successful-mutation signature.
-Therefore their external execution history is conservatively matched.  [TASK_DONE] means only that the
+Therefore their cumulative realized mutation effects are conservatively matched; read/evidence histories may
+differ.  [TASK_DONE] means only that the
 simulated conversation terminated; it is NOT proof that the task succeeded.  First classify terminal feedback:
 - explicit_acceptance: unqualified, semantically explicit satisfaction;
 - protocol_only: the marker carries no semantic judgment;
@@ -430,7 +546,11 @@ evidence and response requirements.  Every communication obligation must include
 authoritative fields it must communicate; a generic causal/comparison marker alone is not discharge evidence.
 Use boolean/profile flags for applicability, not as mention_evidence values; mention_evidence must select the
 actual user-visible amount, status, identifier, policy reason, benefit, or consequence.
-Do not emit a generic amount/reporting obligation merely because a tool returned a number.
+Do not emit a generic amount/reporting obligation merely because a tool returned a number.  A numeric selector
+value is allowed only for a recurring structural policy threshold, must be emitted as a JSON number with
+value_kind=structural_constant, and value_evidence must identify the authoritative non-failed tool-result path
+where that same policy constant occurs in this trace.  Never copy an entity-specific price, refund, date,
+duration, identifier, or answer as a threshold.
 Failed tool events do not ground an obligation by default.  Set selector outcome=failure only when the learned
 contract specifically concerns communicating or resolving that failure.  Preview evidence may ground projected
 consequences, but never counts as executed state.  Action lifecycle is awaiting_confirmation ->
@@ -483,6 +603,50 @@ def unsafe_runtime_text(text: str) -> bool:
         or NUMERIC_LITERAL.search(text)
         or PLANNING_DIRECTIVE.search(text)
         or HARNESS_MARKER.search(text)
+    )
+
+
+def _numeric_scalar(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _iter_scalars(value: Any, prefix: str = ""):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            yield from _iter_scalars(child, path)
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            path = f"{prefix}.{index}" if prefix else str(index)
+            yield from _iter_scalars(child, path)
+    else:
+        yield prefix, value
+
+
+def _normalize_constant_evidence(raw: Any) -> dict[str, str] | None:
+    if not isinstance(raw, dict):
+        return None
+    tool = str(raw.get("tool", "") or "").casefold()
+    path = str(raw.get("path", "") or "").replace("[*]", ".*")
+    path = re.sub(r"\[(\d+)\]", r".\1", path)
+    if not re.fullmatch(r"[a-z0-9_*?.$-]{1,160}", tool) or not re.fullmatch(
+        r"[A-Za-z0-9_*?.$\[\]-]{1,240}", path
+    ):
+        return None
+    return {"source": "tool_result", "tool": tool, "path": path}
+
+
+def _trace_observes_structural_value(
+    trace: TrainTrace, value: int | float, evidence: dict[str, str]
+) -> bool:
+    target = float(value)
+    return any(
+        _numeric_scalar(observed) and float(observed) == target
+        for event in tool_events(trace.conversation)
+        if not result_failed(event.result)
+        and fnmatch.fnmatchcase(event.name.casefold(), evidence["tool"])
+        for path, observed in _iter_scalars(event.result)
+        if fnmatch.fnmatchcase(path.casefold(), evidence["path"].casefold())
     )
 
 
@@ -547,7 +711,9 @@ def contains_trace_literal(contract: dict[str, Any], trace: TrainTrace) -> bool:
     return any(literal in exposed for literal in trace_specific_literals(trace))
 
 
-def normalize_selector(raw: Any) -> dict[str, Any] | None:
+def normalize_selector(
+    raw: Any, *, trace: TrainTrace | None = None
+) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     source = str(raw.get("source", "tool_result"))
@@ -582,14 +748,34 @@ def normalize_selector(raw: Any) -> dict[str, Any] | None:
         output["outcome"] = outcome
     if "value" in raw:
         value = raw.get("value")
-        if isinstance(value, (dict, list)) or unsafe_runtime_text(compact(value, 180)):
+        if isinstance(value, (dict, list)):
+            return None
+        if _numeric_scalar(value):
+            constant_evidence = _normalize_constant_evidence(raw.get("value_evidence"))
+            if (
+                trace is None
+                or raw.get("value_kind") != "structural_constant"
+                or operator not in {"equals", "not_equals", "gt", "gte", "lt", "lte"}
+                or constant_evidence is None
+                or not _trace_observes_structural_value(trace, value, constant_evidence)
+            ):
+                return None
+            value = float(value)
+            if value.is_integer():
+                value = int(value)
+            output["value_kind"] = "structural_constant"
+            output["value_evidence"] = constant_evidence
+        elif unsafe_runtime_text(compact(value, 180)):
             return None
         output["value"] = value
     if isinstance(raw.get("values"), list):
         values = [
             item for item in raw["values"][:12] if not isinstance(item, (dict, list))
         ]
-        if any(unsafe_runtime_text(compact(item, 120)) for item in values):
+        if any(
+            _numeric_scalar(item) or unsafe_runtime_text(compact(item, 120))
+            for item in values
+        ):
             return None
         output["values"] = values
     if operator in {"equals", "not_equals", "contains", "gt", "gte", "lt", "lte"} and (
@@ -601,18 +787,20 @@ def normalize_selector(raw: Any) -> dict[str, Any] | None:
     return output
 
 
-def normalize_evidence_group(raw: Any) -> dict[str, Any] | None:
+def normalize_evidence_group(
+    raw: Any, *, trace: TrainTrace | None = None
+) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     description = _safe_text(raw.get("description", ""), 180)
     selectors = [
         item
         for value in raw.get("any_of", [])
-        if (item := normalize_selector(value)) is not None
+        if (item := normalize_selector(value, trace=trace)) is not None
         and item["source"] != "assistant_text"
     ]
     if not selectors and isinstance(raw.get("selector"), dict):
-        selector = normalize_selector(raw["selector"])
+        selector = normalize_selector(raw["selector"], trace=trace)
         selectors = (
             [selector] if selector and selector["source"] != "assistant_text" else []
         )
@@ -625,7 +813,9 @@ def normalize_evidence_group(raw: Any) -> dict[str, Any] | None:
     }
 
 
-def normalize_response_clause(raw: Any) -> dict[str, Any] | None:
+def normalize_response_clause(
+    raw: Any, *, trace: TrainTrace | None = None
+) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     kind = str(raw.get("kind", ""))
@@ -642,10 +832,10 @@ def normalize_response_clause(raw: Any) -> dict[str, Any] | None:
     selectors = [
         item
         for value in raw.get("selectors", [])
-        if (item := normalize_selector(value)) is not None
+        if (item := normalize_selector(value, trace=trace)) is not None
     ]
     if isinstance(raw.get("selector"), dict):
-        selector = normalize_selector(raw["selector"])
+        selector = normalize_selector(raw["selector"], trace=trace)
         if selector:
             selectors.append(selector)
     if kind == "mention_evidence":
@@ -655,7 +845,7 @@ def normalize_response_clause(raw: Any) -> dict[str, Any] | None:
     evidence_any_of = [
         item
         for value in raw.get("evidence_any_of", [])
-        if (item := normalize_selector(value)) is not None
+        if (item := normalize_selector(value, trace=trace)) is not None
         and item["source"] != "assistant_text"
     ]
     if evidence_any_of:
@@ -704,7 +894,9 @@ def normalize_response_clause(raw: Any) -> dict[str, Any] | None:
     return output
 
 
-def normalize_obligation(raw: Any, family: str, position: int) -> dict[str, Any] | None:
+def normalize_obligation(
+    raw: Any, family: str, position: int, *, trace: TrainTrace | None = None,
+) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     deadline = str(raw.get("deadline", ""))
@@ -715,12 +907,12 @@ def normalize_obligation(raw: Any, family: str, position: int) -> dict[str, Any]
     evidence = [
         item
         for value in raw.get("evidence_requirements", [])
-        if (item := normalize_evidence_group(value)) is not None
+        if (item := normalize_evidence_group(value, trace=trace)) is not None
     ]
     response = [
         item
         for value in raw.get("response_requirements", [])
-        if (item := normalize_response_clause(value)) is not None
+        if (item := normalize_response_clause(value, trace=trace)) is not None
     ]
     if not response:
         return None
@@ -818,7 +1010,7 @@ def normalize_contract(
     predicates = [
         item
         for value in applicability_raw.get("predicates", [])
-        if (item := normalize_selector(value)) is not None
+        if (item := normalize_selector(value, trace=contrast.trace)) is not None
     ]
     unknown_policy = str(applicability_raw.get("unknown_policy", "inactive"))
     if unknown_policy not in {"inactive", "require_resolution"}:
@@ -833,7 +1025,8 @@ def normalize_contract(
     obligations = [
         item
         for index, value in enumerate(raw.get("obligations", []))
-        if (item := normalize_obligation(value, family, index)) is not None
+        if (item := normalize_obligation(value, family, index, trace=contrast.trace))
+        is not None
     ]
     if not obligations:
         return None
@@ -1083,6 +1276,9 @@ def _selector_semantics(selector: dict[str, Any]) -> str:
     }
     if "value" in selector:
         payload["value"] = selector.get("value")
+    if selector.get("value_kind") == "structural_constant":
+        payload["value_kind"] = "structural_constant"
+        payload["value_evidence"] = selector.get("value_evidence")
     if values:
         payload["values"] = sorted(values, key=canonical_sort_key)
     return stable_hash(payload, prefix="selector_")
@@ -1090,6 +1286,51 @@ def _selector_semantics(selector: dict[str, Any]) -> str:
 
 def canonical_sort_key(value: Any) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, default=str)
+
+
+def _walk_selector_nodes(value: Any):
+    if isinstance(value, dict):
+        if {"source", "path", "operator"}.issubset(value):
+            yield value
+        for child in value.values():
+            yield from _walk_selector_nodes(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_selector_nodes(child)
+
+
+def _stamp_structural_constants(
+    value: dict[str, Any],
+    source_objects: list[tuple[str, dict[str, Any]]],
+    *,
+    min_support: int,
+) -> dict[str, Any] | None:
+    """Retain a numeric threshold only when it recurs across train tasks."""
+
+    required_support = max(2, min_support)
+    signatures_by_task = {
+        task_id: {
+            _selector_semantics(selector)
+            for selector in _walk_selector_nodes(source)
+            if selector.get("value_kind") == "structural_constant"
+        }
+        for task_id, source in source_objects
+    }
+    output = copy.deepcopy(value)
+    for selector in _walk_selector_nodes(output):
+        if selector.get("value_kind") != "structural_constant":
+            continue
+        signature = _selector_semantics(selector)
+        source_tasks = sorted(
+            task_id
+            for task_id, signatures in signatures_by_task.items()
+            if signature in signatures
+        )
+        if len(source_tasks) < required_support:
+            return None
+        selector["value_support"] = len(source_tasks)
+        selector["value_provenance_sha256"] = stable_hash(source_tasks)
+    return output
 
 
 def applicability_signature(contract: dict[str, Any]) -> set[str]:
@@ -1183,6 +1424,16 @@ def merge_contracts(
         if len(source_tasks) < min_support:
             continue
         representative = max(group, key=lambda item: item["confidence"])
+        applicability = _stamp_structural_constants(
+            representative["applicability"],
+            [
+                (candidate["source_task"], candidate["applicability"])
+                for candidate in group
+            ],
+            min_support=min_support,
+        )
+        if applicability is None:
+            continue
         obligation_groups: list[list[tuple[dict[str, Any], dict[str, Any]]]] = []
         for candidate in sorted(
             group, key=lambda item: item["confidence"], reverse=True
@@ -1214,7 +1465,16 @@ def merge_contracts(
                     -int(pair[1].get("priority", 50)),
                 ),
             )
-            merged_obligation = dict(selected_obligation)
+            merged_obligation = _stamp_structural_constants(
+                selected_obligation,
+                [
+                    (candidate["source_task"], obligation)
+                    for candidate, obligation in items
+                ],
+                min_support=min_support,
+            )
+            if merged_obligation is None:
+                continue
             merged_obligation["support"] = len(obligation_source_tasks)
             merged_obligation["confidence"] = round(
                 sum(float(candidate.get("confidence", 0.0)) for candidate, _ in items)
@@ -1270,7 +1530,7 @@ def merge_contracts(
                 representative["domain"],
                 representative["family"],
                 representative["title"],
-                representative["applicability"],
+                applicability,
             ],
             prefix="contract_",
         )[:30]
@@ -1287,7 +1547,7 @@ def merge_contracts(
                 "confidence": round(
                     sum(item["confidence"] for item in group) / len(group), 4
                 ),
-                "applicability": representative["applicability"],
+                "applicability": applicability,
                 "obligations": obligations,
                 "search_text": search_text,
                 "tokens": tokens(search_text),
@@ -1363,7 +1623,7 @@ def validation_example_intercepts(
 def validate_contracts(
     contracts: list[dict[str, Any]],
     validation_candidates: list[dict[str, Any]],
-    top_k: int = 5,
+    top_k: int = 3,
 ) -> dict[str, Any]:
     if not validation_candidates or not contracts:
         return {
@@ -1380,7 +1640,7 @@ def validate_contracts(
             "specificity": 0.0,
         }
     artifact = {
-        "version": 3,
+        "version": 4,
         "kind": "effect_matched_closure_contracts",
         "contracts": contracts,
     }
@@ -1500,6 +1760,10 @@ def build_artifact(
     model: str,
     validation_percent: int,
     min_support: int,
+    min_contract_validation_retrievals: int = 0,
+    min_contract_validation_negative_retrievals: int = 0,
+    min_contract_validation_precision: float = 0.0,
+    min_contract_validation_specificity: float = 0.0,
     contrast_count: int | None = None,
     candidate_checkpoint_count: int | None = None,
     terminal_assessment_counts: dict[str, int] | None = None,
@@ -1516,10 +1780,30 @@ def build_artifact(
     ]
     contracts = merge_contracts(train_candidates, min_support=min_support)
     validation = validate_contracts(contracts, validation_candidates)
+    monitor_contracts = contracts
+    for contract in monitor_contracts:
+        metrics = contract.get("validation") or {}
+        reasons = []
+        if int(metrics.get("retrieved", 0)) < min_contract_validation_retrievals:
+            reasons.append("insufficient_positive_retrievals")
+        if (
+            int(metrics.get("negative_retrieved", 0))
+            < min_contract_validation_negative_retrievals
+        ):
+            reasons.append("insufficient_negative_retrievals")
+        if float(metrics.get("precision", 0.0)) < min_contract_validation_precision:
+            reasons.append("low_validation_precision")
+        if float(metrics.get("specificity", 0.0)) < min_contract_validation_specificity:
+            reasons.append("low_validation_specificity")
+        contract["runtime_eligible"] = not reasons
+        contract["runtime_ineligibility_reasons"] = reasons
+    runtime_contracts = [
+        contract for contract in monitor_contracts if contract["runtime_eligible"]
+    ]
     return {
-        "version": 3,
+        "version": 4,
         "kind": "effect_matched_closure_contracts",
-        "method": "effect_matched_contrastive_closure_induction",
+        "method": "within_trajectory_effect_stable_closure_repair_induction",
         "prompt_version": PROMPT_VERSION,
         "model": model,
         "source": {
@@ -1535,8 +1819,9 @@ def build_artifact(
             "uses_task_score": False,
             "uses_test_data": False,
             "terminal_anchor": "conversation termination plus observable contract discharge; never marker-only success",
-            "negative_outcome": "semantic closure-repair feedback",
-            "effect_match": "exact cumulative successful-mutation fingerprint within a trajectory",
+            "negative_outcome": "observable semantic closure-repair feedback",
+            "effect_match": "equal cumulative realized-mutation fingerprint at two checkpoints within one trajectory",
+            "structural_constants": "typed numeric selectors observed in non-failed tool results and supported by distinct train tasks",
             "terminal_assessments": dict(terminal_assessment_counts or {}),
             "terminal_contract_discharge_required": True,
         },
@@ -1544,6 +1829,12 @@ def build_artifact(
             "strategy": "sha256(task_id) deterministic bucket",
             "validation_percent": validation_percent,
             "min_train_support": min_support,
+            "runtime_contract_validation": {
+                "min_retrievals": min_contract_validation_retrievals,
+                "min_negative_retrievals": min_contract_validation_negative_retrievals,
+                "min_precision": min_contract_validation_precision,
+                "min_specificity": min_contract_validation_specificity,
+            },
             "train_trajectory_count": sum(
                 not split_is_validation(trace.task_id, validation_percent)
                 for trace in traces
@@ -1560,18 +1851,25 @@ def build_artifact(
             "train_candidates": len(train_candidates),
             "validation_candidates": len(validation_candidates),
             "merged_contracts": len(contracts),
+            "runtime_eligible_contracts": len(runtime_contracts),
+            "monitor_only_contracts": len(monitor_contracts) - len(runtime_contracts),
             "obligations": sum(len(item["obligations"]) for item in contracts),
         },
-        "validation": validation,
-        "contracts": contracts,
+        "validation": {
+            **validation,
+            "kind": "induction_retrieval_evaluator_consistency_not_effect_validation",
+        },
+        "contracts": runtime_contracts,
+        "monitor_contracts": monitor_contracts,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-root", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--cache-dir", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--cache-dir", type=Path)
+    parser.add_argument("--analyze-only", action="store_true")
     parser.add_argument(
         "--base-url",
         default=os.environ.get("STATE_BENCH_AGENT_BASE_URL")
@@ -1600,11 +1898,56 @@ def main() -> None:
     parser.add_argument("--min-validation-coverage", type=float, default=0.0)
     parser.add_argument("--min-validation-precision", type=float, default=0.0)
     parser.add_argument("--min-validation-specificity", type=float, default=0.0)
+    parser.add_argument("--min-contract-validation-retrievals", type=int, default=2)
+    parser.add_argument(
+        "--min-contract-validation-negative-retrievals", type=int, default=2
+    )
+    parser.add_argument("--min-contract-validation-precision", type=float, default=0.5)
+    parser.add_argument(
+        "--min-contract-validation-specificity", type=float, default=0.8
+    )
     args = parser.parse_args()
-    if not args.base_url or not args.api_key:
-        raise ValueError("base URL and API key are required")
     if not 0 <= args.validation_percent < 100:
         raise ValueError("validation-percent must be in [0, 100)")
+    if args.min_support < 1 or args.max_candidates < 1:
+        raise ValueError("min-support and max-candidates must be positive")
+    if (
+        args.min_contract_validation_retrievals < 0
+        or args.min_contract_validation_negative_retrievals < 0
+    ):
+        raise ValueError("contract validation retrieval counts must be non-negative")
+    for name in (
+        "min_validation_coverage",
+        "min_validation_precision",
+        "min_validation_specificity",
+        "min_contract_validation_precision",
+        "min_contract_validation_specificity",
+    ):
+        value = float(getattr(args, name))
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{name.replace('_', '-')} must be in [0, 1]")
+
+    traces = load_traces(args.input_root, args.limit)
+    if args.analyze_only:
+        report = analyze_pair_availability(
+            traces,
+            terminal_marker=args.terminal_marker,
+            max_candidates=args.max_candidates,
+            validation_percent=args.validation_percent,
+        )
+        rendered = json.dumps(report, ensure_ascii=False, indent=2)
+        if args.output is not None:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            temporary = args.output.with_suffix(args.output.suffix + ".tmp")
+            temporary.write_text(rendered, encoding="utf-8")
+            temporary.replace(args.output)
+        print(rendered, flush=True)
+        return
+
+    if args.output is None or args.cache_dir is None:
+        parser.error("--output and --cache-dir are required unless --analyze-only")
+    if not args.base_url or not args.api_key:
+        parser.error("base URL and API key are required unless --analyze-only")
 
     from openai import OpenAI
 
@@ -1614,7 +1957,6 @@ def main() -> None:
         timeout=180,
         max_retries=2,
     )
-    traces = load_traces(args.input_root, args.limit)
     contrasts = [
         item
         for trace in traces
@@ -1670,14 +2012,16 @@ def main() -> None:
         model=args.model,
         validation_percent=args.validation_percent,
         min_support=args.min_support,
+        min_contract_validation_retrievals=args.min_contract_validation_retrievals,
+        min_contract_validation_negative_retrievals=(
+            args.min_contract_validation_negative_retrievals
+        ),
+        min_contract_validation_precision=args.min_contract_validation_precision,
+        min_contract_validation_specificity=args.min_contract_validation_specificity,
         contrast_count=len(contrasts),
         candidate_checkpoint_count=sum(len(item.candidates) for item in contrasts),
         terminal_assessment_counts=dict(terminal_assessment_counts),
     )
-    if not artifact["contracts"]:
-        raise RuntimeError(
-            "no recurring contracts met min-support; inspect induction cache or lower --min-support"
-        )
     if artifact["validation"]["coverage"] < args.min_validation_coverage:
         raise RuntimeError(
             f"held-out coverage {artifact['validation']['coverage']} is below threshold"

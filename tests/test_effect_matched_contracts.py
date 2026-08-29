@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import copy
 
+import pytest
+
 from agents.effect_matched_contracts import (
     ActionLedger,
     ContractEvaluator,
     EffectMatchedContractIndex,
     EvidenceLedger,
     TruthValue,
+    action_key,
     effect_signatures,
     opening_query,
+    proposed_effect_kind,
     tool_events,
 )
 
@@ -155,6 +159,28 @@ def test_effect_signature_changes_only_after_realized_mutation() -> None:
     assert signatures[3] == signatures[5]
 
 
+def test_dry_run_cannot_count_as_a_realized_mutation_even_with_success_status() -> None:
+    conversation = [
+        {"role": "user", "content": "Check the update."},
+        {
+            "role": "assistant",
+            "content": "Dry-run result.",
+            "tool_calls": [
+                call(
+                    "update_booking",
+                    {"booking_id": "BK-1", "dry_run": True},
+                    {"status": "updated"},
+                )
+            ],
+        },
+        {"role": "assistant", "content": "No state was changed."},
+    ]
+
+    signatures = effect_signatures(conversation)
+    assert signatures[1] == signatures[2]
+    assert ActionLedger(conversation).records[0].state == "awaiting_confirmation"
+
+
 def test_official_working_conversation_does_not_duplicate_tool_evidence() -> None:
     record = call(
         "get_policy", {"topic": "returns"}, {"policy": "authoritative result"},
@@ -235,7 +261,7 @@ def test_preview_and_scoped_yes_never_count_as_execution() -> None:
     assert "executed" not in states.values()
 
 
-def test_ambiguous_entity_words_do_not_bind_one_of_several_previews() -> None:
+def test_grounded_negative_scope_can_select_the_only_remaining_preview() -> None:
     conversation = [
         {
             "role": "assistant",
@@ -248,7 +274,37 @@ def test_ambiguous_entity_words_do_not_bind_one_of_several_previews() -> None:
         {"role": "user", "content": "Yes, the flight only; keep the hotel."},
     ]
     ledger = ActionLedger(conversation)
-    assert {record.state for record in ledger.records} == {"awaiting_confirmation"}
+    states = {record.tool: record.state for record in ledger.records}
+    assert states["cancel_booking"] == "approved_pending_execution"
+    assert states["cancel_hotel"] == "invalidated"
+
+
+def test_grounded_entity_scope_approves_one_action_and_excludes_the_other() -> None:
+    conversation = [
+        {
+            "role": "assistant",
+            "content": "I have previews for the flight and hotel. Shall I cancel them?",
+            "tool_calls": [
+                call(
+                    "cancel_flight",
+                    {"booking_id": "FL-1", "confirm": False},
+                    {"status": "preview"},
+                ),
+                call(
+                    "cancel_hotel",
+                    {"booking_id": "HT-1", "confirm": False},
+                    {"status": "preview"},
+                ),
+            ],
+        },
+        {"role": "user", "content": "Yes, the flight only; keep the hotel."},
+    ]
+
+    states = {
+        record.tool: record.state for record in ActionLedger(conversation).records
+    }
+    assert states["cancel_flight"] == "approved_pending_execution"
+    assert states["cancel_hotel"] == "invalidated"
 
 
 def test_negative_scope_overrides_a_grouped_confirmation_question() -> None:
@@ -363,6 +419,49 @@ def test_preview_and_confirm_match_when_computed_amount_changes() -> None:
     ledger = ActionLedger(conversation)
     assert len(ledger.records) == 1
     assert ledger.records[0].state == "executed"
+
+
+def test_material_action_change_cannot_reuse_a_preview_approval() -> None:
+    conversation = [
+        {
+            "role": "assistant",
+            "content": "Preview ready. Shall I refund to store credit?",
+            "tool_calls": [
+                call(
+                    "process_refund",
+                    {
+                        "item_id": "ITEM-1",
+                        "refund_method": "store_credit",
+                        "confirm": False,
+                    },
+                    {"status": "preview", "refund_amount": 59},
+                )
+            ],
+        },
+        {"role": "user", "content": "Yes, proceed."},
+        {
+            "role": "assistant",
+            "content": "Refunded.",
+            "tool_calls": [
+                call(
+                    "process_refund",
+                    {
+                        "item_id": "ITEM-1",
+                        "refund_method": "original_payment",
+                        "confirm": True,
+                    },
+                    {"status": "refunded", "refund_amount": 59},
+                )
+            ],
+        },
+    ]
+
+    ledger = ActionLedger(conversation)
+    assert len(ledger.records) == 2
+    assert ledger.records[0].state == "approved_pending_execution"
+    assert ledger.records[1].violation == "material_arguments_changed_after_preview"
+    first_event, second_event = tool_events(conversation)
+    assert action_key(first_event) != action_key(second_event)
 
 
 def test_natural_if_you_want_confirmation_is_bound() -> None:
@@ -775,6 +874,39 @@ def test_proposed_mutation_arguments_can_activate_pre_action_applicability() -> 
     assert evaluator.gate(preview).should_recover is False
 
 
+def test_schema_default_preview_is_not_treated_as_effectful_mutation() -> None:
+    contract = copy.deepcopy(boundary_contract())
+    contract["obligations"][0]["deadline"] = "before_action"
+    evaluator = ContractEvaluator([contract], evidence_conversation())
+    response = type(
+        "Response",
+        (),
+        {
+            "text": "",
+            "tool_calls": [
+                {"name": "cancel_booking", "arguments": {"booking_id": "BK-1"}}
+            ],
+        },
+    )()
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "cancel_booking",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"confirm": {"type": "boolean", "default": False}},
+                },
+            },
+        }
+    ]
+
+    decision = evaluator.gate(response, tools)
+    assert decision.should_recover is False
+    assert decision.reason == "preview_tool_proposal"
+    assert proposed_effect_kind(response.tool_calls[0], tools) == "preview"
+
+
 def test_preclaim_gate_uses_each_contracts_own_claim_scope() -> None:
     contract = {
         **boundary_contract(),
@@ -862,7 +994,7 @@ def test_draft_text_can_activate_a_contract_without_joining_the_trajectory() -> 
 
 def test_retrieval_requires_observable_semantic_overlap() -> None:
     artifact = {
-        "version": 3,
+        "version": 4,
         "kind": "effect_matched_closure_contracts",
         "contracts": [boundary_contract()],
     }
@@ -870,6 +1002,41 @@ def test_retrieval_requires_observable_semantic_overlap() -> None:
     assert index.retrieve("cancel near a fee timing boundary")
     assert index.retrieve("paint a landscape in watercolor") == []
     assert index.retrieve("Please help me with this current task") == []
+
+
+def test_runtime_index_rejects_unvalidated_numeric_selectors() -> None:
+    contract = boundary_contract()
+    contract["applicability"]["predicates"] = [
+        {
+            "source": "tool_result",
+            "tool": "preview_cancel",
+            "path": "hours_remaining",
+            "operator": "lte",
+            "value": 24,
+        }
+    ]
+    artifact = {
+        "version": 4,
+        "kind": "effect_matched_closure_contracts",
+        "contracts": [contract],
+    }
+    with pytest.raises(ValueError, match="unvalidated numeric selector"):
+        EffectMatchedContractIndex(artifact, domain="travel")
+
+    selector = contract["applicability"]["predicates"][0]
+    selector.update(
+        {
+            "value_kind": "structural_constant",
+            "value_evidence": {
+                "source": "tool_result",
+                "tool": "get_policy",
+                "path": "cancel_window_hours",
+            },
+            "value_support": 2,
+            "value_provenance_sha256": "safe-hash",
+        }
+    )
+    assert EffectMatchedContractIndex(artifact, domain="travel").contracts
 
 
 def test_runtime_retrieval_query_masks_task_literals() -> None:

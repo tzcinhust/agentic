@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from scripts.build_effect_matched_contracts import (
     TrainTrace,
+    analyze_pair_availability,
     build_artifact,
     build_contrast_set,
     load_traces,
     merge_contracts,
     normalize_payload,
+    normalize_selector,
     split_is_validation,
     validation_gate_intercepts,
     validate_contracts,
@@ -139,6 +142,86 @@ def test_contrast_requires_exactly_unchanged_realized_effect() -> None:
     assert [item.id for item in contrast.candidates] == ["cp_1"]
     assert contrast.terminal.id == "cp_3"
     assert contrast.candidates[0].effect_signature == contrast.terminal.effect_signature
+
+
+def test_numeric_selector_requires_typed_observed_structural_constant() -> None:
+    trace = trace_with_same_effect()
+    trace.conversation[1]["tool_calls"][0]["result"]["policy_threshold"] = 3
+    selector = {
+        "source": "tool_result",
+        "tool": "get_policy",
+        "path": "item_count",
+        "operator": "gte",
+        "value": 3,
+    }
+
+    assert normalize_selector(selector, trace=trace) is None
+    selector["value_kind"] = "structural_constant"
+    selector["value_evidence"] = {
+        "tool": "cancel_*",
+        "path": "policy_threshold",
+    }
+    normalized = normalize_selector(selector, trace=trace)
+    assert normalized["value"] == 3
+    assert normalized["value_kind"] == "structural_constant"
+
+    selector["value"] = 7
+    assert normalize_selector(selector, trace=trace) is None
+
+
+def test_structural_constant_is_stamped_only_after_cross_task_support() -> None:
+    first = trace_with_same_effect()
+    first.conversation[1]["tool_calls"][0]["result"]["policy_threshold"] = 3
+    second = replace(
+        trace_with_same_effect(),
+        task_id="train-b",
+        source_sha256="b" * 64,
+        path=Path("train-b.json"),
+    )
+    second.conversation[1]["tool_calls"][0]["arguments"]["booking_id"] = "BK-OTHER"
+    second.conversation[1]["tool_calls"][0]["result"]["policy_threshold"] = 3
+    payload = valid_payload()
+    payload["contracts"][0]["applicability"]["predicates"] = [
+        {
+            "source": "tool_result",
+            "tool": "cancel_*",
+            "path": "fee",
+            "operator": "gte",
+            "value": 3,
+            "value_kind": "structural_constant",
+            "value_evidence": {"tool": "cancel_*", "path": "policy_threshold"},
+        }
+    ]
+
+    candidates = [
+        *normalize_payload(payload, build_contrast_set(first)),
+        *normalize_payload(payload, build_contrast_set(second)),
+    ]
+    merged = merge_contracts(candidates, min_support=2)
+    selector = merged[0]["applicability"]["predicates"][0]
+    assert selector["value_support"] == 2
+    assert selector["value_provenance_sha256"]
+
+    assert merge_contracts(candidates[:1], min_support=1) == []
+
+
+def test_analyze_only_reports_pair_availability_without_model_calls() -> None:
+    pairable = trace_with_same_effect()
+    no_terminal_base = trace_with_same_effect()
+    no_terminal = replace(
+        no_terminal_base,
+        task_id="no-terminal",
+        source_sha256="c" * 64,
+        conversation=no_terminal_base.conversation[:-1],
+    )
+
+    report = analyze_pair_availability([pairable, no_terminal])
+
+    assert report["trajectories"] == 2
+    assert report["terminal_trajectories"] == 1
+    assert report["pairable_trajectories"] == 1
+    assert report["selected_candidate_checkpoints"] == 1
+    assert report["api_calls"] == 0
 
 
 def test_new_mutation_between_responses_prevents_pairing() -> None:
@@ -417,6 +500,22 @@ def test_heldout_candidates_validate_but_do_not_enter_contract_provenance() -> N
     assert "validation_draft_text" not in serialized_contracts
     assert "validation_tool_calls" not in serialized_contracts
     assert "validation_nonrepair_boundaries" not in serialized_contracts
+
+    strict = build_artifact(
+        traces,
+        candidates,
+        model="mock-model",
+        validation_percent=20,
+        min_support=2,
+        min_contract_validation_retrievals=2,
+        min_contract_validation_negative_retrievals=2,
+        min_contract_validation_precision=0.5,
+        min_contract_validation_specificity=0.8,
+    )
+    assert strict["contracts"] == []
+    assert len(strict["monitor_contracts"]) == 1
+    assert strict["monitor_contracts"][0]["runtime_eligible"] is False
+    assert strict["stats"]["monitor_only_contracts"] == 1
 
 
 def test_heldout_retrieval_uses_opening_request_not_induced_labels() -> None:

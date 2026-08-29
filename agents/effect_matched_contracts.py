@@ -124,6 +124,24 @@ IDENTITY_ARGUMENTS = frozenset(
         "confirmation_number",
     }
 )
+ACTION_SCOPE_STOPWORDS = frozenset(
+    {
+        "add",
+        "apply",
+        "book",
+        "cancel",
+        "create",
+        "exchange",
+        "id",
+        "item",
+        "process",
+        "request",
+        "return",
+        "set",
+        "submit",
+        "update",
+    }
+)
 RETRIEVAL_STOPWORDS = frozenset(
     {
         "a",
@@ -335,7 +353,7 @@ def result_failed(result: Any) -> bool:
 def mutation_completed(event: ToolEvent) -> bool:
     if not MUTATION_NAME.match(event.name) or result_failed(event.result):
         return False
-    if event.status in PREVIEW_STATUSES:
+    if event_is_preview(event):
         return False
     if event.status in SUCCESS_STATUSES or event.status.endswith(
         SUCCESS_STATUS_SUFFIXES
@@ -346,26 +364,137 @@ def mutation_completed(event: ToolEvent) -> bool:
     return event.arguments.get("confirm") is True and isinstance(event.result, dict)
 
 
-def _identity_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
-    stable = {
-        key: value
-        for key, value in arguments.items()
-        if key not in CONTROL_ARGUMENTS
-        and (key.casefold().endswith("_id") or key.casefold() in IDENTITY_ARGUMENTS)
+def _control_value(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().casefold()
+        if lowered in {"true", "yes", "1"}:
+            return True
+        if lowered in {"false", "no", "0"}:
+            return False
+    return None
+
+
+def _tool_parameters(tool: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    definition = (
+        tool.get("function") if isinstance(tool.get("function"), dict) else tool
+    )
+    name = str(definition.get("name", ""))
+    parameters = next(
+        (
+            definition.get(key)
+            for key in ("parameters", "input_schema", "schema")
+            if isinstance(definition.get(key), dict)
+        ),
+        {},
+    )
+    return name, parameters
+
+
+def proposed_effect_kind(
+    call: dict[str, Any], tools: list[dict[str, Any]] | None = None
+) -> str:
+    """Classify a proposed call without mistaking a preview for a write.
+
+    Explicit call arguments take precedence.  When a control argument is
+    omitted, a JSON-schema default may establish that the tool is preview-only.
+    Descriptive prose is deliberately ignored because it is not executable
+    evidence of the call's effect.
+    """
+
+    name = str(call.get("name", ""))
+    if not MUTATION_NAME.match(name):
+        return "read_only"
+    arguments = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
+    if "confirm" in arguments and _control_value(arguments.get("confirm")) is False:
+        return "preview"
+    if "dry_run" in arguments and _control_value(arguments.get("dry_run")) is True:
+        return "preview"
+    if "preview" in arguments and _control_value(arguments.get("preview")) is True:
+        return "preview"
+
+    schema = next(
+        (
+            parameters
+            for tool in tools or []
+            if isinstance(tool, dict)
+            for tool_name, parameters in [_tool_parameters(tool)]
+            if tool_name == name
+        ),
+        {},
+    )
+    properties = (
+        schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    )
+    defaults = {
+        key: definition.get("default")
+        for key, definition in properties.items()
+        if isinstance(definition, dict) and "default" in definition
     }
-    if stable:
-        return stable
-    # Tools without an entity identifier still need a deterministic key.  In
-    # that case retain the non-control arguments; preview and confirmation are
-    # normally identical for such tools.
+    if "confirm" not in arguments and _control_value(defaults.get("confirm")) is False:
+        return "preview"
+    if "dry_run" not in arguments and _control_value(defaults.get("dry_run")) is True:
+        return "preview"
+    if "preview" not in arguments and _control_value(defaults.get("preview")) is True:
+        return "preview"
+    return "potential_mutation"
+
+
+def event_is_preview(event: ToolEvent) -> bool:
+    return (
+        event.status in PREVIEW_STATUSES
+        or proposed_effect_kind({"name": event.name, "arguments": event.arguments})
+        == "preview"
+    )
+
+
+def _non_control_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value for key, value in arguments.items() if key not in CONTROL_ARGUMENTS
     }
 
 
+def _identity_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in arguments.items()
+        if key not in CONTROL_ARGUMENTS
+        and (key.casefold().endswith("_id") or key.casefold() in IDENTITY_ARGUMENTS)
+    }
+
+
+def _material_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    identity = set(_identity_arguments(arguments))
+    return {
+        key: value
+        for key, value in _non_control_arguments(arguments).items()
+        if key not in identity
+    }
+
+
+def action_scope_key(event: ToolEvent) -> str:
+    return canonical_json([event.name, _identity_arguments(event.arguments)])
+
+
 def action_key(event: ToolEvent) -> str:
-    arguments = _identity_arguments(event.arguments)
-    return canonical_json([event.name, arguments])
+    return canonical_json(
+        [
+            event.name,
+            _identity_arguments(event.arguments),
+            _material_arguments(event.arguments),
+        ]
+    )
+
+
+def _derived_argument_values(result: Any) -> dict[str, list[Any]]:
+    output: dict[str, list[Any]] = {}
+    for path, value in _flatten(result):
+        if not path or isinstance(value, (dict, list)):
+            continue
+        leaf = path.rsplit(".", 1)[-1].casefold()
+        output.setdefault(leaf, []).append(value)
+    return output
 
 
 def effect_fingerprint(event: ToolEvent) -> str:
@@ -555,7 +684,7 @@ class EvidenceLedger:
                 "failure"
                 if result_failed(event.result)
                 else "preview"
-                if event.status in PREVIEW_STATUSES
+                if event_is_preview(event)
                 else "success"
             )
             for path, value in _flatten(event.arguments):
@@ -653,12 +782,15 @@ class EvidenceLedger:
 @dataclass
 class ActionRecord:
     key: str
+    scope_key: str
     tool: str
     arguments: dict[str, Any]
     state: str
     preview_sequence: int
     preview_assistant_index: int
     preview_fingerprint: str = ""
+    derived_arguments: dict[str, list[Any]] = field(default_factory=dict)
+    executed_arguments: dict[str, Any] = field(default_factory=dict)
     confirmation_obtained: bool = False
     violation: str = ""
     evidence: list[str] = field(default_factory=list)
@@ -666,8 +798,11 @@ class ActionRecord:
     def to_dict(self) -> dict[str, Any]:
         return {
             "key": self.key,
+            "scope_key": self.scope_key,
             "tool": self.tool,
             "arguments": self.arguments,
+            "derived_arguments": self.derived_arguments,
+            "executed_arguments": self.executed_arguments,
             "state": self.state,
             "preview_sequence": self.preview_sequence,
             "preview_assistant_index": self.preview_assistant_index,
@@ -699,25 +834,97 @@ class ActionLedger:
             if isinstance(value, (str, int, float)) and len(str(value)) >= 3
         ]
 
+    @staticmethod
+    def _scope_terms(record: ActionRecord) -> set[str]:
+        terms = {
+            token
+            for token in tokens(
+                " ".join(
+                    [record.tool, *record.arguments.keys()]
+                    + [
+                        str(value)
+                        for value in record.arguments.values()
+                        if isinstance(value, str)
+                        and len(value) <= 40
+                        and not ENTITY_ID.fullmatch(value)
+                    ]
+                ).replace("_", " ")
+            )
+            if len(token) >= 3 and token not in ACTION_SCOPE_STOPWORDS
+        }
+        return terms
+
+    @classmethod
+    def _scoped_mentions(
+        cls, user_text: str, candidates: list[ActionRecord]
+    ) -> tuple[list[ActionRecord], list[ActionRecord]]:
+        positive: list[ActionRecord] = []
+        negative: list[ActionRecord] = []
+        terms_by_record = [cls._scope_terms(record) for record in candidates]
+        term_counts = Counter(
+            term for record_terms in terms_by_record for term in record_terms
+        )
+        clauses = re.split(r"[;,]|\bbut\b", user_text.casefold())
+        for clause in clauses:
+            is_negative = bool(
+                re.search(r"\b(?:except|keep|leave|not|do not|don't|skip)\b", clause)
+            )
+            for record, record_terms in zip(candidates, terms_by_record):
+                identifiers = cls._argument_values(record)
+                terms = {term for term in record_terms if term_counts[term] == 1}
+                mentioned = any(value in clause for value in identifiers) or any(
+                    re.search(rf"\b{re.escape(term)}\b", clause) for term in terms
+                )
+                if not mentioned:
+                    continue
+                target = negative if is_negative else positive
+                if record not in target:
+                    target.append(record)
+        return positive, negative
+
     def _open_match(self, event: ToolEvent) -> ActionRecord | None:
-        key = action_key(event)
         matches = [
             record
             for record in self.records
-            if record.key == key
+            if record.scope_key == action_scope_key(event)
+            and self._materially_compatible(record, event.arguments)
             and record.state in {"awaiting_confirmation", "approved_pending_execution"}
             and record.preview_sequence < event.sequence
         ]
         return max(matches, key=lambda item: item.preview_sequence, default=None)
 
+    @staticmethod
+    def _materially_compatible(
+        record: ActionRecord, proposed_arguments: dict[str, Any]
+    ) -> bool:
+        approved = _material_arguments(record.arguments)
+        proposed = _material_arguments(proposed_arguments)
+        for key in approved.keys() | proposed.keys():
+            if key not in proposed:
+                return False
+            if key in approved and _same_value(approved[key], proposed[key]):
+                continue
+            lowered_key = key.casefold()
+            derived = [
+                value
+                for result_key, values in record.derived_arguments.items()
+                if result_key == lowered_key
+                or result_key.endswith(f"_{lowered_key}")
+                or lowered_key.endswith(f"_{result_key}")
+                for value in values
+            ]
+            if not any(_same_value(proposed[key], value) for value in derived):
+                return False
+        return True
+
     def _ingest_event(self, event: ToolEvent) -> None:
         if not MUTATION_NAME.match(event.name):
             return
-        if event.status in PREVIEW_STATUSES:
+        if event_is_preview(event):
             preview_fingerprint = stable_hash(
                 {
                     "tool": event.name,
-                    "identity": _identity_arguments(event.arguments),
+                    "arguments": _non_control_arguments(event.arguments),
                     "result": event.result,
                 },
                 prefix="preview_",
@@ -726,7 +933,7 @@ class ActionLedger:
                 (
                     record
                     for record in reversed(self.records)
-                    if record.key == action_key(event)
+                    if record.scope_key == action_scope_key(event)
                     and record.state
                     in {"awaiting_confirmation", "approved_pending_execution"}
                 ),
@@ -736,16 +943,14 @@ class ActionLedger:
                 self.records.append(
                     ActionRecord(
                         key=action_key(event),
+                        scope_key=action_scope_key(event),
                         tool=event.name,
-                        arguments={
-                            key: value
-                            for key, value in event.arguments.items()
-                            if key not in CONTROL_ARGUMENTS
-                        },
+                        arguments=_non_control_arguments(event.arguments),
                         state="awaiting_confirmation",
                         preview_sequence=event.sequence,
                         preview_assistant_index=event.assistant_index,
                         preview_fingerprint=preview_fingerprint,
+                        derived_arguments=_derived_argument_values(event.result),
                         confirmation_obtained=False,
                         evidence=[f"T{event.sequence}:preview"],
                     )
@@ -757,28 +962,40 @@ class ActionLedger:
                 ):
                     existing.state = "awaiting_confirmation"
                     existing.confirmation_obtained = False
+                existing.key = action_key(event)
+                existing.arguments = _non_control_arguments(event.arguments)
                 existing.preview_sequence = event.sequence
                 existing.preview_assistant_index = event.assistant_index
                 existing.preview_fingerprint = preview_fingerprint
+                existing.derived_arguments = _derived_argument_values(event.result)
                 existing.evidence.append(f"T{event.sequence}:preview")
             return
         matching = self._open_match(event)
         if mutation_completed(event):
             if matching is None:
+                scope_conflict = any(
+                    record.scope_key == action_scope_key(event)
+                    and record.state
+                    in {"awaiting_confirmation", "approved_pending_execution"}
+                    for record in self.records
+                )
                 self.records.append(
                     ActionRecord(
                         key=action_key(event),
+                        scope_key=action_scope_key(event),
                         tool=event.name,
-                        arguments={
-                            key: value
-                            for key, value in event.arguments.items()
-                            if key not in CONTROL_ARGUMENTS
-                        },
+                        arguments=_non_control_arguments(event.arguments),
                         state="executed",
                         preview_sequence=event.sequence,
                         preview_assistant_index=event.assistant_index,
                         preview_fingerprint="",
+                        executed_arguments=_non_control_arguments(event.arguments),
                         confirmation_obtained=False,
+                        violation=(
+                            "material_arguments_changed_after_preview"
+                            if scope_conflict
+                            else ""
+                        ),
                         evidence=[f"T{event.sequence}:executed"],
                     )
                 )
@@ -786,6 +1003,7 @@ class ActionLedger:
                 if not matching.confirmation_obtained:
                     matching.violation = "executed_without_bound_confirmation"
                 matching.state = "executed"
+                matching.executed_arguments = _non_control_arguments(event.arguments)
                 matching.evidence.append(f"T{event.sequence}:executed")
         elif result_failed(event.result) and matching is not None:
             matching.evidence.append(f"T{event.sequence}:failed")
@@ -796,16 +1014,20 @@ class ActionLedger:
         if len(candidates) <= 1:
             return candidates
         lowered = user_text.casefold()
-        has_negative_scope = bool(
-            re.search(r"\b(?:except|keep|leave|not|do not|don't|skip)\b", lowered)
-        )
+        scoped_positive, scoped_negative = self._scoped_mentions(user_text, candidates)
+        if scoped_positive:
+            return [item for item in scoped_positive if item not in scoped_negative]
+        if scoped_negative and re.search(
+            r"\b(?:yes|sure|okay|ok|go ahead|proceed|all|both)\b", lowered
+        ):
+            return [item for item in candidates if item not in scoped_negative]
+        if re.search(r"\b(?:except|keep|leave|not|do not|don't|skip)\b", lowered):
+            return []
         identifiers = [
             record
             for record in candidates
             if any(value in lowered for value in self._argument_values(record))
         ]
-        if has_negative_scope:
-            return []
         if identifiers:
             return identifiers
         if re.search(r"\b(?:both|all|them|those|everything)\b", lowered):
@@ -884,13 +1106,17 @@ class ActionLedger:
                     record.evidence.append(f"M{index}:rejection")
                 continue
             selected = self._scope_confirmation(text, assistant_text, candidates)
+            _, excluded = self._scoped_mentions(text, candidates)
             for record in selected:
                 record.state = "approved_pending_execution"
                 record.confirmation_obtained = True
                 record.evidence.append(f"M{index}:confirmation")
+            for record in excluded:
+                record.state = "invalidated"
+                record.evidence.append(f"M{index}:excluded_choice")
             if selected and re.search(r"\bonly\b", text, re.IGNORECASE):
                 for record in candidates:
-                    if record not in selected:
+                    if record not in selected and record.state != "invalidated":
                         record.state = "invalidated"
                         record.evidence.append(f"M{index}:excluded_choice")
 
@@ -929,6 +1155,45 @@ class ActionLedger:
         return (TruthValue.TRUE if satisfied else TruthValue.FALSE), matches
 
 
+def _selector_nodes(value: Any):
+    if isinstance(value, dict):
+        if {"source", "path", "operator"}.issubset(value):
+            yield value
+        for child in value.values():
+            yield from _selector_nodes(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _selector_nodes(child)
+
+
+def _runtime_contract_is_safe(contract: dict[str, Any]) -> bool:
+    for selector in _selector_nodes(contract):
+        value = selector.get("value")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            try:
+                support = int(selector.get("value_support", 0))
+            except (TypeError, ValueError):
+                return False
+            value_evidence = selector.get("value_evidence")
+            if (
+                selector.get("value_kind") != "structural_constant"
+                or not isinstance(value_evidence, dict)
+                or value_evidence.get("source") != "tool_result"
+                or not value_evidence.get("tool")
+                or not value_evidence.get("path")
+                or support < 2
+                or not str(selector.get("value_provenance_sha256", ""))
+            ):
+                return False
+        values = selector.get("values")
+        if isinstance(values, list) and any(
+            isinstance(item, (int, float)) and not isinstance(item, bool)
+            for item in values
+        ):
+            return False
+    return True
+
+
 class EffectMatchedContractIndex:
     """Independent one-shot retriever for learned closure contracts."""
 
@@ -937,24 +1202,43 @@ class EffectMatchedContractIndex:
         artifact: dict[str, Any],
         *,
         domain: str | None,
-        top_k: int = 5,
+        contract_set: str = "runtime",
+        top_k: int = 3,
         relative_threshold: float = 0.32,
         minimum_score: float = 0.25,
     ):
-        if int(artifact.get("version", 0)) < 3:
-            raise ValueError("effect-matched contract artifact must have version >= 3")
+        if int(artifact.get("version", 0)) < 4:
+            raise ValueError("effect-matched contract artifact must have version >= 4")
         if artifact.get("kind") != "effect_matched_closure_contracts":
             raise ValueError("unexpected closure contract artifact kind")
+        if contract_set not in {"runtime", "monitor"}:
+            raise ValueError("contract_set must be runtime or monitor")
         self.top_k = max(1, int(top_k))
         self.relative_threshold = max(0.0, min(1.0, float(relative_threshold)))
         self.minimum_score = max(0.0, float(minimum_score))
-        self.contracts = [
+        source_contracts = (
+            artifact.get("monitor_contracts", [])
+            if contract_set == "monitor" and "monitor_contracts" in artifact
+            else artifact.get("contracts", [])
+        )
+        available = [
             item
-            for item in artifact.get("contracts", [])
+            for item in source_contracts
             if isinstance(item, dict)
             and item.get("obligations")
             and (domain is None or item.get("domain") == domain)
         ]
+        unsafe = [
+            str(item.get("id", "unknown"))
+            for item in available
+            if not _runtime_contract_is_safe(item)
+        ]
+        if unsafe:
+            raise ValueError(
+                "runtime contract contains an unvalidated numeric selector: "
+                + ", ".join(unsafe)
+            )
+        self.contracts = available
         self.document_frequency = Counter(
             token for item in self.contracts for token in set(item.get("tokens", []))
         )
@@ -971,7 +1255,8 @@ class EffectMatchedContractIndex:
         path: Path | str,
         *,
         domain: str | None,
-        top_k: int = 5,
+        contract_set: str = "runtime",
+        top_k: int = 3,
         relative_threshold: float = 0.32,
         minimum_score: float = 0.25,
     ) -> "EffectMatchedContractIndex":
@@ -979,6 +1264,7 @@ class EffectMatchedContractIndex:
         return cls(
             payload,
             domain=domain,
+            contract_set=contract_set,
             top_k=top_k,
             relative_threshold=relative_threshold,
             minimum_score=minimum_score,
@@ -1070,6 +1356,7 @@ class ObligationState:
     applicability: str
     evidence: list[dict[str, Any]] = field(default_factory=list)
     missing_evidence: list[str] = field(default_factory=list)
+    missing_evidence_tools: list[str] = field(default_factory=list)
     failed_response_requirements: list[str] = field(default_factory=list)
     claim_types: list[str] = field(default_factory=list)
     claim_terms: list[str] = field(default_factory=list)
@@ -1090,6 +1377,7 @@ class ObligationState:
             "applicability": self.applicability,
             "evidence": self.evidence,
             "missing_evidence": self.missing_evidence,
+            "missing_evidence_tools": self.missing_evidence_tools,
             "failed_response_requirements": self.failed_response_requirements,
             "claim_types": self.claim_types,
             "claim_terms": self.claim_terms,
@@ -1248,9 +1536,10 @@ class ContractEvaluator:
 
     def _required_evidence(
         self, obligation: dict[str, Any], evidence_view: EvidenceLedger
-    ) -> tuple[list[dict[str, Any]], list[str]]:
+    ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
         evidence: list[dict[str, Any]] = []
         missing: list[str] = []
+        missing_tools: list[str] = []
         for position, group in enumerate(obligation.get("evidence_requirements", [])):
             if not isinstance(group, dict):
                 continue
@@ -1272,7 +1561,13 @@ class ContractEvaluator:
                         group.get("description") or f"evidence_group_{position}", 180
                     )
                 )
-        return evidence, missing
+                missing_tools.extend(
+                    str(selector.get("tool", ""))
+                    for selector in selectors
+                    if selector.get("source") in {"tool_argument", "tool_result"}
+                    and str(selector.get("tool", "")) not in {"", "*"}
+                )
+        return evidence, missing, list(dict.fromkeys(missing_tools))
 
     def _response_clause(
         self,
@@ -1376,7 +1671,9 @@ class ContractEvaluator:
             for obligation in contract.get("obligations", []):
                 if not isinstance(obligation, dict):
                     continue
-                evidence, missing = self._required_evidence(obligation, self.evidence)
+                evidence, missing, missing_tools = self._required_evidence(
+                    obligation, self.evidence
+                )
                 evidence = [
                     *applicability_view.compact_facts(applicability_facts),
                     *evidence,
@@ -1437,6 +1734,25 @@ class ContractEvaluator:
                                 180,
                             )
                         ]
+                    if status == "pending_evidence":
+                        missing_tools = list(
+                            dict.fromkeys(
+                                [
+                                    *missing_tools,
+                                    *[
+                                        str(selector.get("tool", ""))
+                                        for selector in (
+                                            contract.get("applicability") or {}
+                                        ).get("predicates", [])
+                                        if isinstance(selector, dict)
+                                        and selector.get("source")
+                                        in {"tool_argument", "tool_result"}
+                                        and str(selector.get("tool", ""))
+                                        not in {"", "*"}
+                                    ],
+                                ]
+                            )
+                        )
                 elif missing:
                     status = "pending_evidence"
                 else:
@@ -1469,6 +1785,7 @@ class ContractEvaluator:
                         applicability=applicability.value,
                         evidence=evidence[:10],
                         missing_evidence=missing,
+                        missing_evidence_tools=missing_tools,
                         failed_response_requirements=failed,
                         claim_types=claim_types,
                         claim_terms=claim_terms,
@@ -1496,12 +1813,20 @@ class ContractEvaluator:
                 )
         return output
 
-    def gate(self, response: Any) -> GateDecision:
+    def gate(
+        self, response: Any, tools: list[dict[str, Any]] | None = None
+    ) -> GateDecision:
         proposed_text = str(getattr(response, "text", "") or "")
         calls = self._calls(response)
-        mutating = any(MUTATION_NAME.match(call["name"]) for call in calls)
+        effect_kinds = [proposed_effect_kind(call, tools) for call in calls]
+        mutating = "potential_mutation" in effect_kinds
         if calls and not mutating:
-            return GateDecision(False, "tool", [], "read_only_tool_proposal")
+            reason = (
+                "preview_tool_proposal"
+                if "preview" in effect_kinds
+                else "read_only_tool_proposal"
+            )
+            return GateDecision(False, "tool", [], reason)
         # STATE-Bench does not expose text attached to an intermediate tool-call
         # generation to the user. Such text cannot discharge a communication
         # condition before the proposed mutation is executed.

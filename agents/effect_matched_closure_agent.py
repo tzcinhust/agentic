@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import fnmatch
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,7 @@ from agents.effect_matched_contracts import (
     GateDecision,
     compact,
     opening_query,
+    proposed_effect_kind,
     stable_hash,
     tool_events,
 )
@@ -30,8 +33,9 @@ class EffectMatchedClosureAgent(_FrozenPWM):
     """Preserve PWM execution and shield only a proposed response boundary.
 
     Contract retrieval is one-shot and based only on the opening user request.
-    There is no recurrent semantic bookkeeper and no reject/regenerate loop: an
-    unresolved boundary permits at most one recovery generation.
+    There is no recurrent semantic bookkeeper.  An unresolved boundary may
+    receive one budgeted recovery candidate, which is accepted only through a
+    deterministic monotonicity and effect-safety check.
     """
 
     contract_path = Path(
@@ -53,7 +57,7 @@ class EffectMatchedClosureAgent(_FrozenPWM):
         super().__init__(
             client, system_prompt, tools, tool_handlers, runtime_context, **kwargs
         )
-        self.closure_mode = os.environ.get("STATE_BENCH_CLOSURE_MODE", "enforce")
+        self.closure_mode = os.environ.get("STATE_BENCH_CLOSURE_MODE", "pwm_only")
         if self.closure_mode not in CLOSURE_MODES:
             raise ValueError(
                 "STATE_BENCH_CLOSURE_MODE must be pwm_only, monitor, or enforce"
@@ -63,9 +67,22 @@ class EffectMatchedClosureAgent(_FrozenPWM):
         self._retrieval_log: dict[str, Any] | None = None
         self._generation_log: list[dict[str, Any]] = []
         self._artifact_sha256: str | None = None
+        self.max_recoveries_per_task = max(
+            0, int(os.environ.get("STATE_BENCH_CLOSURE_MAX_RECOVERIES_PER_TASK", "1")),
+        )
+        self.max_recoveries_per_contract = max(
+            0,
+            int(os.environ.get("STATE_BENCH_CLOSURE_MAX_RECOVERIES_PER_CONTRACT", "1")),
+        )
+        self.enforce_pre_action = os.environ.get(
+            "STATE_BENCH_CLOSURE_ENFORCE_PRE_ACTION", "false"
+        ).strip().casefold() in {"1", "true", "yes"}
+        self._recovery_count = 0
+        self._contract_recovery_counts: dict[str, int] = {}
+        self._attempted_recovery_signatures: set[str] = set()
         if self.closure_mode != "pwm_only":
             domain = getattr(runtime_context, "domain", None)
-            top_k = int(os.environ.get("STATE_BENCH_CLOSURE_TOP_K", "5"))
+            top_k = int(os.environ.get("STATE_BENCH_CLOSURE_TOP_K", "3"))
             relative_threshold = float(
                 os.environ.get("STATE_BENCH_CLOSURE_RELATIVE_THRESHOLD", "0.32")
             )
@@ -75,6 +92,9 @@ class EffectMatchedClosureAgent(_FrozenPWM):
             self._contract_index = EffectMatchedContractIndex.from_path(
                 self.contract_path,
                 domain=domain,
+                contract_set=(
+                    "monitor" if self.closure_mode == "monitor" else "runtime"
+                ),
                 top_k=top_k,
                 relative_threshold=relative_threshold,
                 minimum_score=minimum_score,
@@ -193,6 +213,147 @@ class EffectMatchedClosureAgent(_FrozenPWM):
             f"Unresolved learned contracts: {json.dumps(records, ensure_ascii=False, default=str)}"
         )
 
+    @staticmethod
+    def _decision_signature(decision: GateDecision) -> str:
+        return stable_hash(
+            [
+                decision.boundary,
+                sorted(
+                    (
+                        item.contract_id,
+                        item.obligation_id,
+                        item.status,
+                        tuple(item.missing_evidence),
+                    )
+                    for item in decision.obligations
+                ),
+            ],
+            prefix="recovery_",
+        )
+
+    def _eligible_recovery(
+        self, decision: GateDecision
+    ) -> tuple[GateDecision | None, str]:
+        if self._recovery_count >= self.max_recoveries_per_task:
+            return None, "task_recovery_budget_exhausted"
+        signature = self._decision_signature(decision)
+        if signature in self._attempted_recovery_signatures:
+            return None, "duplicate_recovery_signature_suppressed"
+        eligible = [
+            item
+            for item in decision.obligations
+            if self._contract_recovery_counts.get(item.contract_id, 0)
+            < self.max_recoveries_per_contract
+        ]
+        if not eligible:
+            return None, "contract_recovery_budget_exhausted"
+        return (
+            GateDecision(True, decision.boundary, eligible, decision.reason),
+            signature,
+        )
+
+    def _consume_recovery_budget(self, decision: GateDecision, signature: str) -> None:
+        self._recovery_count += 1
+        self._attempted_recovery_signatures.add(signature)
+        for contract_id in {item.contract_id for item in decision.obligations}:
+            self._contract_recovery_counts[contract_id] = (
+                self._contract_recovery_counts.get(contract_id, 0) + 1
+            )
+
+    @classmethod
+    def _response_effect_kind(cls, response: Any, tools: list[dict[str, Any]]) -> str:
+        calls = cls._response_calls(response)
+        if not calls:
+            return "final_text"
+        kinds = {proposed_effect_kind(call, tools) for call in calls}
+        if "potential_mutation" in kinds:
+            return "potential_mutation"
+        if "preview" in kinds:
+            return "preview"
+        return "read_only"
+
+    @staticmethod
+    def _safe_no_write_clarification(response: Any) -> bool:
+        text = str(getattr(response, "text", "") or "").strip()
+        if not text or getattr(response, "tool_calls", None):
+            return False
+        asks = "?" in text or bool(
+            re.search(
+                r"\b(?:please (?:confirm|choose|provide|clarify)|which|would you|"
+                r"do you want|may i|could you)\b",
+                text,
+                re.IGNORECASE,
+            )
+        )
+        material_claim = bool(
+            re.search(
+                r"(?:[$£€]\s*\d|\b\d+(?:\.\d+)?\s*(?:%|hours?|days?|points?)\b|"
+                r"\b(?:cancelled|canceled|booked|refunded|returned|completed)\b)",
+                text,
+                re.IGNORECASE,
+            )
+        )
+        return asks and not material_claim
+
+    @classmethod
+    def _is_grounded_evidence_bridge(
+        cls, response: Any, decision: GateDecision, tools: list[dict[str, Any]],
+    ) -> bool:
+        calls = cls._response_calls(response)
+        if not calls or cls._response_effect_kind(response, tools) not in {
+            "read_only",
+            "preview",
+        }:
+            return False
+        patterns = {
+            pattern.casefold()
+            for item in decision.obligations
+            for pattern in item.missing_evidence_tools
+            if pattern not in {"", "*"}
+        }
+        return bool(patterns) and all(
+            any(
+                fnmatch.fnmatchcase(call["name"].casefold(), pattern)
+                for pattern in patterns
+            )
+            for call in calls
+        )
+
+    @classmethod
+    def _accept_recovery(
+        cls,
+        repaired: Any,
+        decision: GateDecision,
+        post_decision: GateDecision | None,
+        post_states: list[Any] | None,
+        tools: list[dict[str, Any]],
+    ) -> tuple[bool, str]:
+        if post_decision is None or post_states is None:
+            return False, "post_recovery_audit_failed"
+        kind = cls._response_effect_kind(repaired, tools)
+        if kind == "potential_mutation":
+            return False, "recovery_mutation_forbidden"
+        if kind in {"read_only", "preview"}:
+            if cls._is_grounded_evidence_bridge(repaired, decision, tools):
+                return True, "grounded_evidence_bridge"
+            return False, "ungrounded_tool_plan_change"
+        pre_keys = {
+            (item.contract_id, item.obligation_id) for item in decision.obligations
+        }
+        unresolved_pre_keys = {
+            (item.contract_id, item.obligation_id)
+            for item in post_states
+            if item.open and (item.contract_id, item.obligation_id) in pre_keys
+        }
+        if not post_decision.should_recover and not unresolved_pre_keys:
+            return True, "all_boundary_obligations_discharged"
+        if cls._safe_no_write_clarification(repaired) and (
+            decision.boundary == "before_action"
+            or all(item.status == "pending_evidence" for item in decision.obligations)
+        ):
+            return True, "safe_no_write_clarification"
+        return False, "recovery_did_not_reduce_open_obligations"
+
     def _record_generation(
         self,
         *,
@@ -201,10 +362,15 @@ class EffectMatchedClosureAgent(_FrozenPWM):
         decision: GateDecision | None,
         repaired: Any | None,
         post_decision: GateDecision | None,
+        post_states: list[Any] | None = None,
         recovery_attempted: bool = False,
+        recovery_accepted: bool = False,
+        recovery_signature: str | None = None,
+        recovery_acceptance_reason: str | None = None,
         fallback_reason: str | None = None,
         error: str | None = None,
     ) -> None:
+        returned = repaired if recovery_accepted and repaired is not None else draft
         self._generation_log.append(
             {
                 "generation_index": len(self._generation_log),
@@ -217,25 +383,36 @@ class EffectMatchedClosureAgent(_FrozenPWM):
                 "gate": decision.to_dict() if decision else None,
                 "closure_injected": recovery_attempted,
                 "recovery_attempted": recovery_attempted,
-                "recovery_used": repaired is not None,
+                "recovery_generated": repaired is not None,
+                "recovery_used": recovery_accepted,
+                "recovery_signature": recovery_signature,
+                "recovery_acceptance_reason": recovery_acceptance_reason,
                 "recovery_calls": int(recovery_attempted),
                 "total_model_calls": 1 + int(recovery_attempted),
-                "returned": self._response_view(
-                    repaired if repaired is not None else draft
-                ),
+                "recovery_candidate": self._response_view(repaired)
+                if repaired is not None
+                else None,
+                "returned": self._response_view(returned),
                 "closure_returned_tool_call": bool(
-                    recovery_attempted
-                    and repaired is not None
-                    and self._response_calls(repaired)
+                    recovery_accepted and self._response_calls(returned)
                 ),
                 "tool_plan_changed": (
-                    self._response_calls(draft) != self._response_calls(repaired)
-                    if recovery_attempted and repaired is not None
+                    self._response_calls(draft) != self._response_calls(returned)
+                    if recovery_attempted
                     else None
                 ),
                 "post_recovery_gate": post_decision.to_dict()
                 if post_decision
                 else None,
+                "post_recovery_open_obligations": [
+                    {
+                        "contract_id": item.contract_id,
+                        "obligation_id": item.obligation_id,
+                        "status": item.status,
+                    }
+                    for item in (post_states or [])
+                    if item.open
+                ],
                 "fallback_reason": fallback_reason,
                 "error": error,
             }
@@ -293,7 +470,7 @@ class EffectMatchedClosureAgent(_FrozenPWM):
 
         evaluator = ContractEvaluator(contracts, conversation)
         try:
-            decision = evaluator.gate(draft)
+            decision = evaluator.gate(draft, tools)
         except Exception as error:
             self._record_generation(
                 conversation=conversation,
@@ -318,7 +495,35 @@ class EffectMatchedClosureAgent(_FrozenPWM):
             )
             return draft
 
-        recovery_prompt = self._recovery_prompt(draft, decision)
+        if decision.boundary == "before_action" and not self.enforce_pre_action:
+            self._record_generation(
+                conversation=conversation,
+                draft=draft,
+                decision=decision,
+                repaired=None,
+                post_decision=None,
+                fallback_reason="pre_action_monitor_only",
+            )
+            return draft
+
+        recovery_decision, signature_or_reason = self._eligible_recovery(decision)
+        if recovery_decision is None:
+            self._record_generation(
+                conversation=conversation,
+                draft=draft,
+                decision=decision,
+                repaired=None,
+                post_decision=None,
+                recovery_signature=(
+                    self._decision_signature(decision) if decision.obligations else None
+                ),
+                fallback_reason=signature_or_reason,
+            )
+            return draft
+        recovery_signature = signature_or_reason
+        self._consume_recovery_budget(recovery_decision, recovery_signature)
+
+        recovery_prompt = self._recovery_prompt(draft, recovery_decision)
         recovery_conversation = self.inject_system_message(
             conversation, recovery_prompt, before_last_user=False,
         )
@@ -336,27 +541,44 @@ class EffectMatchedClosureAgent(_FrozenPWM):
                 repaired=None,
                 post_decision=None,
                 recovery_attempted=True,
+                recovery_signature=recovery_signature,
                 fallback_reason="closure_recovery_error",
                 error=f"{type(error).__name__}: {compact(error, 400)}",
             )
             return draft
         # Audit the one recovery, but never enter a second reject/rewrite loop.
         try:
-            post_decision = evaluator.gate(repaired)
+            post_decision = evaluator.gate(repaired, tools)
+            repaired_calls = self._response_calls(repaired)
+            post_states = evaluator.states(
+                proposed_text=(
+                    "" if repaired_calls else str(getattr(repaired, "text", "") or "")
+                ),
+                proposed_calls=repaired_calls,
+            )
             audit_error = None
         except Exception as error:
             post_decision = None
+            post_states = None
             audit_error = f"{type(error).__name__}: {compact(error, 400)}"
+        accepted, acceptance_reason = self._accept_recovery(
+            repaired, recovery_decision, post_decision, post_states, tools
+        )
         self._record_generation(
             conversation=conversation,
             draft=draft,
             decision=decision,
             repaired=repaired,
             post_decision=post_decision,
+            post_states=post_states,
             recovery_attempted=True,
+            recovery_accepted=accepted,
+            recovery_signature=recovery_signature,
+            recovery_acceptance_reason=acceptance_reason,
+            fallback_reason=None if accepted else acceptance_reason,
             error=audit_error,
         )
-        return repaired
+        return repaired if accepted else draft
 
     def ingest_trajectory(self, trajectory: Any) -> None:
         super().ingest_trajectory(trajectory)
@@ -390,8 +612,11 @@ class EffectMatchedClosureAgent(_FrozenPWM):
             metadata = {}
             trajectory.metadata = metadata
         metadata["effect_matched_closure_memory"] = {
-            "version": "effect_matched_closure_v1",
+            "version": "effect_matched_closure_v2",
             "mode": self.closure_mode,
+            "enforce_pre_action": self.enforce_pre_action,
+            "max_recoveries_per_task": self.max_recoveries_per_task,
+            "max_recoveries_per_contract": self.max_recoveries_per_contract,
             "contract_artifact": str(self.contract_path),
             "contract_artifact_sha256": self._artifact_sha256,
             "retrieval": self._retrieval_log,
@@ -405,6 +630,13 @@ class EffectMatchedClosureAgent(_FrozenPWM):
                 "main_generations": len(self._generation_log),
                 "recovery_generations": sum(
                     int(item["recovery_used"]) for item in self._generation_log
+                ),
+                "generated_recovery_candidates": sum(
+                    int(item["recovery_generated"]) for item in self._generation_log
+                ),
+                "rejected_recovery_candidates": sum(
+                    int(item["recovery_generated"] and not item["recovery_used"])
+                    for item in self._generation_log
                 ),
                 "attempted_recovery_generations": sum(
                     int(item["recovery_attempted"]) for item in self._generation_log
@@ -441,5 +673,6 @@ class EffectMatchedClosureAgent(_FrozenPWM):
                 ),
                 "semantic_bookkeeper_calls": 0,
                 "unbounded_regeneration_loops": 0,
+                "recoveries_per_task": self._recovery_count,
             },
         }

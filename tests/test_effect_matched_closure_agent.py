@@ -131,7 +131,7 @@ def write_artifacts(tmp_path: Path, *, include_contract=True):
     contracts.write_text(
         json.dumps(
             {
-                "version": 3,
+                "version": 4,
                 "kind": "effect_matched_closure_contracts",
                 "contracts": [item] if include_contract else [],
             }
@@ -171,6 +171,27 @@ def configure(monkeypatch, process: Path, contracts: Path, mode: str):
 
 def test_module_does_not_export_parent_loader_name() -> None:
     assert "ProcessWorkflowMemoryAgent" not in vars(closure_module)
+
+
+def test_safe_default_is_pwm_only_and_does_not_require_a_contract_artifact(
+    tmp_path, monkeypatch
+) -> None:
+    process, _ = write_artifacts(tmp_path)
+    monkeypatch.setattr(ProcessWorkflowMemoryAgent, "memory_path", process)
+    monkeypatch.setattr(
+        EffectMatchedClosureAgent, "contract_path", tmp_path / "missing-contracts.json"
+    )
+    monkeypatch.delenv("STATE_BENCH_CLOSURE_MODE", raising=False)
+    agent = EffectMatchedClosureAgent(
+        RecordingClient([("answer", [])]),
+        "system",
+        [],
+        {},
+        runtime_context=SimpleNamespace(domain="travel"),
+    )
+
+    assert agent.closure_mode == "pwm_only"
+    assert agent._contract_index is None
 
 
 def test_pwm_only_is_behaviorally_equivalent_to_frozen_pwm(
@@ -288,6 +309,7 @@ def test_monitor_mode_never_recovers(tmp_path, monkeypatch) -> None:
         tools=[{"name": "get_policy"}],
     )
     assert len(client.calls) == 1
+    assert agent._contract_index.top_k == 3
     assert agent._generation_log[0]["gate"]["should_recover"] is True
     assert agent._generation_log[0]["fallback_reason"] == "monitor_mode"
 
@@ -312,6 +334,159 @@ def test_failed_recovery_falls_back_to_frozen_pwm_draft(tmp_path, monkeypatch) -
     assert agent._generation_log[0]["closure_injected"] is True
     assert agent._generation_log[0]["recovery_calls"] == 1
     assert agent._generation_log[0]["total_model_calls"] == 2
+
+
+def test_non_improving_recovery_is_rejected_in_favor_of_pwm_draft(
+    tmp_path, monkeypatch
+) -> None:
+    process, contracts = write_artifacts(tmp_path)
+    configure(monkeypatch, process, contracts, "enforce")
+    client = RecordingClient(
+        [("The current fee is $90.", []), ("The current fee is still $90.", [])]
+    )
+    agent = EffectMatchedClosureAgent(
+        client, "system", [], {}, runtime_context=SimpleNamespace(domain="travel")
+    )
+
+    response = agent.generate_next_turn(
+        system_prompt="system",
+        conversation=conversation_with_evidence(),
+        tools=[{"name": "get_policy"}],
+    )
+
+    assert response.text == "The current fee is $90."
+    log = agent._generation_log[0]
+    assert log["recovery_generated"] is True
+    assert log["recovery_used"] is False
+    assert log["fallback_reason"] == "recovery_did_not_reduce_open_obligations"
+
+
+def test_final_recovery_cannot_replace_the_draft_with_a_mutation(
+    tmp_path, monkeypatch
+) -> None:
+    process, contracts = write_artifacts(tmp_path)
+    configure(monkeypatch, process, contracts, "enforce")
+    client = RecordingClient(
+        [
+            ("The current fee is $90.", []),
+            (
+                "",
+                [
+                    {
+                        "name": "cancel_booking",
+                        "arguments": {"booking_id": "BK-1", "confirm": True},
+                    }
+                ],
+            ),
+        ]
+    )
+    agent = EffectMatchedClosureAgent(
+        client, "system", [], {}, runtime_context=SimpleNamespace(domain="travel")
+    )
+
+    response = agent.generate_next_turn(
+        system_prompt="system",
+        conversation=conversation_with_evidence(),
+        tools=[{"name": "cancel_booking"}],
+    )
+
+    assert response.text == "The current fee is $90."
+    assert response.tool_calls == []
+    assert agent._generation_log[0]["fallback_reason"] == "recovery_mutation_forbidden"
+
+
+def test_missing_evidence_can_bridge_only_to_the_contracts_read_tool(
+    tmp_path, monkeypatch
+) -> None:
+    process, contracts = write_artifacts(tmp_path)
+    configure(monkeypatch, process, contracts, "enforce")
+    conversation = conversation_with_evidence()
+    del conversation[1]["tool_calls"][0]["result"]["next_fee"]
+    client = RecordingClient(
+        [
+            ("The current fee is $90.", []),
+            ("", [{"name": "preview_cancel", "arguments": {"reservation_id": "R-1"}}],),
+        ]
+    )
+    agent = EffectMatchedClosureAgent(
+        client, "system", [], {}, runtime_context=SimpleNamespace(domain="travel")
+    )
+
+    response = agent.generate_next_turn(
+        system_prompt="system",
+        conversation=conversation,
+        tools=[{"name": "preview_cancel"}, {"name": "get_unrelated"}],
+    )
+
+    assert response.tool_calls[0].name == "preview_cancel"
+    assert agent._generation_log[0]["recovery_used"] is True
+    assert (
+        agent._generation_log[0]["recovery_acceptance_reason"]
+        == "grounded_evidence_bridge"
+    )
+
+
+def test_recovery_budget_is_global_to_the_task_not_each_generation(
+    tmp_path, monkeypatch
+) -> None:
+    process, contracts = write_artifacts(tmp_path)
+    configure(monkeypatch, process, contracts, "enforce")
+    client = RecordingClient(
+        [
+            ("The current fee is $90.", []),
+            ("Still only the current fee is $90.", []),
+            ("The current fee remains $90.", []),
+        ]
+    )
+    agent = EffectMatchedClosureAgent(
+        client, "system", [], {}, runtime_context=SimpleNamespace(domain="travel")
+    )
+
+    for _ in range(2):
+        agent.generate_next_turn(
+            system_prompt="system",
+            conversation=conversation_with_evidence(),
+            tools=[{"name": "get_policy"}],
+        )
+
+    assert len(client.calls) == 3
+    assert (
+        agent._generation_log[1]["fallback_reason"] == "task_recovery_budget_exhausted"
+    )
+
+
+def test_pre_action_contract_is_monitor_only_by_default(tmp_path, monkeypatch) -> None:
+    process, contracts = write_artifacts(tmp_path)
+    payload = json.loads(contracts.read_text(encoding="utf-8"))
+    payload["contracts"][0]["obligations"][0]["deadline"] = "before_action"
+    contracts.write_text(json.dumps(payload), encoding="utf-8")
+    configure(monkeypatch, process, contracts, "enforce")
+    client = RecordingClient(
+        [
+            (
+                "",
+                [
+                    {
+                        "name": "cancel_booking",
+                        "arguments": {"booking_id": "BK-1", "confirm": True},
+                    }
+                ],
+            )
+        ]
+    )
+    agent = EffectMatchedClosureAgent(
+        client, "system", [], {}, runtime_context=SimpleNamespace(domain="travel")
+    )
+
+    response = agent.generate_next_turn(
+        system_prompt="system",
+        conversation=conversation_with_evidence(),
+        tools=[{"name": "cancel_booking"}],
+    )
+
+    assert response.tool_calls
+    assert len(client.calls) == 1
+    assert agent._generation_log[0]["fallback_reason"] == "pre_action_monitor_only"
 
 
 def test_completion_retrieval_is_one_shot_across_turns(tmp_path, monkeypatch) -> None:
