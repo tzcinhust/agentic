@@ -1,0 +1,2805 @@
+{
+  "task_id": "34-oos_exchange_store_credit_no_card_conversion",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** Customer asks to exchange a Premium Cotton Shirt for the Large size, but the Large target is out of stock. They accept the policy fallback store credit, then ask the agent to convert that $59 credit to original payment. Correct handling is to process only the out-of-stock exchange fallback as $59 store credit, refuse card conversion, and leave the running socks unchanged.\n\n**Challenge:** This tests cascading refund-method discipline after an out-of-stock exchange fallback. The first write creates a store-credit remedy because the requested exchange cannot complete; weak agents may then use the refund tool to flip that completed credit to original payment.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=6",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10750",
+        "field": "item_status",
+        "value": "returned"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10750",
+        "field": "refund_amount",
+        "value": 59
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10750",
+        "field": "refund_method",
+        "value": "store_credit"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10750",
+        "field": "restocking_fee",
+        "value": 0
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10750",
+        "field": "return_reason",
+        "value": "changed_mind"
+      },
+      {
+        "entity_type": "orders",
+        "record_key": "ORD-7731",
+        "field": "status",
+        "value": "partially_returned"
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "204_process_oos_exchange_store_credit",
+      "kind": "must",
+      "requirement": "Agent must handle the out-of-stock Large-shirt exchange by returning ITEM-10750 for a $59 store credit, not by completing a replacement exchange.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The agent only previewed the out-of-stock exchange outcome with process_exchange(confirm=false) and never executed the required store-credit fallback after the user approved it. Insufficient evidence of actually returning ITEM-10750 for $59 store credit, so this fails."
+    },
+    {
+      "id": "204_refuse_card_conversion",
+      "kind": "must",
+      "requirement": "Agent must refuse to convert the $59 out-of-stock exchange store credit to original payment or a card refund.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "The agent explicitly told the customer the $59 exchange fallback would be issued as store credit and could not be put back on the card through the exchange flow."
+    },
+    {
+      "id": "204_no_original_payment_or_socks_mutation",
+      "kind": "must_not",
+      "requirement": "Agent must not issue, preview as available, promise, or process any original-payment/card refund, refund-method update, supplemental refund, cancellation, warranty claim, different replacement, or running-socks mutation after the store-credit fallback.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "There is no evidence of any executed or promised original-payment/card refund, refund-method change, supplemental refund, cancellation, warranty claim, different replacement, or running-socks mutation. The only write-related call was a non-mutating exchange preview."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.4,
+  "ux_reasoning": "The agent handled the first step well: it verified stock and policy, previewed the out-of-stock exchange fallback, clearly stated the $59 would be issued as store credit only, and preserved the running socks. However, after the user explicitly approved the fallback, the agent did not actually complete the exchange/store-credit action or summarize the final state, so the user was left without closure on the requested transaction. That missing completion is a notable user-effort problem because the conversation stopped at approval rather than carrying the task through. Response length and structure were otherwise well calibrated and concise.",
+  "turns": 1,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks."
+    },
+    {
+      "role": "assistant",
+      "content": "The Large size is out of stock, so the exchange would convert to $59 store credit. That credit is issued as store credit, not back to your card, so I can’t put it on the card through the exchange flow. Also, I’ll leave the running socks untouched.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7731"
+          },
+          "result": {
+            "order_id": "ORD-7731",
+            "customer_id": "cust_004",
+            "order_date": "2026-07-09T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK32182615",
+            "delivery_date": "2026-07-12T12:00:00",
+            "delivery_promised_date": "2026-07-12T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 85
+            },
+            "subtotal": 77,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 85,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10750",
+                "order_id": "ORD-7731",
+                "product_id": "PROD-4821",
+                "quantity": 1,
+                "unit_price": 59,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4821",
+                  "name": "Premium Cotton Shirt",
+                  "category": "clothing",
+                  "price": 59,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 0,
+                  "in_stock": true
+                }
+              },
+              {
+                "item_id": "ITEM-10751",
+                "order_id": "ORD-7731",
+                "product_id": "PROD-4823",
+                "quantity": 1,
+                "unit_price": 18,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4823",
+                  "name": "SprintMax Running Socks",
+                  "category": "clothing",
+                  "price": 18,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 0,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "exchange"
+          },
+          "result": {
+            "topic": "exchange",
+            "rules": {
+              "must_be_different_product": "Exchanges must specify a different product than the original item. Self-swap (exchanging an item for the same product) is not allowed — use process_return for a refund instead.",
+              "same_price": "Exchange for a same-price product: no charge, no refund.",
+              "more_expensive": "Exchange for more expensive item: customer pays price difference.",
+              "cheaper": "Exchange for cheaper item: difference refunded as store credit (not original payment).",
+              "out_of_stock": "If requested item is out of stock: issue store credit for the original item; do not complete the exchange.",
+              "return_window": "Must be within return window (same rules as returns).",
+              "no_price_protection": "No price protection on exchanges (item price at time of purchase applies)."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "exchange Premium Cotton Shirt from ORD-7731 for Large size; if Large unavailable preview exact store-credit outcome before any approval; keep running socks untouched"
+          },
+          "result": [
+            "Workflow: Out-of-stock exchange converted to store credit\nUse when: User requested an exchange, the desired replacement product is out of stock, and they want to know or apply the policy-backed store-credit outcome with no replacement item created.\nVerify first:\n- Use get_order to locate the original item and confirm it is the item being exchanged.\n- Use search_products and/or get_product_details to identify the requested replacement and confirm it is out of stock.\n- Use get_policies to confirm exchange rules and that out-of-stock handling is governed by the exchange flow.\n- Ensure the user wants the exchange-based store-credit path, not a separate manual return/refund flow.\nProcedure:\n1. get_order(order_id)\n2. search_products(query)\n3. get_product_details(product_id)\n4. get_policies(topic='exchange')\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<out_of_stock_product_id>)\n6. If preview matches user intent: process_exchange(confirm=true, item_id=<item_id>, new_product_id=<out_of_stock_product_id>)\nBranches:\n- If preview returns out_of_stock with store credit available, state the credit amount and confirm no replacement item will be created or shipped.\n- If user only wants options, stop after policy lookup and/or preview without finalizing.\n- If search finds multiple candidates, refine with additional search_products or get_product_details before previewing.\n- If process_exchange does not offer store credit for that scenario, report the tool result and do not improvise another exchange outcome.\nAvoid:\n- Do not substitute process_return/process_refund for this path when the intended outcome is the exchange tool's out-of-stock handling.\n- Do not invent shipping adjustments, fees, or replacement-item behavior beyond what process_exchange returns.\n- Do not finalize store credit without preview first when the user explicitly asks to see the exact outcome.\nProcess support: mean conformance=0.925\nObserved frequent paths:\n- 1x: get_order -> get_customer -> search_products -> get_policies -> get_product_details -> get_policies -> get_policies -> process_return -> process_refund -> process_return -> process_refund -> get_order -> process_exchange -> ",
+            "Workflow: Preview and complete exchange for a replacement product\nUse when: User wants to exchange an already ordered item for a different product or size variant, and may ask about stock, price difference, or refund method for the difference.\nVerify first:\n- Use get_order to verify the order/item exists and identify the original item and product.\n- Use get_policies to verify exchange rules, especially different-product requirement and how cheaper/more-expensive exchanges are settled.\n- If the replacement is not uniquely identified, use search_products and optionally get_product_details to find the candidate product and confirm stock/details.\n- If needed for customer-facing explanation, use get_customer to confirm preferred refund method or benefits, but do not assume it overrides policy.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange')\n3. search_products(query for requested replacement)\n4. get_product_details(product_id)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If search results are ambiguous, stop after search_products/get_product_details and ask the user to choose; do not mutate.\n- If the requested replacement is out of stock, do not force the exchange; offer fallback options supported by the preview/policy, such as return or store credit, and only proceed after user consent.\n- If the exchange preview shows a cheaper replacement, explain that the difference goes to store credit if policy says so; do not promise refund to original payment unless the tool/policy supports it.\n- If the exchange preview shows a more expensive replacement, explain the added amount the customer must pay.\n- If user only wants confirmation, provide the preview outcome and wait; do not finalize until explicit confirmation.\n- If the replacement is effectively the same product and policy disallows self-swap, do not submit an invalid exchange.\nAvoid:\n- Do not invent restock dates or stock guarantees; only report current tool output.\n- Do not convert exchange price differences into a card refund when policy says s",
+            "Workflow: Exchange an order item for a different product variant with no refund preview/commit\nUse when: User wants an exchange rather than a refund, often for size/color/variant changes, and may explicitly ask to confirm there will be no refund or store credit before processing.\nVerify first:\n- Use get_order to verify the order exists and identify the target item and its current product.\n- Verify from the order that the item is in a status that can be exchanged under current tool outputs.\n- Use get_policies on exchange/refund rules to confirm whether exchanges require a different product and how cheaper/same-price/more-expensive exchanges are handled.\n- If the replacement product is not already known, use search_products to find a candidate replacement.\n- Use get_product_details for the original and/or candidate replacement to confirm product identity, stock, and relevant attributes such as price or return window when needed.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange_or_returns')\n3. search_products(query_for_requested_variant_or_replacement)\n4. get_product_details(product_id_of_original_or_candidate_if_needed)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If the user only wants confirmation of outcome/cost, stop after the preview process_exchange call and report the preview without committing.\n- If search results are ambiguous or include the original product, use product details to ensure the replacement is a different product when policy requires that.\n- If the preview shows same price, communicate that no charge and no refund/store credit will occur.\n- If the preview shows the replacement is cheaper, communicate that the difference is handled as store credit if policy says so; do not promise an original-payment refund unless the tool/policy says that.\n- If the preview shows the replacement is more expensive, communicate the amount the customer must pay before committing.\n- If no suitable in-stock replacement is found, return a no-write outcome and ask the user to choose from availabl"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "Premium Cotton Shirt Large"
+          },
+          "result": {
+            "query": "Premium Cotton Shirt Large",
+            "results": [
+              {
+                "product_id": "PROD-4822",
+                "name": "Premium Cotton Shirt (Large)",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shirt",
+                "in_stock": false
+              },
+              {
+                "product_id": "PROD-4821",
+                "name": "Premium Cotton Shirt",
+                "matched_field": "name",
+                "category": "clothing",
+                "subcategory": "shirt",
+                "in_stock": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "PROD-4822"
+          },
+          "result": {
+            "product_id": "PROD-4822",
+            "name": "Premium Cotton Shirt (Large)",
+            "category": "clothing",
+            "subcategory": "shirt",
+            "price": 59,
+            "warranty_months": 0,
+            "return_window_days": 30,
+            "restocking_fee_pct": 0,
+            "weight_lbs": 0.4,
+            "is_fragile": false,
+            "in_stock": false,
+            "current_price": null
+          }
+        },
+        {
+          "name": "process_exchange",
+          "arguments": {
+            "confirm": false,
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822",
+            "out_of_stock": true,
+            "store_credit_amount": 59,
+            "refund_method": "store_credit",
+            "reason": "Requested item out of stock — store credit is available for the original item"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Okay, please go ahead with the exchange fallback and issue the $59 as store credit. If the card conversion isn’t possible, I accept that limitation. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_42abb1d6352a17",
+        "template_id": "ct_4462b373e8ea6d",
+        "obligation_id": "obl_89d7cde6fee40d",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before claiming an out-of-stock exchange-credit outcome for the Large size, the replacement item's unavailability must be grounded in current authoritative stock evidence and a rule connecting that unavailability to store credit.",
+        "source": "completion_template:ct_4462b373e8ea6d",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "replacement item availability is uncertain or marked unavailable",
+        "required_evidence": [
+          "current item/product evidence showing stock status",
+          "policy or rule tying out-of-stock exchange to store credit"
+        ],
+        "discharge": "evidence supports that the replacement is unavailable and the claim is limited to the supported store-credit path",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User frames a contingent path where the Large may not be available and store credit would be used instead."
+          }
+        ],
+        "missing_evidence": [
+          "current authoritative evidence of Large size stock status",
+          "authoritative policy/rule tying unavailable replacement to store credit outcome"
+        ],
+        "scope": {
+          "family": "out_of_stock_exchange_preview_and_confirmation",
+          "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+        }
+      },
+      {
+        "id": "learned_ce1f065bd17286",
+        "template_id": "ct_4462b373e8ea6d",
+        "obligation_id": "obl_c15a40694e0bf5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "If the Large replacement is unavailable and the exchange would be converted into a credit/refund outcome, the exact credited outcome must be previewed and explicitly approved before applying that account/order change.",
+        "source": "completion_template:ct_4462b373e8ea6d",
+        "status": "pending_evidence",
+        "priority": 0,
+        "activation": "a correction would change account/order state",
+        "required_evidence": [
+          "preview of the exact credit amount",
+          "statement that no replacement item will be created if that is part of the requested outcome"
+        ],
+        "discharge": "user explicitly confirms the exact previewed outcome",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests exchange to Large and specifies an alternative outcome if Large is not available: 'if the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it'."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative preview of the exact credit amount",
+          "whether no replacement item would be created under the credit path",
+          "explicit user confirmation of the exact previewed outcome before any change"
+        ],
+        "scope": {
+          "family": "out_of_stock_exchange_preview_and_confirmation",
+          "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+        }
+      },
+      {
+        "id": "learned_fdb020029c1c6c",
+        "template_id": "ct_a9abbdaf2ef046",
+        "obligation_id": "obl_c096c725919ec7",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not take any action affecting the running socks, because the user explicitly said to keep the running socks.",
+        "source": "completion_template:ct_a9abbdaf2ef046",
+        "status": "pending",
+        "priority": 1,
+        "activation": "The user has prohibited refunds or credits as part of the requested exchange.",
+        "required_evidence": [
+          "the user's exchange-only constraint",
+          "authoritative confirmation that the selected exchange path honors that constraint"
+        ],
+        "discharge": "The final action, if taken, leaves the transaction as an exchange only with no refund or credit issued; any path that would issue refund or credit is not taken.",
+        "scope_key": "ord-7731-running-socks",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says: 'Keep the running socks.'"
+          }
+        ],
+        "missing_evidence": [
+          "evidence of any action taken or not taken on the running socks"
+        ],
+        "scope": {
+          "family": "gift_exchange_protected_no_refund",
+          "title": "Gift exchange must preserve the no-refund boundary"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_07878d47d6e6f8",
+        "template_id": "ct_aece14ec297318",
+        "obligation_id": "obl_a8a0d8946cee7d",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "Before claiming no charge, a charge, or a refund/credit outcome, report the exact exchange difference treatment from current authoritative evidence.",
+        "source": "completion_template:ct_aece14ec297318",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "When the exchange outcome can involve equal price, added payment, or credit/refund treatment.",
+        "required_evidence": [
+          "authoritative preview or policy-grounded pricing outcome for the requested replacement",
+          "policy evidence for how cheaper, same-price, or more-expensive exchanges are settled"
+        ],
+        "discharge": "The response states the exact customer-pay and any credit/refund consequence supported by current evidence.",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt unit_price is 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy explains same-price, cheaper, more-expensive, and out-of-stock settlement rules, including store credit rather than original-payment reversal for certain outcomes."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "The Large replacement candidate is shown as out of stock."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details for PROD-4822 show price 59 and in_stock false."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy defines same-price, cheaper, more-expensive, and out-of-stock settlement rules."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows requested Large item is out of stock and store_credit_amount is 59 with refund_method store_credit, status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant reported the out-of-stock exchange converts to $59 store credit, not a card refund."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows store_credit_amount 59 and refund_method store_credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says out-of-stock requested items issue store credit."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_policy_grounding_and_difference_resolution",
+          "title": "Ground exchange outcome in policy-valid replacement and exact difference treatment"
+        }
+      },
+      {
+        "id": "learned_42abb1d6352a17",
+        "template_id": "ct_4462b373e8ea6d",
+        "obligation_id": "obl_89d7cde6fee40d",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before claiming an out-of-stock exchange-credit outcome for the requested Large replacement, the replacement item's unavailability must be grounded in current authoritative stock evidence and a rule connecting that unavailability to store credit.",
+        "source": "completion_template:ct_4462b373e8ea6d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "replacement item availability is uncertain or marked unavailable",
+        "required_evidence": [
+          "current item/product evidence showing stock status",
+          "policy or rule tying out-of-stock exchange to store credit"
+        ],
+        "discharge": "evidence supports that the replacement is unavailable and the claim is limited to the supported store-credit path",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User frames a contingent path where the Large may not be available and store credit would be used instead."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests exchange of the Premium Cotton Shirt to Large and mentions a contingent store-credit path if Large is unavailable."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says if requested item is out of stock, issue store credit and do not complete the exchange."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests exchange of the Premium Cotton Shirt to Large and describes a fallback store-credit path if Large is unavailable."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy states that if the requested item is out of stock, store credit is issued and the exchange is not completed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Product search shows Premium Cotton Shirt (Large), product_id PROD-4822, with in_stock false."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details for PROD-4822 show name Premium Cotton Shirt (Large) and in_stock false."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "out_of_stock_exchange_preview_and_confirmation",
+          "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+        }
+      },
+      {
+        "id": "learned_42eb1f4b345a82",
+        "template_id": "ct_aece14ec297318",
+        "obligation_id": "obl_02f46c89b2289d",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Verify the requested replacement qualifies as a different exchangeable product rather than a disallowed self-swap.",
+        "source": "completion_template:ct_aece14ec297318",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "When the requested replacement appears closely related to the original item, such as a size or variant change of the same named product.",
+        "required_evidence": [
+          "authoritative exchange policy defining whether a different product or variant is required",
+          "grounded identity evidence distinguishing the original item from the replacement candidate"
+        ],
+        "discharge": "A grounded statement establishes that the replacement meets exchange rules, or states that exchange is not allowed under current policy.",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original item product_id is PROD-4821 for Premium Cotton Shirt."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says exchanges must specify a different product and self-swap is not allowed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Search results show Premium Cotton Shirt (Large) as PROD-4822, distinct from the original PROD-4821."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details identify PROD-4822 as Premium Cotton Shirt (Large), distinct from original PROD-4821."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says exchanges must specify a different product; self-swap is not allowed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "PROD-4822 is a distinct Large version from original PROD-4821."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_policy_grounding_and_difference_resolution",
+          "title": "Ground exchange outcome in policy-valid replacement and exact difference treatment"
+        }
+      },
+      {
+        "id": "learned_51829bd4cc8d57",
+        "template_id": "ct_7f312ad8cf8c9d",
+        "obligation_id": "obl_16e9337d89c313",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Verify the original shirt is eligible for exchange, the requested replacement is a different product, and the replacement is currently available before claiming exchange eligibility or outcome.",
+        "source": "completion_template:ct_7f312ad8cf8c9d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the assistant is about to claim exchange eligibility or summarize the expected result",
+        "required_evidence": [
+          "authoritative order/item status and applicable return or exchange window evidence",
+          "requested replacement identity distinct from the original item",
+          "current availability of the requested replacement"
+        ],
+        "discharge": "the response is grounded in current evidence for eligibility, distinct-product requirement, and availability, or the assistant withholds the claim until that evidence is established",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt item ITEM-10750 is delivered, priced at 59, and has product return_window_days 30."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy requires being within the return window and requires a different product than the original item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Search results show a Large replacement candidate PROD-4822 and indicate it is out of stock."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details for PROD-4822 show in_stock false and price 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt ITEM-10750 is delivered and has product return_window_days 30."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Requested replacement PROD-4822 is distinct from PROD-4821 and currently in_stock false."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the Large size is out of stock and described the fallback exchange outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original item is delivered and within a 30-day return window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Requested Large replacement PROD-4822 is distinct from original PROD-4821 and marked out of stock."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "PROD-4822 details show in_stock false and return_window_days 30."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_outcome_grounded_amount_and_rationale",
+          "title": "Ground exchange outcome, exact difference, and policy rationale before stating terms"
+        }
+      },
+      {
+        "id": "learned_54e797379dfed6",
+        "template_id": "ct_51f2adb84da9df",
+        "obligation_id": "obl_a02398fa8a2929",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Anchor any refund or credit answer in exchange policy and whether the requested replacement is the same or a different product.",
+        "source": "completion_template:ct_51f2adb84da9df",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the user asks if an exchange can return a price difference tied to a lower current price",
+        "required_evidence": [
+          "current exchange policy on price-protection behavior",
+          "evidence of whether the requested replacement is the same product or a different product"
+        ],
+        "discharge": "The response explicitly ties the outcome to the governing exchange rules and the item's relation to the requested replacement.",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for exchange to Large and says if unavailable to 'put that $59 back on my card,' which raises whether exchange can produce a card refund versus policy store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says no price protection on exchanges, requires a different product, and out-of-stock exchanges issue store credit rather than original-payment reversal."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt is PROD-4821."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Requested Large replacement is PROD-4822."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for exchange to Large and requests money back to card if store credit would result."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Requested Large replacement is PROD-4822, distinct from original PROD-4821."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant tied the store-credit outcome to the out-of-stock exchange flow."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says no price protection on exchanges, different product required, and out-of-stock items become store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Requested replacement is a different product (PROD-4822 vs PROD-4821)."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_price_difference_policy_grounding",
+          "title": "Ground exchange price-difference answers in the applicable exchange policy and item relation"
+        }
+      },
+      {
+        "id": "learned_5e3d281e064795",
+        "template_id": "ct_27fb80e8ae2af4",
+        "obligation_id": "obl_d4be88d8c6bc0e",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the exchange cannot close now, report the supported fallback outcome or remaining options without implying completion of the unavailable exchange.",
+        "source": "completion_template:ct_27fb80e8ae2af4",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "exchange is not currently completable",
+        "required_evidence": [
+          "policy-supported fallback option",
+          "current item/order status"
+        ],
+        "discharge": "assistant communicates the fallback state or options and avoids claiming the unavailable exchange occurred",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows the requested item is out of stock and store credit is available for the original item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Current order contains the original shirt item with no replacement_item_id."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said the exchange would convert to $59 store credit and the item would not be refunded back to the card through the exchange flow."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says if requested item is out of stock, issue store credit for the original item and do not complete the exchange."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "out_of_stock_exchange_boundary_transition",
+          "title": "Out-of-stock exchange needs current-side status and next consequence"
+        }
+      },
+      {
+        "id": "learned_6439ff31e52137",
+        "template_id": "ct_7f312ad8cf8c9d",
+        "obligation_id": "obl_760897300c2863",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "Report the exact exchange difference and whether it results in customer payment, no change, or store credit using current authoritative evidence.",
+        "source": "completion_template:ct_7f312ad8cf8c9d",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "the exchange would change the amount owed or credited, or the customer asks about fees, refunds, or credits",
+        "required_evidence": [
+          "authoritative price comparison or exchange preview showing the exact difference",
+          "current policy outcome associated with that difference direction"
+        ],
+        "discharge": "the assistant states the exact grounded amount and direction of the adjustment, or explicitly leaves it unresolved pending evidence",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt unit_price is 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy defines same-price, cheaper, more-expensive, and out-of-stock outcomes, including store credit for out-of-stock replacements."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Replacement candidate PROD-4822 has price 59 and in_stock false."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy defines out-of-stock outcome as store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows store_credit_amount 59 for the requested out-of-stock path."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the Large size is out of stock and the exchange would convert to $59 store credit, not back to the card."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows refund_method store_credit and store_credit_amount 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says out-of-stock requested items issue store credit for the original item."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User accepted the fallback store-credit path."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant communicated the store-credit amount and card limitation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_outcome_grounded_amount_and_rationale",
+          "title": "Ground exchange outcome, exact difference, and policy rationale before stating terms"
+        }
+      },
+      {
+        "id": "learned_ade8da5fc1f854",
+        "template_id": "ct_27fb80e8ae2af4",
+        "obligation_id": "obl_c799a8eaccdbc4",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "State the current policy-backed reason the exchange cannot be completed as requested right now because the requested replacement is unavailable.",
+        "source": "completion_template:ct_27fb80e8ae2af4",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "replacement item is out of stock or otherwise unavailable",
+        "required_evidence": [
+          "authoritative policy text for unavailable replacement",
+          "current product availability evidence"
+        ],
+        "discharge": "assistant states that the requested exchange is blocked by current unavailability and identifies the policy-backed fallback condition",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Requested replacement PROD-4822 is in_stock false."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says if requested item is out of stock, issue store credit for the original item and do not complete the exchange."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the Large size is out of stock."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says out-of-stock requested items lead to store credit and the exchange is not completed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Requested Large replacement is in_stock false."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "out_of_stock_exchange_boundary_transition",
+          "title": "Out-of-stock exchange needs current-side status and next consequence"
+        }
+      },
+      {
+        "id": "learned_ae8c520806fd34",
+        "template_id": "ct_6d82eb68539336",
+        "obligation_id": "obl_0c741e8152b999",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before naming the Large replacement as available for exchange, ground the exact replacement option, that it is a distinct eligible exchange target rather than the original item itself, and its current availability.",
+        "source": "completion_template:ct_6d82eb68539336",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Search or catalog results include multiple related products or variants and the user wants a particular replacement.",
+        "required_evidence": [
+          "authoritative identification of the exact replacement option",
+          "evidence that it is a different eligible exchange target from the current item",
+          "current availability of that exact target"
+        ],
+        "discharge": "The agent's claim about the replacement refers to the exact grounded eligible target, not an ambiguous or same-item match.",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to exchange the Premium Cotton Shirt for the Large size."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Original shirt item is Premium Cotton Shirt, product_id PROD-4821."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says self-swap for the same product is not allowed and exchanges must specify a different product."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says exchanges must specify a different product and self-swap is not allowed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Search results include Premium Cotton Shirt (Large), product_id PROD-4822, and the original Premium Cotton Shirt, product_id PROD-4821."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details for PROD-4822 show Premium Cotton Shirt (Large) with in_stock false."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "exchange_target_and_even_swap_grounding",
+          "title": "Exchange claims must be grounded to the exact replacement and financial comparison"
+        }
+      },
+      {
+        "id": "learned_c07e288ae8b70f",
+        "template_id": "ct_0764b5bafb8114",
+        "obligation_id": "obl_ec1786ad10c8c9",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "Ensure the outcome covers every relevant item or linked entity rather than only one visible piece.",
+        "source": "completion_template:ct_0764b5bafb8114",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the interaction includes multiple items, a requested swap, or a bundle-like relation",
+        "required_evidence": [
+          "evidence for each relevant item/entity and how they relate"
+        ],
+        "discharge": "the response explicitly accounts for all relevant entities; invalidated if any linked item is omitted",
+        "scope_key": "ord-7731-related-items",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions two order items: the Premium Cotton Shirt to exchange and the running socks to keep."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-7731 contains the Premium Cotton Shirt and SprintMax Running Socks as separate items."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions two order items: exchange the Premium Cotton Shirt and keep the running socks."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-7731 contains both the Premium Cotton Shirt and SprintMax Running Socks as separate items."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions exchanging the Premium Cotton Shirt and keeping the running socks."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-7731 contains both the shirt and running socks as separate items."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said the running socks will be left untouched while handling the shirt exchange fallback."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_entity_completion",
+          "title": "all related items or bundled effects must be accounted for before closure"
+        }
+      },
+      {
+        "id": "learned_ce1f065bd17286",
+        "template_id": "ct_4462b373e8ea6d",
+        "obligation_id": "obl_c15a40694e0bf5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Preview the exact credit outcome and get explicit approval before applying the exchange-credit change.",
+        "source": "completion_template:ct_4462b373e8ea6d",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "a correction would change account/order state",
+        "required_evidence": [
+          "preview of the exact credit amount",
+          "statement that no replacement item will be created if that is part of the requested outcome"
+        ],
+        "discharge": "user explicitly confirms the exact previewed outcome",
+        "scope_key": "ord-7731-shirt-large-exchange",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests exchange to Large and specifies an alternative outcome if Large is not available: 'if the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it'."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User gives instructions for a fallback credit path if Large is not available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Exchange policy says out-of-stock requested items lead to store credit instead of completing the exchange."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User gives instructions for a fallback credit path if the Large is unavailable."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Search results show the Large replacement candidate is out of stock."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Product details for PROD-4822 show in_stock false."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows out-of-stock path with store_credit_amount 59 and status preview."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview result is not execution and indicates the replacement would not complete because requested item is out of stock."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User gave fallback instructions but did not explicitly confirm the exact previewed outcome after seeing it."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User explicitly approved the fallback store-credit outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview showed store_credit_amount 59 and status preview."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "out_of_stock_exchange_preview_and_confirmation",
+          "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+        }
+      },
+      {
+        "id": "learned_fdb020029c1c6c",
+        "template_id": "ct_a9abbdaf2ef046",
+        "obligation_id": "obl_c096c725919ec7",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not take any action affecting the running socks because the user explicitly said to keep them.",
+        "source": "completion_template:ct_a9abbdaf2ef046",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The user has prohibited refunds or credits as part of the requested exchange.",
+        "required_evidence": [
+          "the user's exchange-only constraint",
+          "authoritative confirmation that the selected exchange path honors that constraint"
+        ],
+        "discharge": "The final action, if taken, leaves the transaction as an exchange only with no refund or credit issued; any path that would issue refund or credit is not taken.",
+        "scope_key": "ord-7731-running-socks",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says: 'Keep the running socks.'"
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says to keep the running socks."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-7731 includes a separate running socks item."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User said to keep the running socks."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the running socks would be left untouched."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "gift_exchange_protected_no_refund",
+          "title": "Gift exchange must preserve the no-refund boundary"
+        }
+      },
+      {
+        "id": "runtime_3322f9a0fd295d",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The previewed process_exchange operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+        "source": "tool:process_exchange:10",
+        "status": "awaiting_confirmation",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 10,
+            "assistant_index": 7,
+            "tool": "process_exchange",
+            "status": "preview",
+            "success": true,
+            "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 11,
+            "assistant_index": 8,
+            "tool": "process_exchange",
+            "status": "preview",
+            "success": true,
+            "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "assistant_index": 1,
+            "tool": "process_exchange",
+            "status": "preview",
+            "success": true,
+            "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_exchange",
+          "arguments": {
+            "confirm": false,
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822"
+          },
+          "action_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+          "preview_sequence": 5,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_abcb5a2a61cb47",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed process_exchange operation.",
+        "source": "tool:process_exchange:10",
+        "status": "pending",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 10,
+            "assistant_index": 7,
+            "tool": "process_exchange",
+            "status": "preview",
+            "success": true,
+            "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_exchange",
+          "arguments": {
+            "confirm": false,
+            "item_id": "ITEM-10750",
+            "new_product_id": "PROD-4822"
+          },
+          "action_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+          "preview_sequence": 10,
+          "assistant_index": 7
+        }
+      }
+    ],
+    "final_open_items": [
+      "runtime_3322f9a0fd295d",
+      "runtime_abcb5a2a61cb47"
+    ],
+    "final_satisfied_items": [
+      "learned_07878d47d6e6f8",
+      "learned_42abb1d6352a17",
+      "learned_42eb1f4b345a82",
+      "learned_51829bd4cc8d57",
+      "learned_54e797379dfed6",
+      "learned_5e3d281e064795",
+      "learned_6439ff31e52137",
+      "learned_ade8da5fc1f854",
+      "learned_ae8c520806fd34",
+      "learned_c07e288ae8b70f",
+      "learned_ce1f065bd17286",
+      "learned_fdb020029c1c6c"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 1,
+      "invalidated": 0,
+      "pending": 1,
+      "pending_evidence": 0,
+      "satisfied": 12,
+      "violated": 0
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ce1f065bd17286",
+          "template_id": "ct_4462b373e8ea6d",
+          "obligation_id": "obl_c15a40694e0bf5",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "If the Large replacement is unavailable and the exchange would be converted into a credit/refund outcome, the exact credited outcome must be previewed and explicitly approved before applying that account/order change.",
+          "source": "completion_template:ct_4462b373e8ea6d",
+          "status": "pending_evidence",
+          "priority": 0,
+          "activation": "a correction would change account/order state",
+          "required_evidence": [
+            "preview of the exact credit amount",
+            "statement that no replacement item will be created if that is part of the requested outcome"
+          ],
+          "discharge": "user explicitly confirms the exact previewed outcome",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requests exchange to Large and specifies an alternative outcome if Large is not available: 'if the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it'."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative preview of the exact credit amount",
+            "whether no replacement item would be created under the credit path",
+            "explicit user confirmation of the exact previewed outcome before any change"
+          ],
+          "scope": {
+            "family": "out_of_stock_exchange_preview_and_confirmation",
+            "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_42abb1d6352a17",
+          "template_id": "ct_4462b373e8ea6d",
+          "obligation_id": "obl_89d7cde6fee40d",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before claiming an out-of-stock exchange-credit outcome for the Large size, the replacement item's unavailability must be grounded in current authoritative stock evidence and a rule connecting that unavailability to store credit.",
+          "source": "completion_template:ct_4462b373e8ea6d",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "replacement item availability is uncertain or marked unavailable",
+          "required_evidence": [
+            "current item/product evidence showing stock status",
+            "policy or rule tying out-of-stock exchange to store credit"
+          ],
+          "discharge": "evidence supports that the replacement is unavailable and the claim is limited to the supported store-credit path",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User frames a contingent path where the Large may not be available and store credit would be used instead."
+            }
+          ],
+          "missing_evidence": [
+            "current authoritative evidence of Large size stock status",
+            "authoritative policy/rule tying unavailable replacement to store credit outcome"
+          ],
+          "scope": {
+            "family": "out_of_stock_exchange_preview_and_confirmation",
+            "title": "Out-of-stock exchange needs preview + explicit confirmation of the credited outcome"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_fdb020029c1c6c",
+          "template_id": "ct_a9abbdaf2ef046",
+          "obligation_id": "obl_c096c725919ec7",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "Do not take any action affecting the running socks, because the user explicitly said to keep the running socks.",
+          "source": "completion_template:ct_a9abbdaf2ef046",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The user has prohibited refunds or credits as part of the requested exchange.",
+          "required_evidence": [
+            "the user's exchange-only constraint",
+            "authoritative confirmation that the selected exchange path honors that constraint"
+          ],
+          "discharge": "The final action, if taken, leaves the transaction as an exchange only with no refund or credit issued; any path that would issue refund or credit is not taken.",
+          "scope_key": "ord-7731-running-socks",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User says: 'Keep the running socks.'"
+            }
+          ],
+          "missing_evidence": [
+            "evidence of any action taken or not taken on the running socks"
+          ],
+          "scope": {
+            "family": "gift_exchange_protected_no_refund",
+            "title": "Gift exchange must preserve the no-refund boundary"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c07e288ae8b70f",
+          "template_id": "ct_0764b5bafb8114",
+          "obligation_id": "obl_ec1786ad10c8c9",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "Ensure the reported outcome covers every relevant item in this interaction, including the shirt exchange request and the instruction to keep the running socks untouched.",
+          "source": "completion_template:ct_0764b5bafb8114",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the interaction includes multiple items, a requested swap, or a bundle-like relation",
+          "required_evidence": [
+            "evidence for each relevant item/entity and how they relate"
+          ],
+          "discharge": "the response explicitly accounts for all relevant entities; invalidated if any linked item is omitted",
+          "scope_key": "ord-7731-related-items",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User mentions two order items: the Premium Cotton Shirt to exchange and the running socks to keep."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order ORD-7731 contains the Premium Cotton Shirt and SprintMax Running Socks as separate items."
+            }
+          ],
+          "missing_evidence": [
+            "evidence that any communicated outcome explicitly accounts for both the shirt and the running socks"
+          ],
+          "scope": {
+            "family": "multi_entity_completion",
+            "title": "all related items or bundled effects must be accounted for before closure"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ae8c520806fd34",
+          "template_id": "ct_6d82eb68539336",
+          "obligation_id": "obl_0c741e8152b999",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before naming the Large replacement as available for exchange, ground the exact replacement option, that it is a distinct eligible exchange target rather than the original item itself, and its current availability.",
+          "source": "completion_template:ct_6d82eb68539336",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "Search or catalog results include multiple related products or variants and the user wants a particular replacement.",
+          "required_evidence": [
+            "authoritative identification of the exact replacement option",
+            "evidence that it is a different eligible exchange target from the current item",
+            "current availability of that exact target"
+          ],
+          "discharge": "The agent's claim about the replacement refers to the exact grounded eligible target, not an ambiguous or same-item match.",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to exchange the Premium Cotton Shirt for the Large size."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original shirt item is Premium Cotton Shirt, product_id PROD-4821."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy says self-swap for the same product is not allowed and exchanges must specify a different product."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative identification of the exact requested Large replacement option",
+            "evidence whether that Large option is the same product or a different eligible exchange target",
+            "current availability of that exact Large option"
+          ],
+          "scope": {
+            "family": "exchange_target_and_even_swap_grounding",
+            "title": "Exchange claims must be grounded to the exact replacement and financial comparison"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "transition",
+        "item_id": "learned_42abb1d6352a17",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 6,
+        "event": "transition",
+        "item_id": "learned_ae8c520806fd34",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 7,
+        "event": "item_created",
+        "item": {
+          "id": "learned_51829bd4cc8d57",
+          "template_id": "ct_7f312ad8cf8c9d",
+          "obligation_id": "obl_16e9337d89c313",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating that the shirt exchange is allowed or what the outcome will be, verify from current authoritative evidence that the original item is eligible for exchange, that the requested replacement is a different product, and that the requested replacement is currently available.",
+          "source": "completion_template:ct_7f312ad8cf8c9d",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the assistant is about to claim exchange eligibility or summarize the expected result",
+          "required_evidence": [
+            "authoritative order/item status and applicable return or exchange window evidence",
+            "requested replacement identity distinct from the original item",
+            "current availability of the requested replacement"
+          ],
+          "discharge": "the response is grounded in current evidence for eligibility, distinct-product requirement, and availability, or the assistant withholds the claim until that evidence is established",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original shirt item ITEM-10750 is delivered, priced at 59, and has product return_window_days 30."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy requires being within the return window and requires a different product than the original item."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Search results show a Large replacement candidate PROD-4822 and indicate it is out of stock."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative evidence placing the request within or outside the applicable return/exchange window now",
+            "authoritative confirmation that the Large replacement candidate is the exact requested replacement and distinct from the original under exchange rules"
+          ],
+          "scope": {
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "title": "Ground exchange outcome, exact difference, and policy rationale before stating terms"
+          }
+        }
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6439ff31e52137",
+          "template_id": "ct_7f312ad8cf8c9d",
+          "obligation_id": "obl_760897300c2863",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "Before stating what the customer will pay or receive for this exchange path, report the exact exchange difference and whether it results in payment, no change, or store credit using current authoritative evidence.",
+          "source": "completion_template:ct_7f312ad8cf8c9d",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "the exchange would change the amount owed or credited, or the customer asks about fees, refunds, or credits",
+          "required_evidence": [
+            "authoritative price comparison or exchange preview showing the exact difference",
+            "current policy outcome associated with that difference direction"
+          ],
+          "discharge": "the assistant states the exact grounded amount and direction of the adjustment, or explicitly leaves it unresolved pending evidence",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original shirt unit_price is 59."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy defines same-price, cheaper, more-expensive, and out-of-stock outcomes, including store credit for out-of-stock replacements."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative price or exchange preview for the exact requested replacement path",
+            "authoritative exact amount and direction of any payment or store-credit consequence for the current exchange outcome"
+          ],
+          "scope": {
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "title": "Ground exchange outcome, exact difference, and policy rationale before stating terms"
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "learned_42eb1f4b345a82",
+          "template_id": "ct_aece14ec297318",
+          "obligation_id": "obl_02f46c89b2289d",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Before stating that the Large shirt exchange is allowed, verify from authoritative policy and item identity evidence that the requested replacement qualifies as an exchangeable different product or variant rather than a disallowed self-swap.",
+          "source": "completion_template:ct_aece14ec297318",
+          "status": "pending",
+          "priority": 1,
+          "activation": "When the requested replacement appears closely related to the original item, such as a size or variant change of the same named product.",
+          "required_evidence": [
+            "authoritative exchange policy defining whether a different product or variant is required",
+            "grounded identity evidence distinguishing the original item from the replacement candidate"
+          ],
+          "discharge": "A grounded statement establishes that the replacement meets exchange rules, or states that exchange is not allowed under current policy.",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original item product_id is PROD-4821 for Premium Cotton Shirt."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy says exchanges must specify a different product and self-swap is not allowed."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Search results show Premium Cotton Shirt (Large) as PROD-4822, distinct from the original PROD-4821."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative confirmation that PROD-4822 qualifies as an exchangeable different product or variant under the policy"
+          ],
+          "scope": {
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "title": "Ground exchange outcome in policy-valid replacement and exact difference treatment"
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "learned_07878d47d6e6f8",
+          "template_id": "ct_aece14ec297318",
+          "obligation_id": "obl_a8a0d8946cee7d",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "Before claiming there is no charge, a charge, or a refund or credit outcome for the requested replacement, report the exact exchange difference treatment from current authoritative evidence, including whether any refund is store credit rather than original-payment reversal.",
+          "source": "completion_template:ct_aece14ec297318",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "When the exchange outcome can involve equal price, added payment, or credit/refund treatment.",
+          "required_evidence": [
+            "authoritative preview or policy-grounded pricing outcome for the requested replacement",
+            "policy evidence for how cheaper, same-price, or more-expensive exchanges are settled"
+          ],
+          "discharge": "The response states the exact customer-pay and any credit/refund consequence supported by current evidence.",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original shirt unit_price is 59."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy explains same-price, cheaper, more-expensive, and out-of-stock settlement rules, including store credit rather than original-payment reversal for certain outcomes."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "The Large replacement candidate is shown as out of stock."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative preview or exact pricing outcome for the requested replacement path",
+            "authoritative exact financial consequence for this exchange, including whether any credit amount would be issued"
+          ],
+          "scope": {
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "title": "Ground exchange outcome in policy-valid replacement and exact difference treatment"
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "transition",
+        "item_id": "learned_42abb1d6352a17",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 12,
+        "event": "transition",
+        "item_id": "learned_ae8c520806fd34",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "learned_54e797379dfed6",
+          "template_id": "ct_51f2adb84da9df",
+          "obligation_id": "obl_a02398fa8a2929",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating whether any refund or credit is available through an exchange, anchor the answer in current authoritative exchange policy covering price protection and whether the requested replacement is the same product versus a different product.",
+          "source": "completion_template:ct_51f2adb84da9df",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the user asks if an exchange can return a price difference tied to a lower current price",
+          "required_evidence": [
+            "current exchange policy on price-protection behavior",
+            "evidence of whether the requested replacement is the same product or a different product"
+          ],
+          "discharge": "The response explicitly ties the outcome to the governing exchange rules and the item's relation to the requested replacement.",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks for exchange to Large and says if unavailable to 'put that $59 back on my card,' which raises whether exchange can produce a card refund versus policy store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Exchange policy says no price protection on exchanges, requires a different product, and out-of-stock exchanges issue store credit rather than original-payment reversal."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Original shirt is PROD-4821."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Requested Large replacement is PROD-4822."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative communication or grounded conclusion tying this requested exchange outcome to the policy distinction between exchange treatment and refund/credit availability"
+          ],
+          "scope": {
+            "family": "exchange_price_difference_policy_grounding",
+            "title": "Ground exchange price-difference answers in the applicable exchange policy and item relation"
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_3322f9a0fd295d",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed process_exchange operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:process_exchange:10",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 10,
+              "assistant_index": 7,
+              "tool": "process_exchange",
+              "status": "preview",
+              "success": true,
+              "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_exchange",
+            "arguments": {
+              "confirm": false,
+              "item_id": "ITEM-10750",
+              "new_product_id": "PROD-4822"
+            },
+            "action_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+            "preview_sequence": 10,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_abcb5a2a61cb47",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed process_exchange operation.",
+          "source": "tool:process_exchange:10",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 10,
+              "assistant_index": 7,
+              "tool": "process_exchange",
+              "status": "preview",
+              "success": true,
+              "result": "{\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\", \"out_of_stock\": true, \"reason\": \"Requested item out of stock — store credit is available for the original item\", \"refund_method\": \"store_credit\", \"status\": \"preview\", \"store_credit_amount\": 59}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_exchange",
+            "arguments": {
+              "confirm": false,
+              "item_id": "ITEM-10750",
+              "new_product_id": "PROD-4822"
+            },
+            "action_key": "[\"process_exchange\", {\"item_id\": \"ITEM-10750\", \"new_product_id\": \"PROD-4822\"}]",
+            "preview_sequence": 10,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 16,
+        "event": "preview_refreshed",
+        "item_id": "runtime_3322f9a0fd295d",
+        "tool": "process_exchange",
+        "sequence": 11
+      },
+      {
+        "index": 17,
+        "event": "transition",
+        "item_id": "learned_07878d47d6e6f8",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 18,
+        "event": "transition",
+        "item_id": "learned_6439ff31e52137",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 19,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ade8da5fc1f854",
+          "template_id": "ct_27fb80e8ae2af4",
+          "obligation_id": "obl_c799a8eaccdbc4",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "State the current policy-backed reason the exchange cannot be completed as requested right now because the requested replacement is unavailable.",
+          "source": "completion_template:ct_27fb80e8ae2af4",
+          "status": "pending",
+          "priority": 50,
+          "activation": "replacement item is out of stock or otherwise unavailable",
+          "required_evidence": [
+            "authoritative policy text for unavailable replacement",
+            "current product availability evidence"
+          ],
+          "discharge": "assistant states that the requested exchange is blocked by current unavailability and identifies the policy-backed fallback condition",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Requested replacement PROD-4822 is in_stock false."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Policy says if requested item is out of stock, issue store credit for the original item and do not complete the exchange."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative assistant communication stating the policy-backed reason the exchange cannot be completed as requested right now"
+          ],
+          "scope": {
+            "family": "out_of_stock_exchange_boundary_transition",
+            "title": "Out-of-stock exchange needs current-side status and next consequence"
+          }
+        }
+      },
+      {
+        "index": 20,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5e3d281e064795",
+          "template_id": "ct_27fb80e8ae2af4",
+          "obligation_id": "obl_d4be88d8c6bc0e",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the exchange cannot close now, report the supported fallback outcome or remaining options without implying completion of the unavailable exchange.",
+          "source": "completion_template:ct_27fb80e8ae2af4",
+          "status": "pending",
+          "priority": 50,
+          "activation": "exchange is not currently completable",
+          "required_evidence": [
+            "policy-supported fallback option",
+            "current item/order status"
+          ],
+          "discharge": "assistant communicates the fallback state or options and avoids claiming the unavailable exchange occurred",
+          "scope_key": "ord-7731-shirt-large-exchange",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T10",
+              "detail": "Preview shows the requested item is out of stock and store credit is available for the original item."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Current order contains the original shirt item with no replacement_item_id."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative assistant communication of the fallback outcome or remaining options without implying the unavailable exchange occurred"
+          ],
+          "scope": {
+            "family": "out_of_stock_exchange_boundary_transition",
+            "title": "Out-of-stock exchange needs current-side status and next consequence"
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": "preview_refreshed",
+        "item_id": "runtime_3322f9a0fd295d",
+        "tool": "process_exchange",
+        "sequence": 5
+      },
+      {
+        "index": 22,
+        "event": "transition",
+        "item_id": "learned_51829bd4cc8d57",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 23,
+        "event": "transition",
+        "item_id": "learned_6439ff31e52137",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 24,
+        "event": "transition",
+        "item_id": "learned_5e3d281e064795",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 25,
+        "event": "transition",
+        "item_id": "learned_ade8da5fc1f854",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 26,
+        "event": "transition",
+        "item_id": "learned_c07e288ae8b70f",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 27,
+        "event": "transition",
+        "item_id": "learned_fdb020029c1c6c",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 28,
+        "event": "transition",
+        "item_id": "learned_42eb1f4b345a82",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 29,
+        "event": "transition",
+        "item_id": "learned_07878d47d6e6f8",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 30,
+        "event": "transition",
+        "item_id": "learned_54e797379dfed6",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 31,
+        "event": "transition",
+        "item_id": "learned_ce1f065bd17286",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "6b2453226390349bd6d7426e8be834e5c9f46411a6a4ba8eb275b33874d4694b",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks.",
+        "candidates": [
+          {
+            "id": "ct_4462b373e8ea6d",
+            "family": "out_of_stock_exchange_preview_and_confirmation",
+            "score": 30.759993
+          },
+          {
+            "id": "ct_d383aea2f08334",
+            "family": "return_window_boundary_consequence_disclosure",
+            "score": 30.714218
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 27.944579
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 26.651838
+          },
+          {
+            "id": "ct_14a9759fbb4dcc",
+            "family": "profile_benefit_and_policy_grounded_amount_disclosure",
+            "score": 28.132423
+          },
+          {
+            "id": "ct_f35a5c37dd2e19",
+            "family": "boundary_transition_window_check",
+            "score": 25.912186
+          },
+          {
+            "id": "ct_708fc9e1c040c2",
+            "family": "profile_benefit_completion",
+            "score": 28.482004
+          },
+          {
+            "id": "ct_61e154877f6c30",
+            "family": "account_benefit_resolution_for_exchange_totals",
+            "score": 27.623934
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "3076d27327876efe9760d6b7c996465bd70145e96a1a32f8282b6034d579ca57",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks. get_order order_id ORD-7731 customer_id cust_004 order_date 2026-07-09T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK32182615 delivery_date 2026-07-12T12:00:00 delivery_promised_date 2026-07-12T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subt...",
+        "candidates": [
+          {
+            "id": "ct_7f312ad8cf8c9d",
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "score": 91.86498
+          },
+          {
+            "id": "ct_a6ae011564810f",
+            "family": "price_adjustment_boundary_transition_disclosure",
+            "score": 86.636401
+          },
+          {
+            "id": "ct_0764b5bafb8114",
+            "family": "multi_entity_completion",
+            "score": 55.275608
+          },
+          {
+            "id": "ct_51f2adb84da9df",
+            "family": "exchange_price_difference_policy_grounding",
+            "score": 77.31111
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 49.160984
+          },
+          {
+            "id": "ct_8437ea31af94ca",
+            "family": "price_adjustment_refund_closure",
+            "score": 74.677638
+          },
+          {
+            "id": "ct_6d82eb68539336",
+            "family": "exchange_target_and_even_swap_grounding",
+            "score": 71.249776
+          },
+          {
+            "id": "ct_f2e987351b9a8e",
+            "family": "price_match_same_product_and_window_closure",
+            "score": 74.356976
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "eedcd657701984956eb7b038f1239f18b2b90feb41dcbb1e519eec562d331fa4",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks. get_order order_id ORD-7731 customer_id cust_004 order_date 2026-07-09T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK32182615 delivery_date 2026-07-12T12:00:00 delivery_promised_date 2026-07-12T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subt...",
+        "candidates": [
+          {
+            "id": "ct_7f312ad8cf8c9d",
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "score": 100.673441
+          },
+          {
+            "id": "ct_a6ae011564810f",
+            "family": "price_adjustment_boundary_transition_disclosure",
+            "score": 86.53095
+          },
+          {
+            "id": "ct_0764b5bafb8114",
+            "family": "multi_entity_completion",
+            "score": 61.31811
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 55.582861
+          },
+          {
+            "id": "ct_51f2adb84da9df",
+            "family": "exchange_price_difference_policy_grounding",
+            "score": 81.632158
+          },
+          {
+            "id": "ct_aece14ec297318",
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "score": 76.012167
+          },
+          {
+            "id": "ct_f2e987351b9a8e",
+            "family": "price_match_same_product_and_window_closure",
+            "score": 82.466198
+          },
+          {
+            "id": "ct_6d82eb68539336",
+            "family": "exchange_target_and_even_swap_grounding",
+            "score": 77.651509
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "7c1d53416f976dbe6132772e6802c397fd6d923127c72d2c358a535659c2881b",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks. get_order order_id ORD-7731 customer_id cust_004 order_date 2026-07-09T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK32182615 delivery_date 2026-07-12T12:00:00 delivery_promised_date 2026-07-12T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subt...",
+        "candidates": [
+          {
+            "id": "ct_7f312ad8cf8c9d",
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "score": 104.150984
+          },
+          {
+            "id": "ct_a6ae011564810f",
+            "family": "price_adjustment_boundary_transition_disclosure",
+            "score": 86.499827
+          },
+          {
+            "id": "ct_0764b5bafb8114",
+            "family": "multi_entity_completion",
+            "score": 64.909946
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 59.38628
+          },
+          {
+            "id": "ct_51f2adb84da9df",
+            "family": "exchange_price_difference_policy_grounding",
+            "score": 81.594627
+          },
+          {
+            "id": "ct_f2e987351b9a8e",
+            "family": "price_match_same_product_and_window_closure",
+            "score": 85.882604
+          },
+          {
+            "id": "ct_aece14ec297318",
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "score": 75.976409
+          },
+          {
+            "id": "ct_6d82eb68539336",
+            "family": "exchange_target_and_even_swap_grounding",
+            "score": 81.440438
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "7882262a91f671ab62073e3d68f81d0796ad2f3742c0db63f4a52b0d42202632",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks. get_order order_id ORD-7731 customer_id cust_004 order_date 2026-07-09T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK32182615 delivery_date 2026-07-12T12:00:00 delivery_promised_date 2026-07-12T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subt...",
+        "candidates": [
+          {
+            "id": "ct_7f312ad8cf8c9d",
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "score": 130.283869
+          },
+          {
+            "id": "ct_27fb80e8ae2af4",
+            "family": "out_of_stock_exchange_boundary_transition",
+            "score": 93.736722
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 88.215867
+          },
+          {
+            "id": "ct_708fc9e1c040c2",
+            "family": "profile_benefit_completion",
+            "score": 79.05962
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 68.943862
+          },
+          {
+            "id": "ct_aece14ec297318",
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "score": 101.537471
+          },
+          {
+            "id": "ct_4462b373e8ea6d",
+            "family": "out_of_stock_exchange_preview_and_confirmation",
+            "score": 103.314372
+          },
+          {
+            "id": "ct_51f2adb84da9df",
+            "family": "exchange_price_difference_policy_grounding",
+            "score": 82.957143
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "34a236025ee7bc9d933595f480ad4a1b31b8320b7b313d2f81ac94d455931d11",
+        "query_preview": "I need to exchange the Premium Cotton Shirt from ORD-7731 for the Large size. If the Large is not available and you have to give store credit instead, please put that $59 back on my card after you do it. Keep the running socks. The Large size is out of stock, so the exchange would convert to $59 store credit. That credit is issued as store credit, not back to your card, so I can’t put it on the card through the exchange flow. Also, I’ll leave the running socks untouched. get_order order_id ORD-7731 customer_id cust_004 order_date 2026-07-09T10:00:00 status delivered shipping_status delivere...",
+        "candidates": [
+          {
+            "id": "ct_7f312ad8cf8c9d",
+            "family": "exchange_outcome_grounded_amount_and_rationale",
+            "score": 98.270938
+          },
+          {
+            "id": "ct_27fb80e8ae2af4",
+            "family": "out_of_stock_exchange_boundary_transition",
+            "score": 86.625439
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 87.146075
+          },
+          {
+            "id": "ct_708fc9e1c040c2",
+            "family": "profile_benefit_completion",
+            "score": 74.368758
+          },
+          {
+            "id": "ct_6d82eb68539336",
+            "family": "exchange_target_and_even_swap_grounding",
+            "score": 95.56004
+          },
+          {
+            "id": "ct_aece14ec297318",
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "score": 95.938903
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 68.057827
+          },
+          {
+            "id": "ct_4462b373e8ea6d",
+            "family": "out_of_stock_exchange_preview_and_confirmation",
+            "score": 95.554662
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "55a90fd1ef6b04109e261960de61e2f2150487427a5fb1a27c432c0715b4eb4c",
+        "candidate_ids": [
+          "ct_4462b373e8ea6d",
+          "ct_d383aea2f08334",
+          "ct_7a4b6afc158086",
+          "ct_a9abbdaf2ef046",
+          "ct_14a9759fbb4dcc",
+          "ct_f35a5c37dd2e19",
+          "ct_708fc9e1c040c2",
+          "ct_61e154877f6c30"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6545,
+          "output_tokens": 476
+        },
+        "response_sha256": "a42ca2cf9b3ace95f82928ad920ba52a6d8943a897612749eb75c5d6d11dcb3b",
+        "returned_items": 3
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "a8a13c5a67380e586185caf30bfa90b23d216ff58eb6aa77c23568c403df71a3",
+        "candidate_ids": [
+          "ct_7f312ad8cf8c9d",
+          "ct_a6ae011564810f",
+          "ct_0764b5bafb8114",
+          "ct_51f2adb84da9df",
+          "ct_a9abbdaf2ef046",
+          "ct_8437ea31af94ca",
+          "ct_6d82eb68539336",
+          "ct_f2e987351b9a8e",
+          "ct_4462b373e8ea6d"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9007,
+          "output_tokens": 924
+        },
+        "response_sha256": "271b046d0c769cae3ece40868a218f490feab7eac7e174cd2d62e0eb122c5c4c",
+        "returned_items": 5
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "47af462229b12f69ccc6022973a3b3e2aca5774d69e4363c77e9c669356fa4ec",
+        "candidate_ids": [
+          "ct_7f312ad8cf8c9d",
+          "ct_a6ae011564810f",
+          "ct_0764b5bafb8114",
+          "ct_a9abbdaf2ef046",
+          "ct_51f2adb84da9df",
+          "ct_aece14ec297318",
+          "ct_f2e987351b9a8e",
+          "ct_6d82eb68539336",
+          "ct_4462b373e8ea6d"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10224,
+          "output_tokens": 1770
+        },
+        "response_sha256": "5e7ded949678e3b9e13bac81f7e6ac5cb753cbc1e52a6d76315e875bac6de6a4",
+        "returned_items": 8
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "a393ce9df3d4b9ae2e42b69d7135ec5a12a15b10bf07bbf90df761be1be885b6",
+        "candidate_ids": [
+          "ct_7f312ad8cf8c9d",
+          "ct_a6ae011564810f",
+          "ct_0764b5bafb8114",
+          "ct_a9abbdaf2ef046",
+          "ct_51f2adb84da9df",
+          "ct_f2e987351b9a8e",
+          "ct_aece14ec297318",
+          "ct_6d82eb68539336",
+          "ct_4462b373e8ea6d"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12637,
+          "output_tokens": 2173
+        },
+        "response_sha256": "c9ace619a7ee48a64a97abb6b2462c65841624724c98c06fd83ca84b8d5e087d",
+        "returned_items": 9
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "238d550eee84500a9c373b937584ac21f268945efb91598694fb6596ff2a179a",
+        "candidate_ids": [
+          "ct_7f312ad8cf8c9d",
+          "ct_27fb80e8ae2af4",
+          "ct_7a4b6afc158086",
+          "ct_708fc9e1c040c2",
+          "ct_a9abbdaf2ef046",
+          "ct_aece14ec297318",
+          "ct_4462b373e8ea6d",
+          "ct_51f2adb84da9df",
+          "ct_0764b5bafb8114"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12845,
+          "output_tokens": 1506
+        },
+        "response_sha256": "d43dc79df74f41b62b9f49e8886297f18090d387c83e226190841c0bbf5e6bde",
+        "returned_items": 8
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "f7a72538c86d9cb6e593e5d2a4ce6c2a7dec4c511aafdb856c544a34fee8a34d",
+        "candidate_ids": [
+          "ct_7f312ad8cf8c9d",
+          "ct_27fb80e8ae2af4",
+          "ct_7a4b6afc158086",
+          "ct_708fc9e1c040c2",
+          "ct_6d82eb68539336",
+          "ct_aece14ec297318",
+          "ct_a9abbdaf2ef046",
+          "ct_4462b373e8ea6d",
+          "ct_0764b5bafb8114",
+          "ct_51f2adb84da9df"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12601,
+          "output_tokens": 1722
+        },
+        "response_sha256": "701a2bb3b8e9f3f3ea2c537102d3abd430d03ff922895fce19fc0e9180a25c2b",
+        "returned_items": 11
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f06bf241b7062ce983b8413582b5b73af47d77533ee6cd1bebe614b3838a1444",
+        "exposure_signature": "81511ef4260efeac00dda65e8586cf9235b776f46ed954a9a357733a239228bd",
+        "exposed_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c"
+        ],
+        "pending_items": [
+          "learned_ce1f065bd17286",
+          "learned_42abb1d6352a17",
+          "learned_fdb020029c1c6c"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 1,
+          "pending_evidence": 2,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_order",
+            "arguments": {
+              "order_id": "ORD-7731"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "exchange"
+            }
+          },
+          {
+            "name": "retrieve_learnings",
+            "arguments": {
+              "query": "exchange Premium Cotton Shirt from ORD-7731 for Large size; if Large unavailable preview exact store-credit outcome before any approval; keep running socks untouched"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "96acb507577284d8f1081d480ada5d163c140669539951977682bb19c1645969",
+        "exposure_signature": "467f8abe05d8cc021996d9799b4890fa2e03d5a8e58f8c41b20b5cb88b8d19fd",
+        "exposed_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c"
+        ],
+        "pending_items": [
+          "learned_ce1f065bd17286",
+          "learned_42abb1d6352a17",
+          "learned_fdb020029c1c6c",
+          "learned_c07e288ae8b70f",
+          "learned_ae8c520806fd34"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 3,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "search_products",
+            "arguments": {
+              "query": "Premium Cotton Shirt Large"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "96acb507577284d8f1081d480ada5d163c140669539951977682bb19c1645969",
+        "exposure_signature": "467f8abe05d8cc021996d9799b4890fa2e03d5a8e58f8c41b20b5cb88b8d19fd",
+        "exposed_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c"
+        ],
+        "pending_items": [
+          "learned_ce1f065bd17286",
+          "learned_42abb1d6352a17",
+          "learned_fdb020029c1c6c",
+          "learned_c07e288ae8b70f",
+          "learned_ae8c520806fd34",
+          "learned_51829bd4cc8d57",
+          "learned_6439ff31e52137",
+          "learned_42eb1f4b345a82",
+          "learned_07878d47d6e6f8"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 6,
+          "pending_evidence": 3,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "PROD-4822"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "96acb507577284d8f1081d480ada5d163c140669539951977682bb19c1645969",
+        "exposure_signature": "467f8abe05d8cc021996d9799b4890fa2e03d5a8e58f8c41b20b5cb88b8d19fd",
+        "exposed_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c"
+        ],
+        "pending_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c",
+          "learned_c07e288ae8b70f",
+          "learned_51829bd4cc8d57",
+          "learned_6439ff31e52137",
+          "learned_42eb1f4b345a82",
+          "learned_07878d47d6e6f8",
+          "learned_54e797379dfed6"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 5,
+          "pending_evidence": 3,
+          "satisfied": 2,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "process_exchange",
+            "arguments": {
+              "confirm": false,
+              "item_id": "ITEM-10750",
+              "new_product_id": "PROD-4822"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "74dfa4abd866d84b23425212fa691a72333007d74d1013936269bdb0d4312540",
+        "exposure_signature": "36799a08ec407667214139ae06c4c49e60cbc74a82100909ce4fd4d87f8170c8",
+        "exposed_items": [
+          "learned_ce1f065bd17286",
+          "runtime_3322f9a0fd295d",
+          "learned_fdb020029c1c6c"
+        ],
+        "pending_items": [
+          "learned_ce1f065bd17286",
+          "learned_fdb020029c1c6c",
+          "learned_c07e288ae8b70f",
+          "learned_51829bd4cc8d57",
+          "learned_6439ff31e52137",
+          "learned_42eb1f4b345a82",
+          "learned_07878d47d6e6f8",
+          "learned_54e797379dfed6",
+          "runtime_3322f9a0fd295d",
+          "runtime_abcb5a2a61cb47",
+          "learned_ade8da5fc1f854",
+          "learned_5e3d281e064795"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 10,
+          "pending_evidence": 1,
+          "satisfied": 2,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 5,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 6,
+      "regenerations": 0,
+      "exposures": 5,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 4,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 1,
+      "tool_calls": 6,
+      "bookkeeper_input_tokens": 63859,
+      "bookkeeper_output_tokens": 8571,
+      "bookkeeper_total_tokens": 72430,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 88018,
+    "cached_input_tokens": 0,
+    "output_tokens": 8809,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 96827,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 88018,
+  "cached_input_tokens": 0,
+  "output_tokens": 8809,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 96827,
+  "state_diff": {
+    "created": {},
+    "modified": {},
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10750",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10750",
+      "field": "refund_amount",
+      "expected_value": 59
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10750",
+      "field": "refund_method",
+      "expected_value": "store_credit"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10750",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10750",
+      "field": "return_reason",
+      "expected_value": "changed_mind"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7731",
+      "field": "status",
+      "expected_value": "partially_returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10751",
+      "field": "item_status",
+      "expected_value": "delivered"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10751",
+      "field": "refund_amount",
+      "expected_value": null
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10751",
+      "field": "refund_method",
+      "expected_value": null
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10751",
+      "field": "return_reason",
+      "expected_value": null
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 6,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

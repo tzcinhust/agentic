@@ -1,0 +1,2088 @@
+{
+  "task_id": "16-welcome_discount_proactive",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** A first-time Standard customer (shop_002) adds SP-3001 PowerBlend Pro Blender ($229). Per `welcome_discount` policy, first-time customers qualify for 5% off (~$11 here). No promo codes in env — welcome is the only discount in play and it's profile-driven.\n\n**Challenge:** Pitfall is silent completion — agent adds the blender, summarizes cart at $229, and never mentions welcome eligibility. Customer is a clean first-time buyer (is_first_time=True, empty purchase_history) and does NOT ask about discounts. Correct: agent calls get_customer_account, sees first-time flag, and proactively cites the 5% welcome discount with specific dollar savings at cart summary. Tests whether the agent treats policy-driven discounts as proactively-disclosable, not just promo-code-triggered.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_customer_profile",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account for shop_002 to determine first-time status before discussing pricing/discounts.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "No get_customer_account call appears in the tool history for shop_002 before the agent discussed price or discounts."
+    },
+    {
+      "id": "disclosed_welcome_eligibility",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned that the customer qualifies for the welcome (first-time) discount, WITHOUT the customer asking. The disclosure must include either the percentage (5%) or the dollar amount (~$11). Generic 'we have discounts available' or 'you qualify for promotions' fails — the specific welcome discount must be named.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent never proactively mentioned a welcome/first-time discount, 5%, or about $11 savings; it only stated the cart total was $229."
+    },
+    {
+      "id": "correct_product_added",
+      "kind": "must",
+      "requirement": "Agent added SP-3001 PowerBlend Pro Blender to the cart, quantity 1, no gift wrap.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "add_to_cart was called for customer shop_002 with product_id SP-3001, quantity 1, and gift_wrap false; the result confirms variant_id null and the correct product."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points calls in the tool history."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.4,
+  "ux_reasoning": "The agent did keep the user in control of the actual cart mutation by confirming quantity and gift wrap before calling add_to_cart, and it clearly stated the item was added afterward. However, it failed to check the customer account and proactively surface the first-time welcome discount, then gave an incorrect cart total of $229 with no mention of the available savings. That omission creates meaningful user effort because the user would have to discover or question a policy-driven discount the agent should have handled automatically. Response length was generally concise and well-structured, with the main issue being missing critical pricing detail rather than verbosity.",
+  "turns": 2,
+  "tool_calls": 6,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "Absolutely — I found the PowerBlend Pro Blender for $229, and it’s in stock.\n\nBefore I add it, I need 2 quick choices:\n1. Quantity: how many would you like?\n2. Gift wrap: it’s available for $5 per unit — would you like gift wrap?",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add PowerBlend Pro Blender to cart for customer shop_002; resolve product and any required variant before adding"
+          },
+          "result": [
+            "Workflow: Search item, resolve variant, and add to cart\nUse when: User wants one or more specific products added to cart and the exact cart-ready product/variant is not yet fully resolved from the request alone.\nVerify first:\n- Identify the intended product(s) from the user's wording or provided product identifier.\n- Verify the selected catalog item exists via search_products or get_product_details.\n- Check whether a variant_id is required via get_variants.\n- If the user mentioned compatibility-sensitive context, verify with get_product_details and optionally check_compatibility before adding.\nProcedure:\n1. search_products(query=<requested item>, category=<if known>, in_stock_only=<if user requires>)\n2. get_variants(product_id=<selected product>)\n3. get_product_details(product_id=<selected product>)\n4. check_compatibility(device_name=<user device>, product_id=<selected product>)\n5. add_to_cart(customer_id=<customer>, product_id=<selected product>, variant_id=<resolved variant or null>, quantity=<requested qty>, gift_wrap=<requested flag>)\nBranches:\n- If the user provides an exact product_id and intent is clear, you may skip search_products and start with get_variants or get_product_details.\n- If get_variants shows no variants, add with variant_id=null.\n- If variants exist and the user did not specify one, do not add yet; ask for the needed option.\n- If product details show out of stock, do not assume it is addable; check get_policies(topic=<out_of_stock/backorder>) and offer the available no-write option if policy/details allow.\n- If compatibility is relevant and check_compatibility indicates incompatible or unknown, warn the user; if they explicitly still want it, add_to_cart is allowed.\n- If the user requests multiple items, repeat the resolve-and-add sequence per item.\nAvoid:\n- Do not invent variant choices or compatibility outcomes.\n- Do not promise restock, backorder, deposits, or timelines without get_product_details/get_policies confirmation.\n- Do not treat a search hit as sufficient when a variant may be required.\n- Do not block an explicit override solely because of a compatibility warning if the tool-confirmed item can still be added.\nProcess support: ",
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies",
+            "Workflow: Inspect a product or cart item's details, variants, and relevant policy\nUse when: User wants information before buying or changing anything: product details, all size/color variants, stock status, which option is larger/roomier, or a policy such as returns for that item.\nVerify first:\n- Identify the target product either from a search query or from an item already in the cart.\n- Verify product details from the product record.\n- If the request involves sizes/colors/options, verify variants for that product.\n- If the request references a current cart item, verify the cart first to anchor the exact product/variant.\n- If the request asks about store policy, verify the specific policy topic from policies.\nProcedure:\n1. If product is referenced as already in cart, get_cart(customer_id=<customer_id>)\n2. If product must be found by name, search_products(query=<product name>, category=<optional>, in_stock_only=<optional>, min_price=<optional>, max_price=<optional>, min_rating=<optional>, sort_by=<optional>)\n3. get_product_details(product_id=<product_id>)\n4. If options/sizes/colors are requested, get_variants(product_id=<product_id>)\n5. If policy is requested, get_policies(topic=<returns|price_match|quantity_limit|other available topic>)\nBranches:\n- If variants exist, list the relevant variants with stock status and any obvious ordering implied by labels (for example, larger size being roomier); if no variants exist, say so.\n- If the user said not to change the cart, explicitly note no changes were made after checking the cart.\n- If the policy response gives general rules and nothing marks the item as excluded, present the standard policy while avoiding unsupported guarantees.\n- If search yields multiple similar products, use product details to disambiguate before giving variant or policy information.\nAvoid:\n- Do not mutate cart contents when the user only asked for information.\n- Do not invent fit guidance beyond what is directly inferable from variant labels or tool data.\n- Do not assume an item is final sale, returnable, or variantless without tool confirmation.\n- Do not answer policy questions from memory; use get_policies.\nProcess support: mean conformance="
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "PowerBlend Pro Blender",
+            "category": "kitchen",
+            "in_stock_only": true
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_002"
+          },
+          "result": {
+            "cart_id": "CART-shop_002",
+            "customer_id": "shop_002",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "base_price": 229,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_product_details",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "name": "PowerBlend Pro Blender",
+            "category": "kitchen",
+            "subcategory": "blender",
+            "brand": "PowerBlend",
+            "price": 229,
+            "rating": 4.6,
+            "review_count": 1580,
+            "description": "Pro-grade countertop blender.",
+            "specs": {},
+            "compatible_with": [],
+            "in_stock": true,
+            "stock_quantity": 50,
+            "shipping_days": 3,
+            "gift_wrap_available": true,
+            "backorder_available": false,
+            "previous_price": null,
+            "variants": null,
+            "shipping_estimate": "3 business days (standard)"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Just one, please, and no gift wrap."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — 1 PowerBlend Pro Blender added to your cart, no gift wrap. Your cart total is now $229.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 229,
+            "cart_subtotal": 229,
+            "cart_total": 229
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [],
+    "final_items": [
+      {
+        "id": "learned_1020c1212a56f9",
+        "template_id": "ct_2e184fabb0730b",
+        "obligation_id": "obl_50dae717d7cfed",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the PowerBlend Pro Blender was successfully added to the cart, the assistant must clearly report that it was added, including confirmed quantity/configuration and resulting cart amount when available.",
+        "source": "completion_template:ct_2e184fabb0730b",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The add-to-cart outcome is successful and the user asked for the item to be added.",
+        "required_evidence": [
+          "successful add result",
+          "the quantity and any confirmed configurable options",
+          "resulting cart subtotal or total if returned"
+        ],
+        "discharge": "Satisfied by a final message confirming the successful addition and the resulting cart state; unsatisfied if the assistant finishes without confirming the completed cart outcome.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add the PowerBlend Pro Blender to the cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Product was identified for the requested item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "No variant_id is needed for this product."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User confirmed quantity 1 and no gift wrap."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "No variant_id is needed for this product."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart returned status added for PowerBlend Pro Blender quantity 1 with gift_wrap false and cart total 229."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirmed 1 PowerBlend Pro Blender was added, no gift wrap, and cart total is now $229."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "grounded_cart_pricing_and_add_result_reporting",
+          "title": "Ground price claims and report the resulting cart state"
+        }
+      },
+      {
+        "id": "learned_2fbf491c47bb67",
+        "template_id": "ct_f3fb2cc325a02d",
+        "obligation_id": "obl_8e761e243139a0",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain the user's choice on the optional paid gift-wrap add-on before adding the PowerBlend Pro Blender.",
+        "source": "completion_template:ct_f3fb2cc325a02d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "An optional paid add-on is available and the user has not already accepted or declined it.",
+        "required_evidence": [
+          "authoritative indication that the add-on exists and affects price or configuration",
+          "the user's acceptance or refusal of the add-on"
+        ],
+        "discharge": "Satisfied when the user explicitly chooses the add-on state or previously gave an unambiguous preference covering it; violated if the item is added while that paid option remains unresolved.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Product details show gift_wrap_available is true."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add the PowerBlend Pro Blender and did not express a gift-wrap preference."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Product details show gift_wrap_available is true."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked whether gift wrap was wanted and stated it costs $5 per unit."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User said 'no gift wrap.'"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked whether gift wrap was wanted."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User said no gift wrap."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart used gift_wrap false."
+          }
+        ],
+        "missing_evidence": [
+          "assistant completion message, if any, treating the add-on choice as resolved in the completed cart outcome"
+        ],
+        "scope": {
+          "family": "cart_addition_with_optional_paid_addons_confirmation",
+          "title": "Confirm optional paid add-ons before cart addition"
+        }
+      },
+      {
+        "id": "learned_6d011913f929cc",
+        "template_id": "ct_662a5373f92c34",
+        "obligation_id": "obl_ed57a04eee162a",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "The completion message must include the resulting cart state for the PowerBlend Pro Blender addition, not merely say it was added.",
+        "source": "completion_template:ct_662a5373f92c34",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the cart update has succeeded",
+        "required_evidence": [
+          "successful cart update result",
+          "resulting quantity and total"
+        ],
+        "discharge": "the assistant reports the added quantity and the resulting cart total or equivalent final cart state",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Successful cart update result shows quantity 1 and cart total 229."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant reported 1 PowerBlend Pro Blender added and cart total now $229."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "final_cart_state_reporting",
+          "title": "report the resulting cart state when the task is otherwise complete"
+        }
+      },
+      {
+        "id": "learned_c22b3a16af891d",
+        "template_id": "ct_2e184fabb0730b",
+        "obligation_id": "obl_383049a0408990",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete item price or resulting cart amount for the PowerBlend Pro Blender cart addition, the amount must be grounded in current authoritative product or cart evidence.",
+        "source": "completion_template:ct_2e184fabb0730b",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is about to state a specific price, subtotal, or cart total.",
+        "required_evidence": [
+          "current product pricing evidence for the requested item or current cart evidence for the resulting total"
+        ],
+        "discharge": "Satisfied when the stated amount matches current authoritative evidence; violated if a concrete amount is asserted without such grounding.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Current product evidence shows PowerBlend Pro Blender price 229."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Current cart evidence shows subtotal 0 and total 0 before any addition."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Product search shows PowerBlend Pro Blender price 229."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Current cart evidence shows subtotal 0 and total 0 before any addition."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart returned cart_subtotal 229 and cart_total 229 after addition."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the blender price as $229."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart returned cart_total 229 after addition."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated the cart total is now $229."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "grounded_cart_pricing_and_add_result_reporting",
+          "title": "Ground price claims and report the resulting cart state"
+        }
+      },
+      {
+        "id": "learned_cfcf31436d13df",
+        "template_id": "ct_662a5373f92c34",
+        "obligation_id": "obl_0ba33929b21a52",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Once cart modifications are complete and no requested items remain unresolved, the assistant should give a concise final cart report for the PowerBlend Pro Blender addition using the latest supported cart state.",
+        "source": "completion_template:ct_662a5373f92c34",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "cart modifications are complete and no unresolved requested items remain",
+        "required_evidence": [
+          "latest cart state",
+          "item names and quantities",
+          "cart total or subtotal"
+        ],
+        "discharge": "a final summary of what is in the cart is communicated; invalidated if the final cart state is omitted or contradicted",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Latest authoritative add result shows PowerBlend Pro Blender quantity 1 and cart total 229."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant gave a concise final cart report with item, quantity, no gift wrap, and cart total $229."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "final_cart_state_reporting",
+          "title": "report the resulting cart state when the task is otherwise complete"
+        }
+      },
+      {
+        "id": "learned_dbf21bab4c531b",
+        "template_id": "ct_f3fb2cc325a02d",
+        "obligation_id": "obl_0e2f3646b77de7",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The assistant must not silently choose, add, or omit an unresolved paid option such as gift wrap for the PowerBlend Pro Blender before user direction is known.",
+        "source": "completion_template:ct_f3fb2cc325a02d",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A cart addition would commit a paid option choice without prior user direction.",
+        "required_evidence": [
+          "the current option state is unresolved",
+          "the action would set the option state"
+        ],
+        "discharge": "Satisfied when no irreversible addition occurs until the option choice is grounded in the user's preference; permanently violated if an unconfirmed paid option state was committed.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Product details show gift_wrap_available is true."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "No user preference about gift wrap appears in the transcript."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Product details show gift_wrap_available is true."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked about gift wrap instead of silently choosing it."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User declined gift wrap."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked about gift wrap before adding."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart used gift_wrap false after the user declined gift wrap."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_addition_with_optional_paid_addons_confirmation",
+          "title": "Confirm optional paid add-ons before cart addition"
+        }
+      },
+      {
+        "id": "learned_de4f3b78aea2df",
+        "template_id": "ct_fa84e50fc98731",
+        "obligation_id": "obl_0c0d1ed08a0aca",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "The exact quantity to be added for the PowerBlend Pro Blender must be grounded before the cart state can be considered complete.",
+        "source": "completion_template:ct_fa84e50fc98731",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The user requests a specific count or the count affects the add-to-cart outcome.",
+        "required_evidence": [
+          "explicit quantity from the user",
+          "matching add-to-cart evidence or confirmation"
+        ],
+        "discharge": "Quantity is explicitly confirmed and reflected in the resulting cart evidence.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested adding the PowerBlend Pro Blender but did not state a quantity."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked for quantity before adding."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User said 'Just one, please.'"
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User chose quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart returned quantity 1 for PowerBlend Pro Blender."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirmed 1 PowerBlend Pro Blender was added."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_option_choice_before_purchase",
+          "title": "collect required cart options before asserting readiness"
+        }
+      },
+      {
+        "id": "learned_e618d12a05d01f",
+        "template_id": "ct_fa84e50fc98731",
+        "obligation_id": "obl_dd1988661de4b5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "The user's chosen cart options for the PowerBlend Pro Blender must be known before the item can be treated as ready to add.",
+        "source": "completion_template:ct_fa84e50fc98731",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The user’s message indicates a preference among mutually exclusive cart options.",
+        "required_evidence": [
+          "explicit user choice for the option",
+          "the option is compatible with the item"
+        ],
+        "discharge": "The chosen option is confirmed in the conversation; otherwise the readiness claim is premature.",
+        "scope_key": "powerblend_pro_blender",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User specified no gift wrap."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Gift wrap is an available option for this product."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "add_to_cart used gift_wrap false."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirmed the completed addition with no gift wrap."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_option_choice_before_purchase",
+          "title": "collect required cart options before asserting readiness"
+        }
+      },
+      {
+        "id": "runtime_b788c9d7881f8d",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:6",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 4,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "preview_sequence": 6,
+          "assistant_index": 4
+        }
+      },
+      {
+        "id": "runtime_dee36a316d91dc",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:5",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "assistant_index": 3,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "preview_sequence": 5,
+          "assistant_index": 3
+        }
+      }
+    ],
+    "final_open_items": [],
+    "final_satisfied_items": [
+      "learned_1020c1212a56f9",
+      "learned_2fbf491c47bb67",
+      "learned_6d011913f929cc",
+      "learned_c22b3a16af891d",
+      "learned_cfcf31436d13df",
+      "learned_dbf21bab4c531b",
+      "learned_de4f3b78aea2df",
+      "learned_e618d12a05d01f",
+      "runtime_b788c9d7881f8d",
+      "runtime_dee36a316d91dc"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 0,
+      "pending_evidence": 0,
+      "satisfied": 10,
+      "violated": 0
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1020c1212a56f9",
+          "template_id": "ct_2e184fabb0730b",
+          "obligation_id": "obl_50dae717d7cfed",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the requested blender is successfully added to the cart, the assistant must clearly report that it was added, including confirmed quantity/configuration and resulting cart amount when available.",
+          "source": "completion_template:ct_2e184fabb0730b",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The add-to-cart outcome is successful and the user asked for the item to be added.",
+          "required_evidence": [
+            "successful add result",
+            "the quantity and any confirmed configurable options",
+            "resulting cart subtotal or total if returned"
+          ],
+          "discharge": "Satisfied by a final message confirming the successful addition and the resulting cart state; unsatisfied if the assistant finishes without confirming the completed cart outcome.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add the PowerBlend Pro Blender to the cart."
+            }
+          ],
+          "missing_evidence": [
+            "successful add result",
+            "confirmed quantity/configuration for the added item",
+            "assistant final message confirming the completed cart outcome",
+            "resulting cart subtotal or total if returned"
+          ],
+          "scope": {
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "title": "Ground price claims and report the resulting cart state"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_de4f3b78aea2df",
+          "template_id": "ct_fa84e50fc98731",
+          "obligation_id": "obl_0c0d1ed08a0aca",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "The exact quantity to be added for the PowerBlend Pro Blender must be grounded before the cart state can be considered complete.",
+          "source": "completion_template:ct_fa84e50fc98731",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "The user requests a specific count or the count affects the add-to-cart outcome.",
+          "required_evidence": [
+            "explicit quantity from the user",
+            "matching add-to-cart evidence or confirmation"
+          ],
+          "discharge": "Quantity is explicitly confirmed and reflected in the resulting cart evidence.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requested adding the PowerBlend Pro Blender but did not state a quantity."
+            }
+          ],
+          "missing_evidence": [
+            "explicit quantity from the user or another authoritative source",
+            "matching add-to-cart evidence or confirmation reflecting that quantity"
+          ],
+          "scope": {
+            "family": "cart_option_choice_before_purchase",
+            "title": "collect required cart options before asserting readiness"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c22b3a16af891d",
+          "template_id": "ct_2e184fabb0730b",
+          "obligation_id": "obl_383049a0408990",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete item price or resulting cart amount for the PowerBlend Pro Blender cart addition, the amount must be grounded in current authoritative product or cart evidence.",
+          "source": "completion_template:ct_2e184fabb0730b",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant is about to state a specific price, subtotal, or cart total.",
+          "required_evidence": [
+            "current product pricing evidence for the requested item or current cart evidence for the resulting total"
+          ],
+          "discharge": "Satisfied when the stated amount matches current authoritative evidence; violated if a concrete amount is asserted without such grounding.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Current product evidence shows PowerBlend Pro Blender price 229."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Current cart evidence shows subtotal 0 and total 0 before any addition."
+            }
+          ],
+          "missing_evidence": [
+            "an assistant message stating a concrete price, subtotal, or cart total, if any",
+            "authoritative add result or updated cart evidence for any resulting post-add amount"
+          ],
+          "scope": {
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "title": "Ground price claims and report the resulting cart state"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_2fbf491c47bb67",
+          "template_id": "ct_f3fb2cc325a02d",
+          "obligation_id": "obl_8e761e243139a0",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before adding the PowerBlend Pro Blender, the user's choice on the optional paid gift-wrap add-on must be obtained because it would alter configuration or total.",
+          "source": "completion_template:ct_f3fb2cc325a02d",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "An optional paid add-on is available and the user has not already accepted or declined it.",
+          "required_evidence": [
+            "authoritative indication that the add-on exists and affects price or configuration",
+            "the user's acceptance or refusal of the add-on"
+          ],
+          "discharge": "Satisfied when the user explicitly chooses the add-on state or previously gave an unambiguous preference covering it; violated if the item is added while that paid option remains unresolved.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T7",
+              "detail": "Product details show gift_wrap_available is true."
+            },
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add the PowerBlend Pro Blender and did not express a gift-wrap preference."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative evidence that gift wrap is a paid add-on that affects price or configuration",
+            "the user's acceptance or refusal of gift wrap",
+            "authoritative add result showing no add occurred before the option choice was resolved, if later relevant"
+          ],
+          "scope": {
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "title": "Confirm optional paid add-ons before cart addition"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_dbf21bab4c531b",
+          "template_id": "ct_f3fb2cc325a02d",
+          "obligation_id": "obl_0e2f3646b77de7",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The assistant must not silently choose, add, or omit an unresolved paid option such as gift wrap for the PowerBlend Pro Blender before user direction is known.",
+          "source": "completion_template:ct_f3fb2cc325a02d",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A cart addition would commit a paid option choice without prior user direction.",
+          "required_evidence": [
+            "the current option state is unresolved",
+            "the action would set the option state"
+          ],
+          "discharge": "Satisfied when no irreversible addition occurs until the option choice is grounded in the user's preference; permanently violated if an unconfirmed paid option state was committed.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T7",
+              "detail": "Product details show gift_wrap_available is true."
+            },
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "No user preference about gift wrap appears in the transcript."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative evidence that gift wrap is a paid option",
+            "evidence of whether any add-to-cart action committed an option state while unresolved"
+          ],
+          "scope": {
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "title": "Confirm optional paid add-ons before cart addition"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "transition",
+        "item_id": "learned_2fbf491c47bb67",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 6,
+        "event": "transition",
+        "item_id": "learned_dbf21bab4c531b",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 7,
+        "event": "transition",
+        "item_id": "learned_de4f3b78aea2df",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_dee36a316d91dc",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:5",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 5,
+              "assistant_index": 3,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+            "preview_sequence": 5,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_b788c9d7881f8d",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:6",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 4,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+            "preview_sequence": 6,
+            "assistant_index": 4
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "transition",
+        "item_id": "learned_c22b3a16af891d",
+        "previous": "pending",
+        "status": "pending_evidence",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 11,
+        "event": "transition_ignored",
+        "item_id": "learned_2fbf491c47bb67",
+        "previous": "satisfied",
+        "requested": "pending",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 12,
+        "event": "item_created",
+        "item": {
+          "id": "learned_e618d12a05d01f",
+          "template_id": "ct_fa84e50fc98731",
+          "obligation_id": "obl_dd1988661de4b5",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "The user's chosen cart options for the PowerBlend Pro Blender must be known before the item can be treated as ready to add.",
+          "source": "completion_template:ct_fa84e50fc98731",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The user’s message indicates a preference among mutually exclusive cart options.",
+          "required_evidence": [
+            "explicit user choice for the option",
+            "the option is compatible with the item"
+          ],
+          "discharge": "The chosen option is confirmed in the conversation; otherwise the readiness claim is premature.",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User specified no gift wrap."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Gift wrap is an available option for this product."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "add_to_cart used gift_wrap false."
+            }
+          ],
+          "missing_evidence": [
+            "assistant message, if any, asserting the item is ready or completed with the resolved option state"
+          ],
+          "scope": {
+            "family": "cart_option_choice_before_purchase",
+            "title": "collect required cart options before asserting readiness"
+          }
+        }
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6d011913f929cc",
+          "template_id": "ct_662a5373f92c34",
+          "obligation_id": "obl_ed57a04eee162a",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "The completion message must include the resulting cart state for the PowerBlend Pro Blender addition, not merely say it was added.",
+          "source": "completion_template:ct_662a5373f92c34",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the cart update has succeeded",
+          "required_evidence": [
+            "successful cart update result",
+            "resulting quantity and total"
+          ],
+          "discharge": "the assistant reports the added quantity and the resulting cart total or equivalent final cart state",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Successful cart update result shows quantity 1 and cart total 229."
+            }
+          ],
+          "missing_evidence": [
+            "assistant completion message reporting the resulting cart state"
+          ],
+          "scope": {
+            "family": "final_cart_state_reporting",
+            "title": "report the resulting cart state when the task is otherwise complete"
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "learned_cfcf31436d13df",
+          "template_id": "ct_662a5373f92c34",
+          "obligation_id": "obl_0ba33929b21a52",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "Once cart modifications are complete and no requested items remain unresolved, the assistant should give a concise final cart report for the PowerBlend Pro Blender addition using the latest supported cart state.",
+          "source": "completion_template:ct_662a5373f92c34",
+          "status": "pending",
+          "priority": 1,
+          "activation": "cart modifications are complete and no unresolved requested items remain",
+          "required_evidence": [
+            "latest cart state",
+            "item names and quantities",
+            "cart total or subtotal"
+          ],
+          "discharge": "a final summary of what is in the cart is communicated; invalidated if the final cart state is omitted or contradicted",
+          "scope_key": "powerblend_pro_blender",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Latest authoritative add result shows PowerBlend Pro Blender quantity 1 and cart total 229."
+            }
+          ],
+          "missing_evidence": [
+            "assistant final summary of what is now in the cart"
+          ],
+          "scope": {
+            "family": "final_cart_state_reporting",
+            "title": "report the resulting cart state when the task is otherwise complete"
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "transition",
+        "item_id": "learned_1020c1212a56f9",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 16,
+        "event": "transition",
+        "item_id": "learned_6d011913f929cc",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 17,
+        "event": "transition",
+        "item_id": "learned_c22b3a16af891d",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 18,
+        "event": "transition",
+        "item_id": "learned_cfcf31436d13df",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 19,
+        "event": "transition",
+        "item_id": "learned_dbf21bab4c531b",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 20,
+        "event": "transition",
+        "item_id": "learned_de4f3b78aea2df",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 21,
+        "event": "transition",
+        "item_id": "learned_e618d12a05d01f",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "092036c8af127390183bf4baf8d7ae4b929d8ed22bf63d0ad65efb53abe9b888",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please.",
+        "candidates": [
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 22.108509
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 21.867223
+          },
+          {
+            "id": "ct_5fe63cc694d9da",
+            "family": "account_linked_benefit_resolution",
+            "score": 14.929216
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 18.844954
+          },
+          {
+            "id": "ct_b2135f50c00742",
+            "family": "quantity_limit_disclosure",
+            "score": 13.241414
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 13.235444
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 16.412292
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 14.733868
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "4e5321719162e8f41a754a843b762f1424967e82478556cf92017c5ceb7b3710",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. retrieve_learnings retrieve_learnings",
+        "candidates": [
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 20.658415
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 20.417129
+          },
+          {
+            "id": "ct_5fe63cc694d9da",
+            "family": "account_linked_benefit_resolution",
+            "score": 14.243717
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 17.942673
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 11.800687
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 12.527973
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 15.316665
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 14.165548
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "219a132d0e4de3acc190937912994fa7b3c93cb128930726fe7980ac20388ca0",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. retrieve_learnings retrieve_learnings search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found get_cart cart_id CART-shop_002 customer_id shop_002 items subtotal discount_amount gift_wrap_fee loyalty_discount loyalty_points_redeemed shipping_option shipping_cost total applied_promo_codes search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory ble...",
+        "candidates": [
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 45.884843
+          },
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 45.178165
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 44.458382
+          },
+          {
+            "id": "ct_e4d9f3829f1242",
+            "family": "multi_item_discount_or_bundle_eligibility_must_be_resolved_and_disclosed",
+            "score": 24.181631
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 37.024358
+          },
+          {
+            "id": "ct_6ca35e3c669770",
+            "family": "boundary_transition_checkout_total",
+            "score": 22.763577
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 35.203094
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 32.373604
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "0df4e2e36f9f0ef7e2c7d9660c95e510cf2015f3e58fc8950872373503dde335",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. retrieve_learnings retrieve_learnings search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found get_cart cart_id CART-shop_002 customer_id shop_002 items subtotal discount_amount gift_wrap_fee loyalty_discount loyalty_points_redeemed shipping_option shipping_cost total applied_promo_codes search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory ble...",
+        "candidates": [
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 60.164933
+          },
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 50.449569
+          },
+          {
+            "id": "ct_5a3ed54b1fafbc",
+            "family": "aggregate_shipping_bundle_resolution",
+            "score": 41.396119
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 55.425867
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 30.911083
+          },
+          {
+            "id": "ct_8dfcbd42d098d9",
+            "family": "budget_threshold_comparison_for_recommendations",
+            "score": 30.661344
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 47.284706
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 43.493294
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "d259391b77ac740b364cbf6e2f512507b2503a017b8b75d2ab5c6ef561f90e74",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. Just one, please, and no gift wrap. Absolutely — I found the PowerBlend Pro Blender for $229, and it’s in stock. Before I add it, I need 2 quick choices: 1. Quantity: how many would you like? 2. Gift wrap: it’s available for $5 per unit — would you like gift wrap? retrieve_learnings search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found get_cart cart_id CART-shop_002 customer_id shop_002 items subtotal di...",
+        "candidates": [
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 64.847156
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 57.181407
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 43.069541
+          },
+          {
+            "id": "ct_5a3ed54b1fafbc",
+            "family": "aggregate_shipping_bundle_resolution",
+            "score": 42.079203
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 57.461213
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 56.13926
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 33.434515
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 53.352297
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "e87ad747c1f36b1f72f52fbd6fff5ea84e66539a650968c1df434a1b2e1cf567",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. Just one, please, and no gift wrap. Absolutely — I found the PowerBlend Pro Blender for $229, and it’s in stock. Before I add it, I need 2 quick choices: 1. Quantity: how many would you like? 2. Gift wrap: it’s available for $5 per unit — would you like gift wrap? retrieve_learnings search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found get_cart cart_id CART-shop_002 customer_id shop_002 items subtotal di...",
+        "candidates": [
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 64.792628
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 62.842581
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 44.958715
+          },
+          {
+            "id": "ct_662a5373f92c34",
+            "family": "final_cart_state_reporting",
+            "score": 48.77473
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 57.936372
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 61.596989
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 37.824416
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 53.12717
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "25ade50adff2a9bbab4cf4547911c529b6232a66ee30620ba2ca98e3ebbd917e",
+        "query_preview": "Hi! I'd like to add the PowerBlend Pro Blender to my cart please. Just one, please, and no gift wrap. Absolutely — I found the PowerBlend Pro Blender for $229, and it’s in stock. Before I add it, I need 2 quick choices: 1. Quantity: how many would you like? 2. Gift wrap: it’s available for $5 per unit — would you like gift wrap? Done — 1 PowerBlend Pro Blender added to your cart, no gift wrap. Your cart total is now $229. retrieve_learnings search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count ...",
+        "candidates": [
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 65.237564
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 63.233171
+          },
+          {
+            "id": "ct_662a5373f92c34",
+            "family": "final_cart_state_reporting",
+            "score": 53.34542
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 45.371613
+          },
+          {
+            "id": "ct_f3fb2cc325a02d",
+            "family": "cart_addition_with_optional_paid_addons_confirmation",
+            "score": 58.851173
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 63.027583
+          },
+          {
+            "id": "ct_b2135f50c00742",
+            "family": "quantity_limit_disclosure",
+            "score": 57.847485
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 56.266951
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "fcc0cef23ee363a9b9ec11c3777526b8eb598457deef8bd867bcec9d97f86828",
+        "candidate_ids": [
+          "ct_2e184fabb0730b",
+          "ct_f3fb2cc325a02d",
+          "ct_5fe63cc694d9da",
+          "ct_aa31b766512ba7",
+          "ct_b2135f50c00742",
+          "ct_f3a896820c0b68",
+          "ct_fa84e50fc98731",
+          "ct_58356c8546d964"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 4067,
+          "output_tokens": 8
+        },
+        "response_sha256": "eef46741adfc3a9f76294d3b78f37a45f113092ac9d44ee77c7a038a88ff09a1",
+        "returned_items": 0
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "652267761e5f06abf5face7b271fe1b42d621733c97d841dff76bf59e0315357",
+        "candidate_ids": [
+          "ct_2e184fabb0730b",
+          "ct_f3fb2cc325a02d",
+          "ct_5fe63cc694d9da",
+          "ct_aa31b766512ba7",
+          "ct_b3d7ebef646e89",
+          "ct_f3a896820c0b68",
+          "ct_fa84e50fc98731",
+          "ct_58356c8546d964"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 5857,
+          "output_tokens": 290
+        },
+        "response_sha256": "6669f1d038379dde44ba9ac10285254c6b3f31148d2748f86404f4ad374c8052",
+        "returned_items": 2
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "2469fe44b28aedac8f7c6b652044756932e223af7930d90d3c678c4aca7ee6e7",
+        "candidate_ids": [
+          "ct_aa31b766512ba7",
+          "ct_b9b70c4349f4bc",
+          "ct_2e184fabb0730b",
+          "ct_e4d9f3829f1242",
+          "ct_58356c8546d964",
+          "ct_6ca35e3c669770",
+          "ct_6462ba60d12fda",
+          "ct_f3fb2cc325a02d",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6706,
+          "output_tokens": 466
+        },
+        "response_sha256": "8894b31514e17f8e3790bb32b452ddf64f60a16af159e7bbdf82e46450fa32c2",
+        "returned_items": 3
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "307dfacb8f1137f4c668e29b09bf8249b1b9840714d27b123652e7ce4b52889a",
+        "candidate_ids": [
+          "ct_aa31b766512ba7",
+          "ct_b9b70c4349f4bc",
+          "ct_5a3ed54b1fafbc",
+          "ct_2e184fabb0730b",
+          "ct_e039a38a6bf512",
+          "ct_8dfcbd42d098d9",
+          "ct_58356c8546d964",
+          "ct_f3fb2cc325a02d",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8043,
+          "output_tokens": 863
+        },
+        "response_sha256": "efef46eb661d403aed6003bc1221d612fc31dc0f9ca37331d704f7440c6a9685",
+        "returned_items": 5
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "77446a29bd94b01bd26789ff038057137d925c0c23a088bb64baf7a2f9389d89",
+        "candidate_ids": [
+          "ct_aa31b766512ba7",
+          "ct_b3d7ebef646e89",
+          "ct_e039a38a6bf512",
+          "ct_5a3ed54b1fafbc",
+          "ct_f3fb2cc325a02d",
+          "ct_2e184fabb0730b",
+          "ct_f3a896820c0b68",
+          "ct_58356c8546d964",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8047,
+          "output_tokens": 663
+        },
+        "response_sha256": "e5bedd63296a4684dce6e08205da9379fd2d2ad46c0db26c1373cdfd9f89725c",
+        "returned_items": 4
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "c9bc8cc5efca52a1817fdb63ed6f8dc7874a2d83aeeb3e890ea4e44570f591cb",
+        "candidate_ids": [
+          "ct_aa31b766512ba7",
+          "ct_b3d7ebef646e89",
+          "ct_e039a38a6bf512",
+          "ct_662a5373f92c34",
+          "ct_f3fb2cc325a02d",
+          "ct_2e184fabb0730b",
+          "ct_f3a896820c0b68",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7635,
+          "output_tokens": 1358
+        },
+        "response_sha256": "75d433c03144430265704db2e79ea2eefc5c10eb9883a8a7ccc10aadf874466c",
+        "returned_items": 8
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "0ef3a8f935fb19a54d13623d4d7abdb15005e3d4f237aa46219e043330ede19b",
+        "candidate_ids": [
+          "ct_aa31b766512ba7",
+          "ct_b3d7ebef646e89",
+          "ct_662a5373f92c34",
+          "ct_e039a38a6bf512",
+          "ct_f3fb2cc325a02d",
+          "ct_2e184fabb0730b",
+          "ct_b2135f50c00742",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8459,
+          "output_tokens": 1170
+        },
+        "response_sha256": "2ac43451afe04d5144b55599bbce3a6afae0f7029ccee4802e6607a1e40801fd",
+        "returned_items": 7
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": false,
+        "exposure_mode": null,
+        "exposure_prompt_sha256": null,
+        "exposure_signature": null,
+        "exposed_items": [],
+        "pending_items": [],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 0,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "c29c9dcc2e44dd9139a4dfe26d34d0c0a62a7547e2ec4a7e0416d84190761618",
+        "exposure_signature": "4b3a87691508bb8e623d2c8e3b99a6b299b126422b497259c2db6fbdd5ac2d30",
+        "exposed_items": [
+          "learned_de4f3b78aea2df"
+        ],
+        "pending_items": [
+          "learned_1020c1212a56f9",
+          "learned_de4f3b78aea2df"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 1,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "search_products",
+            "arguments": {
+              "query": "PowerBlend Pro Blender",
+              "category": "kitchen",
+              "in_stock_only": true
+            }
+          },
+          {
+            "name": "get_cart",
+            "arguments": {
+              "customer_id": "shop_002"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "c29c9dcc2e44dd9139a4dfe26d34d0c0a62a7547e2ec4a7e0416d84190761618",
+        "exposure_signature": "4b3a87691508bb8e623d2c8e3b99a6b299b126422b497259c2db6fbdd5ac2d30",
+        "exposed_items": [
+          "learned_de4f3b78aea2df"
+        ],
+        "pending_items": [
+          "learned_1020c1212a56f9",
+          "learned_de4f3b78aea2df",
+          "learned_c22b3a16af891d"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          },
+          {
+            "name": "get_product_details",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "14860c783ad1193c101fd240ca1cfcca60b96298d137de2264a6593b99bd26cc",
+        "exposure_signature": "47541b236fd94c4bf52957b8f3c25f1312ae9e7cadb451e188fd35ce0da6af94",
+        "exposed_items": [
+          "learned_2fbf491c47bb67",
+          "learned_dbf21bab4c531b",
+          "learned_de4f3b78aea2df"
+        ],
+        "pending_items": [
+          "learned_1020c1212a56f9",
+          "learned_de4f3b78aea2df",
+          "learned_c22b3a16af891d",
+          "learned_2fbf491c47bb67",
+          "learned_dbf21bab4c531b"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 3,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "b2585880cad669db8fc800173d1da9be13b9635c13743b8939308a8871a75f7f",
+        "exposure_signature": "dc8e6fa68b2bbeccf818a1ae1bfa7c5a468be3f92e653b9d7e4ca0c8b0594f80",
+        "exposed_items": [
+          "learned_dbf21bab4c531b",
+          "learned_de4f3b78aea2df"
+        ],
+        "pending_items": [
+          "learned_1020c1212a56f9",
+          "learned_de4f3b78aea2df",
+          "learned_c22b3a16af891d",
+          "learned_dbf21bab4c531b"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 0,
+          "satisfied": 1,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "42b857cc565305fa59196943ec98290c00b537b43b9248922020cf8b0745a9f2",
+        "exposure_signature": "8e53bbd056b9286838662f0fb4c4f3e12125d947483638bb2d498e745dcf18bf",
+        "exposed_items": [
+          "learned_e618d12a05d01f",
+          "learned_dbf21bab4c531b",
+          "learned_de4f3b78aea2df"
+        ],
+        "pending_items": [
+          "learned_1020c1212a56f9",
+          "learned_de4f3b78aea2df",
+          "learned_c22b3a16af891d",
+          "learned_dbf21bab4c531b",
+          "learned_e618d12a05d01f",
+          "learned_6d011913f929cc",
+          "learned_cfcf31436d13df"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 6,
+          "pending_evidence": 1,
+          "satisfied": 3,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 6,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 7,
+      "regenerations": 0,
+      "exposures": 5,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 3,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 2,
+      "tool_calls": 6,
+      "bookkeeper_input_tokens": 48814,
+      "bookkeeper_output_tokens": 4818,
+      "bookkeeper_total_tokens": 53632,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 78514,
+    "cached_input_tokens": 0,
+    "output_tokens": 5113,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 83627,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 78514,
+  "cached_input_tokens": 0,
+  "output_tokens": 5113,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 83627,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_002",
+          "product_id": "SP-3001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_002": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 229
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 229
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "subtotal",
+      "expected_value": 229
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "total",
+      "expected_value": 229
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_002",
+        "product_id": "SP-3001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 6,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

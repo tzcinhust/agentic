@@ -1,0 +1,4247 @@
+{
+  "task_id": "7-category_bundle_vs_promo",
+  "user_id": "shop_004",
+  "task_summary": "**Task:** A returning customer (shop_004) wants to buy 3 kitchen items — PowerBlend Pro Blender (SP-3001, $229), CasaGrande Cast-Iron Skillet (SP-3007, $89), HomeBrew Pour-Over Coffee Set (SP-3008, $59). Subtotal $377. The customer has the KITCHEN10 promo code (10% off kitchen) and wants it applied.\n\n**Challenge:** 3+ same-category items activate the `category_bundle` policy (5% off qualifying items' line totals). The customer also has KITCHEN10 (10% off). Per `category_bundle` and `promo_stacking` policies: category_bundle does NOT stack with promo codes on the same items — customer gets the better. The correct behavior is to (a) recognize the 3-item same-category qualifier, (b) compute both discounts (category_bundle 5% = ~$18, KITCHEN10 10% = $37), (c) explain non-stacking, (d) apply KITCHEN10 as the larger discount. Pitfalls: agent silently applies KITCHEN10 without surfacing the category-bundle alternative (missed disclosure), agent tries to stack both in conversation (policy violation + customer mistrust), or agent applies category_bundle instead and misses KITCHEN10 (under-discount).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "recognized_category_bundle_eligibility",
+      "kind": "must",
+      "requirement": "Agent verbalized that 3+ same-category items qualify for the category_bundle policy (5% off). Evidence: the agent mentioned the category bundle or same-category bonus before or during the discount decision. Silently applying KITCHEN10 without ever mentioning category_bundle fails this requirement.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly referenced the category bundle by saying, 'for these three kitchen items together' and 'category bundle discounts don’t stack with promo codes,' which verbalizes awareness that the 3 same-category items trigger that policy."
+    },
+    {
+      "id": "explained_non_stacking_rule",
+      "kind": "must",
+      "requirement": "Agent explicitly explained that category_bundle and promo codes do NOT stack — customer gets the better of the two. Language like 'they can't combine, so I'll apply whichever saves you more' is sufficient. Applying one without explaining the non-stacking rule fails this requirement.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant explicitly stated that 'category bundle discounts don’t stack with promo codes on the same items' and identified the '10% kitchen promo' as the 'best confirmed savings,' which explains the non-stacking rule and that the better discount is used."
+    },
+    {
+      "id": "applied_better_discount",
+      "kind": "must",
+      "requirement": "Agent applied KITCHEN10 via apply_promo (10% = $37 discount), NOT category_bundle (5% = ~$18). At cart summary, discount_amount=$37 and applied_promo_codes=['KITCHEN10']. The larger discount must win.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool calls show apply_promo with promo_code 'KITCHEN10', and the final cart has discount_amount 37 and applied_promo_codes ['KITCHEN10'], matching the required better discount."
+    },
+    {
+      "id": "no_stacking_claim",
+      "kind": "must_not",
+      "requirement": "Agent must NOT claim in conversation that both KITCHEN10 and the category bundle are applied simultaneously, or that the customer is getting 15% off, or otherwise mislead about combined discounts. Category bundle does not stack with promo codes per policy — any such claim is a disclosure failure.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant did not claim both discounts were applied together or that the customer received 15% off; instead it correctly said category bundle discounts do not stack with promo codes."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no tool calls to set_shipping_option or redeem_loyalty_points."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 2,
+  "ux_score": 2.61,
+  "ux_reasoning": "The agent executed consequential cart mutations and applied the promo immediately in the same turn, without first previewing the discounts and waiting for explicit approval, which is a material user-control flaw for shopping write actions. It did at least summarize the resulting cart clearly afterward and did not ignore any explicit no-action instruction. On effort, the core task was completed in one turn and the agent correctly chose KITCHEN10 over the non-stacking bundle discount, but it failed to explicitly surface the actual 5% category-bundle alternative and its amount, which the user reasonably should have been told before the promo was applied. Response density was solid: concise, structured, and it included prices, subtotal, discount, total, and the non-stacking caveat without major filler.",
+  "turns": 1,
+  "tool_calls": 16,
+  "tool_errors": 0,
+  "redundant_calls": 1,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added all three items and applied KITCHEN10.\n\nCart:\n- PowerBlend Pro Blender — $229\n- CasaGrande Cast-Iron Skillet 12\" — $89\n- HomeBrew Pour-Over Coffee Set — $59\n\nSummary:\n- Subtotal: $377\n- Promo: KITCHEN10 applied\n- Discount: $37\n- Total: $340\n\nNote: for these three kitchen items together, the current best confirmed savings in your cart is the 10% kitchen promo. Store policy allows only one promo code per cart, and category bundle discounts don’t stack with promo codes on the same items.\n\nIf you want, I can also help you:\n- redeem your 2,200 loyalty points, or\n- compare shipping options.",
+      "tool_calls": [
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "PowerBlend Pro Blender"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3001",
+                "name": "PowerBlend Pro Blender",
+                "brand": "PowerBlend",
+                "category": "kitchen",
+                "subcategory": "blender",
+                "price": 229,
+                "rating": 4.6,
+                "review_count": 1580,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "CasaGrande Cast-Iron Skillet"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3007",
+                "name": "CasaGrande Cast-Iron Skillet 12\"",
+                "brand": "CasaGrande",
+                "category": "kitchen",
+                "subcategory": "cookware",
+                "price": 89,
+                "rating": 4.6,
+                "review_count": 820,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "category": "kitchen",
+            "in_stock_only": true,
+            "query": "HomeBrew Pour-Over Coffee Set"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-3008",
+                "name": "HomeBrew Pour-Over Coffee Set",
+                "brand": "HomeBrew",
+                "category": "kitchen",
+                "subcategory": "coffee",
+                "price": 59,
+                "rating": 4.4,
+                "review_count": 460,
+                "in_stock": true
+              }
+            ],
+            "total_found": 1
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [],
+            "subtotal": 0,
+            "discount_amount": 0,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 0,
+            "applied_promo_codes": []
+          }
+        },
+        {
+          "name": "validate_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "valid": true,
+            "reason": "Promo applied: 10% off any kitchen-category purchase.",
+            "estimated_discount": 0
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3001"
+          },
+          "result": {
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "base_price": 229,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3007"
+          },
+          "result": {
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "base_price": 89,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-3008"
+          },
+          "result": {
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "base_price": 59,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        },
+        {
+          "name": "get_customer_account",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "customer_id": "shop_004",
+            "name": "Taylor Kim",
+            "email": "taylor.kim@example.com",
+            "tier": "standard",
+            "is_first_time": false,
+            "loyalty_points": 2200,
+            "purchase_history": []
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "promo_stacking"
+          },
+          "result": {
+            "topic": "promo_stacking",
+            "summary": "At most one promo code per cart. Some discounts stack with each other but not with promo codes.",
+            "rules": [
+              "One promo code per cart.",
+              "Category bundle (5%) does NOT stack with promo codes on the same items — customer gets the better of the two.",
+              "Welcome discount (5%) does NOT stack with promo codes — customer gets the better of the two.",
+              "Brand bundle bonus (3%) DOES stack with everything."
+            ]
+          }
+        },
+        {
+          "name": "get_promotions",
+          "arguments": {
+            "category": "kitchen"
+          },
+          "result": {
+            "promotions": [
+              {
+                "promo_code": "KITCHEN10",
+                "description": "10% off any kitchen-category purchase.",
+                "discount_type": "percentage",
+                "discount_value": 10,
+                "min_purchase": 0,
+                "max_discount": 0,
+                "category_restriction": [
+                  "kitchen"
+                ],
+                "expiry_date": "2026-12-31",
+                "active": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-3001",
+            "product_name": "PowerBlend Pro Blender",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 229,
+            "cart_subtotal": 229,
+            "cart_total": 229
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0002",
+            "product_id": "SP-3007",
+            "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 89,
+            "cart_subtotal": 318,
+            "cart_total": 318
+          }
+        },
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0003",
+            "product_id": "SP-3008",
+            "product_name": "HomeBrew Pour-Over Coffee Set",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 59,
+            "cart_subtotal": 377,
+            "cart_total": 377
+          }
+        },
+        {
+          "name": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "result": {
+            "status": "applied",
+            "promo_code": "KITCHEN10",
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ],
+            "discount_amount": 37,
+            "cart_subtotal": 377,
+            "cart_total": 340
+          }
+        },
+        {
+          "name": "get_cart",
+          "arguments": {
+            "customer_id": "shop_004"
+          },
+          "result": {
+            "cart_id": "CART-shop_004",
+            "customer_id": "shop_004",
+            "items": [
+              {
+                "cart_item_id": "CI-0001",
+                "product_id": "SP-3001",
+                "product_name": "PowerBlend Pro Blender",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 229,
+                "line_total": 229
+              },
+              {
+                "cart_item_id": "CI-0002",
+                "product_id": "SP-3007",
+                "product_name": "CasaGrande Cast-Iron Skillet 12\"",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 89,
+                "line_total": 89
+              },
+              {
+                "cart_item_id": "CI-0003",
+                "product_id": "SP-3008",
+                "product_name": "HomeBrew Pour-Over Coffee Set",
+                "quantity": 1,
+                "gift_wrap": false,
+                "unit_price": 59,
+                "line_total": 59
+              }
+            ],
+            "subtotal": 377,
+            "discount_amount": 37,
+            "gift_wrap_fee": 0,
+            "loyalty_discount": 0,
+            "loyalty_points_redeemed": 0,
+            "shipping_option": null,
+            "shipping_cost": 0,
+            "total": 340,
+            "applied_promo_codes": [
+              "KITCHEN10"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No, not this time — I don't want to use points. I don't need to pick shipping right now — skip it, I'll handle it at checkout. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_8d153956100fbe",
+        "template_id": "ct_2c778aa381f0de",
+        "obligation_id": "obl_4b1e457050cbc8",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating that a promo works or changes the price, ground the claim in current authoritative promotion and cart evidence showing the code is active and applicable to the current purchase.",
+        "source": "completion_template:ct_2c778aa381f0de",
+        "status": "pending",
+        "priority": 1,
+        "activation": "A promo or coupon is requested or referenced.",
+        "required_evidence": [
+          "current promotion details for the requested code or matching offer",
+          "current cart contents/subtotal relevant to applicability"
+        ],
+        "discharge": "The response states the promo outcome only after authoritative evidence supports applicability, or explicitly reports that applicability could not be confirmed.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add three products to cart and use promo code KITCHEN10."
+          }
+        ],
+        "missing_evidence": [
+          "current promotion details for KITCHEN10 or matching offer",
+          "current cart contents/subtotal relevant to promo applicability"
+        ],
+        "scope": {
+          "family": "cart_promo_completion_grounded_totals",
+          "title": "Grounded promo application and exact cart totals"
+        }
+      },
+      {
+        "id": "learned_94ec1f33c6c398",
+        "template_id": "ct_6462ba60d12fda",
+        "obligation_id": "obl_0593a9f273d2e8",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "Before claiming final pricing or discount for this three-item request, determine whether the correct outcome depends on the combined set of requested items rather than evaluating each item separately.",
+        "source": "completion_template:ct_6462ba60d12fda",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "Multiple related items are requested or present, and an aggregate or bundle condition could materially change correctness.",
+        "required_evidence": [
+          "the full set of in-scope items",
+          "authoritative pricing or promotion terms indicating whether any aggregate or bundle rule applies"
+        ],
+        "discharge": "The assistant establishes whether an aggregate/bundle condition applies and bases the claim on the whole in-scope set.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested multiple items in one shopping task: blender, skillet, and coffee set."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative pricing or promotion terms indicating whether any aggregate or bundle rule applies across the set",
+          "resolved full in-scope item set in cart state"
+        ],
+        "scope": {
+          "family": "aggregate_bundle_condition_for_related_items",
+          "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+        }
+      },
+      {
+        "id": "learned_a493eaa584d410",
+        "template_id": "ct_6462ba60d12fda",
+        "obligation_id": "obl_ef7c79cb341fea",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Completion must account for all three requested items or explicitly state any item left outside the resolved pricing or discount outcome.",
+        "source": "completion_template:ct_6462ba60d12fda",
+        "status": "pending",
+        "priority": 2,
+        "activation": "The user’s shopping request includes more than one item or an item group whose members affect one another.",
+        "required_evidence": [
+          "a complete list of in-scope requested or cart-related items",
+          "the resolved pricing/discount status for each item or for the aggregate set"
+        ],
+        "discharge": "The final report covers all in-scope items under the aggregate outcome or explicitly identifies unresolved/excluded items.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Three requested items are in scope for the shopping task."
+          }
+        ],
+        "missing_evidence": [
+          "resolved pricing/discount status for each requested item or for the aggregate set",
+          "final communicated outcome covering all in-scope items"
+        ],
+        "scope": {
+          "family": "aggregate_bundle_condition_for_related_items",
+          "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_155563b71c44ae",
+        "template_id": "ct_da34e3a18f3e1a",
+        "obligation_id": "obl_1ea5f6b72657ee",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "Report the exact discount amount and resulting subtotal/total for the current cart from authoritative evidence.",
+        "source": "completion_template:ct_da34e3a18f3e1a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The agent mentions a currently available promotion or redeemable benefit for the cart.",
+        "required_evidence": [
+          "current cart subtotal or total used by the discount",
+          "authoritative discount rate or redemption rule",
+          "any cap that limits the amount"
+        ],
+        "discharge": "The response includes the exact current discount value and resulting subtotal or states that the exact amount cannot yet be determined from current evidence.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Current cart subtotal after all three adds is 377."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "KITCHEN10 is 10% off kitchen-category purchase."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Validation reason states promo applied, but estimated_discount is 0 and no post-application cart state is shown."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart shows subtotal 377, discount_amount 37, total 340 with KITCHEN10 applied."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "KITCHEN10 is an active 10% off kitchen-category purchase promotion."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "KITCHEN10 applied."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Cart subtotal 377, discount 37, total 340."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "discount_option_amount_and_interaction_reporting",
+          "title": "Report exact discount amounts and interactions from current evidence"
+        }
+      },
+      {
+        "id": "learned_2da22fd22a8ae6",
+        "template_id": "ct_2e184fabb0730b",
+        "obligation_id": "obl_383049a0408990",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Ground any stated item price or resulting cart amount in current authoritative evidence.",
+        "source": "completion_template:ct_2e184fabb0730b",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is about to state a specific price, subtotal, or cart total.",
+        "required_evidence": [
+          "current product pricing evidence for the requested item or current cart evidence for the resulting total"
+        ],
+        "discharge": "Satisfied when the stated amount matches current authoritative evidence; violated if a concrete amount is asserted without such grounding.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "PowerBlend Pro Blender price is 229."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "CasaGrande Cast-Iron Skillet 12\" price is 89."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "HomeBrew Pour-Over Coffee Set price is 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T21",
+            "detail": "Add result reports cart subtotal 229 after blender add."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T22",
+            "detail": "Add result reports cart subtotal 318 after skillet add."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Add result reports cart subtotal 377 after coffee set add."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T11",
+            "detail": "Blender added at 229."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T12",
+            "detail": "Skillet added at 89."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T13",
+            "detail": "Coffee set added at 59."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Current cart total 340 after promo."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "grounded_cart_pricing_and_add_result_reporting",
+          "title": "Ground price claims and report the resulting cart state"
+        }
+      },
+      {
+        "id": "learned_3541d98c68a9df",
+        "template_id": "ct_bbc7258226647f",
+        "obligation_id": "obl_d9acfb1c57a4df",
+        "phase": "final",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not imply loyalty points or similar rewards were applied unless authoritative cart evidence shows redemption.",
+        "source": "completion_template:ct_bbc7258226647f",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "a loyalty or similar benefit exists on the account",
+        "required_evidence": [
+          "cart/account evidence of redemption status"
+        ],
+        "discharge": "final message contains no unsupported claim of applied points or credits",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T18",
+            "detail": "Customer account has loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Cart shows loyalty_points_redeemed 0, so no redemption is evidenced."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Customer has 2200 loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "loyalty_points_redeemed 0 and loyalty_discount 0."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "loyalty_points_purchase_disclosure",
+          "title": "final purchase report with unused rewards disclosure"
+        }
+      },
+      {
+        "id": "learned_3fe97fc634a0eb",
+        "template_id": "ct_2c778aa381f0de",
+        "obligation_id": "obl_e4ccc692449b93",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If the promo has been applied, report the exact discount amount and resulting cart total from current authoritative cart state.",
+        "source": "completion_template:ct_2c778aa381f0de",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A promo application succeeds or changes cart pricing.",
+        "required_evidence": [
+          "post-application cart discount amount",
+          "post-application cart total"
+        ],
+        "discharge": "The final reply includes the exact grounded discount and final total from cart state.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Post-application cart shows KITCHEN10 applied with discount_amount 37 and total 340."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T28",
+            "detail": "apply_promo reports status applied with cart_subtotal 377, cart_total 340, discount_amount 37."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Promo applied."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Discount 37, total 340."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_promo_completion_grounded_totals",
+          "title": "Grounded promo application and exact cart totals"
+        }
+      },
+      {
+        "id": "learned_66c2653f3e071b",
+        "template_id": "ct_b9b70c4349f4bc",
+        "obligation_id": "obl_6ec364e64e808a",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not imply the reported total is complete best payable outcome if unresolved bundle or aggregate promo conditions could matter.",
+        "source": "completion_template:ct_b9b70c4349f4bc",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "several related items are being purchased together and aggregate savings may materially change the total",
+        "required_evidence": [
+          "evidence that no applicable aggregate savings condition needs resolution, or explicit framing that the reported amount is only the current subtotal before any unresolved savings"
+        ],
+        "discharge": "the assistant either resolves the aggregate-savings question from authoritative evidence or clearly states that the amount reported does not account for unresolved bundle/promo eligibility",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested several related kitchen products together."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy references category bundle and brand bundle bonus, suggesting possible aggregate savings conditions."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Current add results reach cart subtotal/total 377 before any shown promo application."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart shows KITCHEN10 applied, subtotal 377, discount 37, total 340."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explicitly noted current best confirmed savings and promo stacking limits."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Category bundle does not stack with promo codes; brand bundle bonus stacks."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_item_bundle_discount_disclosure",
+          "title": "Disclose unresolved bundle or aggregate savings when related items are added together"
+        }
+      },
+      {
+        "id": "learned_79114d45b12391",
+        "template_id": "ct_b9b70c4349f4bc",
+        "obligation_id": "obl_07649a946ffbb6",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "Proactively alert the user to possible bundle or aggregate savings when no aggregate-savings determination is provided.",
+        "source": "completion_template:ct_b9b70c4349f4bc",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "multiple related items were added together and no aggregate-savings determination has been provided",
+        "required_evidence": [
+          "observable relation among the items that could matter for bundle or promo eligibility"
+        ],
+        "discharge": "the assistant explicitly flags the potential for bundle or aggregate savings and distinguishes it from the current subtotal",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Multiple related kitchen items were requested together."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Visible policy includes category bundle and brand bundle bonus, so aggregate savings could matter."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant flagged the current best confirmed savings and stacking rules."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_item_bundle_discount_disclosure",
+          "title": "Disclose unresolved bundle or aggregate savings when related items are added together"
+        }
+      },
+      {
+        "id": "learned_79ba3d0807acd1",
+        "template_id": "ct_f3a896820c0b68",
+        "obligation_id": "obl_9edf40f14dc642",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Explain which side of any visible threshold or transition rule the user is currently on and why that produces the current outcome.",
+        "source": "completion_template:ct_f3a896820c0b68",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Authoritative offer or pricing evidence includes a boundary condition that is relevant to the current cart state.",
+        "required_evidence": [
+          "current cart state relevant to the threshold",
+          "authoritative terms describing the threshold and its effect"
+        ],
+        "discharge": "The response explains the current boundary status and ties it to the current outcome.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy exposes transition rules: one promo code per cart, category bundle does not stack with promo codes, and brand bundle bonus stacks."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Current cart has no items, no promo applied, and subtotal 0."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy states one promo code per cart, category bundle does not stack with promo codes on the same items, and brand bundle bonus stacks with everything."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart has KITCHEN10 applied with subtotal 377 and total 340."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explained one promo code per cart and category bundle non-stacking."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Stacking rules provided."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "threshold_consequence_disclosure",
+          "title": "Explain current threshold status and the exact next consequence when crossing it would change outcome"
+        }
+      },
+      {
+        "id": "learned_803e30a92da39b",
+        "template_id": "ct_52a52876040f21",
+        "obligation_id": "obl_03b373f7f2b6cd",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Summarize the resulting cart state, including the item added and the applied pricing change that took effect.",
+        "source": "completion_template:ct_52a52876040f21",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The add/apply request has succeeded.",
+        "required_evidence": [
+          "post-change cart item state",
+          "post-change promo/application state"
+        ],
+        "discharge": "The response confirms the successful change and summarizes the resulting cart contents/pricing.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T21",
+            "detail": "Blender add succeeded."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T22",
+            "detail": "Skillet add succeeded."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Coffee set add succeeded."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Post-change cart shows all three items and KITCHEN10 applied with discount 37 and total 340."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Three items in cart; promo applied; subtotal 377; total 340."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "post_change_cart_state_reporting_with_unset_consequence",
+          "title": "Report resulting cart state and any still-unset consequential field"
+        }
+      },
+      {
+        "id": "learned_8c18f10500fec6",
+        "template_id": "ct_52a52876040f21",
+        "obligation_id": "obl_9c7e9f217a9b2b",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "Disclose if a consequential cart field remains unset after the requested change.",
+        "source": "completion_template:ct_52a52876040f21",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "Post-change cart state contains an unset consequential field such as fulfillment/shipping selection.",
+        "required_evidence": [
+          "current cart state showing the field is unset"
+        ],
+        "discharge": "The final reply explicitly notes the still-unset field and avoids implying the purchase is fully configured.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Cart shows shipping_option is null."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Post-change cart shows shipping_option is null."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "shipping_option is null."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "post_change_cart_state_reporting_with_unset_consequence",
+          "title": "Report resulting cart state and any still-unset consequential field"
+        }
+      },
+      {
+        "id": "learned_8d153956100fbe",
+        "template_id": "ct_2c778aa381f0de",
+        "obligation_id": "obl_4b1e457050cbc8",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating that a promo works or changes the price, ground the claim in current authoritative promotion and cart evidence showing the code is active and applicable to the current purchase.",
+        "source": "completion_template:ct_2c778aa381f0de",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A promo or coupon is requested or referenced.",
+        "required_evidence": [
+          "current promotion details for the requested code or matching offer",
+          "current cart contents/subtotal relevant to applicability"
+        ],
+        "discharge": "The response states the promo outcome only after authoritative evidence supports applicability, or explicitly reports that applicability could not be confirmed.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add three products to cart and use promo code KITCHEN10."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Promo validation shows KITCHEN10 valid with reason '10% off any kitchen-category purchase.'"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Current cart is still empty with subtotal 0 and no applied promo codes."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add three kitchen items and use promo code KITCHEN10."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Promo validation says KITCHEN10 is valid with reason '10% off any kitchen-category purchase.'"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Current cart still has no items and no applied promo codes."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to use promo code KITCHEN10."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "Current kitchen promotions include active code KITCHEN10 for 10% off any kitchen-category purchase."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T21",
+            "detail": "Requested blender was added to cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T22",
+            "detail": "Requested skillet was added to cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Requested coffee set was added to cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy states one promo code per cart and category bundle does not stack with promo codes on the same items."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "Current promotions show active code KITCHEN10 for 10% off kitchen-category purchase."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Post-application cart shows KITCHEN10 applied with discount 37 and total 340."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_promo_completion_grounded_totals",
+          "title": "Grounded promo application and exact cart totals"
+        }
+      },
+      {
+        "id": "learned_94ec1f33c6c398",
+        "template_id": "ct_6462ba60d12fda",
+        "obligation_id": "obl_0593a9f273d2e8",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "Determine whether the final pricing outcome depends on the combined multi-item set rather than isolated items.",
+        "source": "completion_template:ct_6462ba60d12fda",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Multiple related items are requested or present, and an aggregate or bundle condition could materially change correctness.",
+        "required_evidence": [
+          "the full set of in-scope items",
+          "authoritative pricing or promotion terms indicating whether any aggregate or bundle rule applies"
+        ],
+        "discharge": "The assistant establishes whether an aggregate/bundle condition applies and bases the claim on the whole in-scope set.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested multiple items in one shopping task: blender, skillet, and coffee set."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "PowerBlend Pro Blender found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "CasaGrande Cast-Iron Skillet found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "HomeBrew Pour-Over Coffee Set found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Validated promo refers to any kitchen-category purchase, suggesting a cart-wide relation may matter."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Blender found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Skillet found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Coffee set found in kitchen category."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy mentions category bundle and brand bundle bonus, indicating aggregate relations may matter."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested blender, skillet, and coffee set together in one shopping task."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Blender is a kitchen item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Skillet is a kitchen item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Coffee set is a kitchen item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "Promo terms refer to any kitchen-category purchase, indicating cart-wide relation may matter."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart contains all three requested items with promo applied."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Three related kitchen items requested together."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Promo stacking policy present."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Current cart reflects aggregate subtotal and promo outcome."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "aggregate_bundle_condition_for_related_items",
+          "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+        }
+      },
+      {
+        "id": "learned_a493eaa584d410",
+        "template_id": "ct_6462ba60d12fda",
+        "obligation_id": "obl_ef7c79cb341fea",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Final report must account for every in-scope item or state any item left outside the resolved outcome.",
+        "source": "completion_template:ct_6462ba60d12fda",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The user’s shopping request includes more than one item or an item group whose members affect one another.",
+        "required_evidence": [
+          "a complete list of in-scope requested or cart-related items",
+          "the resolved pricing/discount status for each item or for the aggregate set"
+        ],
+        "discharge": "The final report covers all in-scope items under the aggregate outcome or explicitly identifies unresolved/excluded items.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Three requested items are in scope for the shopping task."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Blender identified."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Skillet identified."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Coffee set identified."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Current cart still shows no items added."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Cart still shows no items added."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Three requested items are in scope."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T21",
+            "detail": "Blender add result observed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T22",
+            "detail": "Skillet add result observed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Coffee set add result observed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart lists blender, skillet, and coffee set with one aggregate cart pricing outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Blender, skillet, and coffee set all present."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "aggregate_bundle_condition_for_related_items",
+          "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+        }
+      },
+      {
+        "id": "learned_c479e350f24a4b",
+        "template_id": "ct_bbc7258226647f",
+        "obligation_id": "obl_5035fd9a12fe44",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "Mention that an available account benefit exists and can affect the cart, without claiming it was used.",
+        "source": "completion_template:ct_bbc7258226647f",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the customer profile contains an available reward or benefit signal relevant to the purchase",
+        "required_evidence": [
+          "current account benefit state",
+          "cart state showing no redemption if unused"
+        ],
+        "discharge": "report that the benefit is available or optionally usable, with no false claim of redemption",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T18",
+            "detail": "Customer account shows 2200 loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Cart shows loyalty_points_redeemed 0 and loyalty_discount 0."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Observed cart state shows loyalty_points_redeemed 0 and loyalty_discount 0 before the add results."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Cart shows loyalty_points_redeemed 0 and loyalty_discount 0 after the adds and promo application."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "2200 loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "No loyalty redemption used."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "loyalty_points_purchase_disclosure",
+          "title": "final purchase report with unused rewards disclosure"
+        }
+      },
+      {
+        "id": "learned_d7b56e1879b5de",
+        "template_id": "ct_2e184fabb0730b",
+        "obligation_id": "obl_50dae717d7cfed",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Confirm the requested item(s) were added with quantity/configuration and include the resulting cart amount when available.",
+        "source": "completion_template:ct_2e184fabb0730b",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The add-to-cart outcome is successful and the user asked for the item to be added.",
+        "required_evidence": [
+          "successful add result",
+          "the quantity and any confirmed configurable options",
+          "resulting cart subtotal or total if returned"
+        ],
+        "discharge": "Satisfied by a final message confirming the successful addition and the resulting cart state; unsatisfied if the assistant finishes without confirming the completed cart outcome.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add three named items to the cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Observed cart state remains empty, so no successful add result is yet visible."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T21",
+            "detail": "Blender was added with quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T22",
+            "detail": "Skillet was added with quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Coffee set was added with quantity 1 and cart subtotal/total 377."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T23",
+            "detail": "Coffee set was added with quantity 1 and cart subtotal 377."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T29",
+            "detail": "Current cart confirms all three items in quantity 1 and total 340 after promo."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T11",
+            "detail": "Blender added quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T12",
+            "detail": "Skillet added quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T13",
+            "detail": "Coffee set added quantity 1."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T15",
+            "detail": "Cart total 340."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "grounded_cart_pricing_and_add_result_reporting",
+          "title": "Ground price claims and report the resulting cart state"
+        }
+      },
+      {
+        "id": "learned_f9e331efa0b39d",
+        "template_id": "ct_da34e3a18f3e1a",
+        "obligation_id": "obl_d68401f79aed2d",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "Disclose material stacking or better-of interactions between multiple discount paths.",
+        "source": "completion_template:ct_da34e3a18f3e1a",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "More than one discount source is observable for the same cart or item.",
+        "required_evidence": [
+          "policy evidence on promo stacking and incompatibilities",
+          "eligibility status for each relevant discount source"
+        ],
+        "discharge": "The response explains the relevant interaction rules so the user understands whether options can combine or compete.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Promo code KITCHEN10 is valid for kitchen-category purchase."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T18",
+            "detail": "Customer account has loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy says category bundle does not stack with promo codes and brand bundle bonus does stack with everything."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T20",
+            "detail": "Promo code KITCHEN10 is available for kitchen purchases."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T18",
+            "detail": "Customer account has 2200 loyalty points available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T14",
+            "detail": "Policy says category bundle does not stack with promo codes and brand bundle bonus stacks with everything."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated only one promo code per cart and that category bundle discounts do not stack with promo codes."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Policy confirms interaction rules."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "discount_option_amount_and_interaction_reporting",
+          "title": "Report exact discount amounts and interactions from current evidence"
+        }
+      },
+      {
+        "id": "runtime_2c9aead12cd284",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:25",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 25,
+            "assistant_index": 6,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "preview_sequence": 25,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_43e6281b63d36a",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:13",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 13,
+            "assistant_index": 1,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "preview_sequence": 13,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_6907df378d4cef",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The apply_promo operation completed successfully.",
+        "source": "tool:apply_promo:14",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 14,
+            "assistant_index": 1,
+            "tool": "apply_promo",
+            "status": "applied",
+            "success": true,
+            "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "preview_sequence": 14,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_6abbc1eb49c814",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:26",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 26,
+            "assistant_index": 6,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "preview_sequence": 26,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_6e7f544b7548c1",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:12",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 12,
+            "assistant_index": 1,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "preview_sequence": 12,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_834b47a08b8e96",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:21",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 21,
+            "assistant_index": 5,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "preview_sequence": 21,
+          "assistant_index": 5
+        }
+      },
+      {
+        "id": "runtime_8cdb6fa66de88b",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:22",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 22,
+            "assistant_index": 5,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3007",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "preview_sequence": 22,
+          "assistant_index": 5
+        }
+      },
+      {
+        "id": "runtime_c807d45381b747",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:27",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 27,
+            "assistant_index": 6,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "preview_sequence": 27,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_d27252f0a40d07",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The apply_promo operation completed successfully.",
+        "source": "tool:apply_promo:28",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 28,
+            "assistant_index": 7,
+            "tool": "apply_promo",
+            "status": "applied",
+            "success": true,
+            "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "preview_sequence": 28,
+          "assistant_index": 7
+        }
+      },
+      {
+        "id": "runtime_de027a87c78719",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The apply_promo operation completed successfully.",
+        "source": "tool:apply_promo:30",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 30,
+            "assistant_index": 8,
+            "tool": "apply_promo",
+            "status": "applied",
+            "success": true,
+            "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "apply_promo",
+          "arguments": {
+            "customer_id": "shop_004",
+            "promo_code": "KITCHEN10"
+          },
+          "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "preview_sequence": 30,
+          "assistant_index": 8
+        }
+      },
+      {
+        "id": "runtime_e8e2dd43b4bf01",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:11",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 11,
+            "assistant_index": 1,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "preview_sequence": 11,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_f5710b8a44bace",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:23",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 23,
+            "assistant_index": 5,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_004",
+            "product_id": "SP-3008",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "preview_sequence": 23,
+          "assistant_index": 5
+        }
+      }
+    ],
+    "final_open_items": [],
+    "final_satisfied_items": [
+      "learned_155563b71c44ae",
+      "learned_2da22fd22a8ae6",
+      "learned_3541d98c68a9df",
+      "learned_3fe97fc634a0eb",
+      "learned_66c2653f3e071b",
+      "learned_79114d45b12391",
+      "learned_79ba3d0807acd1",
+      "learned_803e30a92da39b",
+      "learned_8c18f10500fec6",
+      "learned_8d153956100fbe",
+      "learned_94ec1f33c6c398",
+      "learned_a493eaa584d410",
+      "learned_c479e350f24a4b",
+      "learned_d7b56e1879b5de",
+      "learned_f9e331efa0b39d",
+      "runtime_2c9aead12cd284",
+      "runtime_43e6281b63d36a",
+      "runtime_6907df378d4cef",
+      "runtime_6abbc1eb49c814",
+      "runtime_6e7f544b7548c1",
+      "runtime_834b47a08b8e96",
+      "runtime_8cdb6fa66de88b",
+      "runtime_c807d45381b747",
+      "runtime_d27252f0a40d07",
+      "runtime_de027a87c78719",
+      "runtime_e8e2dd43b4bf01",
+      "runtime_f5710b8a44bace"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 0,
+      "pending_evidence": 0,
+      "satisfied": 27,
+      "violated": 0
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8d153956100fbe",
+          "template_id": "ct_2c778aa381f0de",
+          "obligation_id": "obl_4b1e457050cbc8",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating that a promo works or changes the price, ground the claim in current authoritative promotion and cart evidence showing the code is active and applicable to the current purchase.",
+          "source": "completion_template:ct_2c778aa381f0de",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A promo or coupon is requested or referenced.",
+          "required_evidence": [
+            "current promotion details for the requested code or matching offer",
+            "current cart contents/subtotal relevant to applicability"
+          ],
+          "discharge": "The response states the promo outcome only after authoritative evidence supports applicability, or explicitly reports that applicability could not be confirmed.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add three products to cart and use promo code KITCHEN10."
+            }
+          ],
+          "missing_evidence": [
+            "current promotion details for KITCHEN10 or matching offer",
+            "current cart contents/subtotal relevant to promo applicability"
+          ],
+          "scope": {
+            "family": "cart_promo_completion_grounded_totals",
+            "title": "Grounded promo application and exact cart totals"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_94ec1f33c6c398",
+          "template_id": "ct_6462ba60d12fda",
+          "obligation_id": "obl_0593a9f273d2e8",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "Before claiming final pricing or discount for this three-item request, determine whether the correct outcome depends on the combined set of requested items rather than evaluating each item separately.",
+          "source": "completion_template:ct_6462ba60d12fda",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "Multiple related items are requested or present, and an aggregate or bundle condition could materially change correctness.",
+          "required_evidence": [
+            "the full set of in-scope items",
+            "authoritative pricing or promotion terms indicating whether any aggregate or bundle rule applies"
+          ],
+          "discharge": "The assistant establishes whether an aggregate/bundle condition applies and bases the claim on the whole in-scope set.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requested multiple items in one shopping task: blender, skillet, and coffee set."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative pricing or promotion terms indicating whether any aggregate or bundle rule applies across the set",
+            "resolved full in-scope item set in cart state"
+          ],
+          "scope": {
+            "family": "aggregate_bundle_condition_for_related_items",
+            "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a493eaa584d410",
+          "template_id": "ct_6462ba60d12fda",
+          "obligation_id": "obl_ef7c79cb341fea",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "Completion must account for all three requested items or explicitly state any item left outside the resolved pricing or discount outcome.",
+          "source": "completion_template:ct_6462ba60d12fda",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The user’s shopping request includes more than one item or an item group whose members affect one another.",
+          "required_evidence": [
+            "a complete list of in-scope requested or cart-related items",
+            "the resolved pricing/discount status for each item or for the aggregate set"
+          ],
+          "discharge": "The final report covers all in-scope items under the aggregate outcome or explicitly identifies unresolved/excluded items.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "Three requested items are in scope for the shopping task."
+            }
+          ],
+          "missing_evidence": [
+            "resolved pricing/discount status for each requested item or for the aggregate set",
+            "final communicated outcome covering all in-scope items"
+          ],
+          "scope": {
+            "family": "aggregate_bundle_condition_for_related_items",
+            "title": "Resolve all-item or bundle effects when multiple related items are in scope"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_d7b56e1879b5de",
+          "template_id": "ct_2e184fabb0730b",
+          "obligation_id": "obl_50dae717d7cfed",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the requested cart addition is completed, the final response must confirm that the three requested items were added with their confirmed quantities/configurations and include the resulting cart amount when available.",
+          "source": "completion_template:ct_2e184fabb0730b",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The add-to-cart outcome is successful and the user asked for the item to be added.",
+          "required_evidence": [
+            "successful add result",
+            "the quantity and any confirmed configurable options",
+            "resulting cart subtotal or total if returned"
+          ],
+          "discharge": "Satisfied by a final message confirming the successful addition and the resulting cart state; unsatisfied if the assistant finishes without confirming the completed cart outcome.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add three named items to the cart."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Observed cart state remains empty, so no successful add result is yet visible."
+            }
+          ],
+          "missing_evidence": [
+            "successful add result for the requested items",
+            "confirmed quantity and any configurable options for each added item",
+            "resulting cart subtotal or total if returned"
+          ],
+          "scope": {
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "title": "Ground price claims and report the resulting cart state"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c479e350f24a4b",
+          "template_id": "ct_bbc7258226647f",
+          "obligation_id": "obl_5035fd9a12fe44",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If a final purchase/cart outcome is reported, mention that an available account benefit exists and can affect the cart without claiming it was used.",
+          "source": "completion_template:ct_bbc7258226647f",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the customer profile contains an available reward or benefit signal relevant to the purchase",
+          "required_evidence": [
+            "current account benefit state",
+            "cart state showing no redemption if unused"
+          ],
+          "discharge": "report that the benefit is available or optionally usable, with no false claim of redemption",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T18",
+              "detail": "Customer account shows 2200 loyalty points available."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Cart shows loyalty_points_redeemed 0 and loyalty_discount 0."
+            }
+          ],
+          "missing_evidence": [
+            "assistant message that communicates the unused available benefit in the final report"
+          ],
+          "scope": {
+            "family": "loyalty_points_purchase_disclosure",
+            "title": "final purchase report with unused rewards disclosure"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "learned_3541d98c68a9df",
+          "template_id": "ct_bbc7258226647f",
+          "obligation_id": "obl_d9acfb1c57a4df",
+          "phase": "final",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "Do not imply loyalty points or similar rewards were applied unless authoritative cart evidence shows redemption.",
+          "source": "completion_template:ct_bbc7258226647f",
+          "status": "pending",
+          "priority": 2,
+          "activation": "a loyalty or similar benefit exists on the account",
+          "required_evidence": [
+            "cart/account evidence of redemption status"
+          ],
+          "discharge": "final message contains no unsupported claim of applied points or credits",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T18",
+              "detail": "Customer account has loyalty points available."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Cart shows loyalty_points_redeemed 0, so no redemption is evidenced."
+            }
+          ],
+          "missing_evidence": [
+            "final assistant message showing no unsupported claim of applied points or credits"
+          ],
+          "scope": {
+            "family": "loyalty_points_purchase_disclosure",
+            "title": "final purchase report with unused rewards disclosure"
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "item_created",
+        "item": {
+          "id": "learned_f9e331efa0b39d",
+          "template_id": "ct_da34e3a18f3e1a",
+          "obligation_id": "obl_d68401f79aed2d",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "If multiple discount paths are presented for this cart, disclose material stacking or better-of interactions that change what the user would actually receive.",
+          "source": "completion_template:ct_da34e3a18f3e1a",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "More than one discount source is observable for the same cart or item.",
+          "required_evidence": [
+            "policy evidence on promo stacking and incompatibilities",
+            "eligibility status for each relevant discount source"
+          ],
+          "discharge": "The response explains the relevant interaction rules so the user understands whether options can combine or compete.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "Promo code KITCHEN10 is valid for kitchen-category purchase."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T18",
+              "detail": "Customer account has loyalty points available."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T14",
+              "detail": "Policy says category bundle does not stack with promo codes and brand bundle bonus does stack with everything."
+            }
+          ],
+          "missing_evidence": [
+            "eligibility status of each relevant discount source for this specific cart",
+            "assistant communication explaining any relevant interaction rules if multiple discount paths are presented"
+          ],
+          "scope": {
+            "family": "discount_option_amount_and_interaction_reporting",
+            "title": "Report exact discount amounts and interactions from current evidence"
+          }
+        }
+      },
+      {
+        "index": 7,
+        "event": "item_created",
+        "item": {
+          "id": "learned_66c2653f3e071b",
+          "template_id": "ct_b9b70c4349f4bc",
+          "obligation_id": "obl_6ec364e64e808a",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The assistant must not imply a reported total is the complete best payable outcome if these related kitchen items may qualify for unresolved bundle, aggregate, or promo treatment.",
+          "source": "completion_template:ct_b9b70c4349f4bc",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "several related items are being purchased together and aggregate savings may materially change the total",
+          "required_evidence": [
+            "evidence that no applicable aggregate savings condition needs resolution, or explicit framing that the reported amount is only the current subtotal before any unresolved savings"
+          ],
+          "discharge": "the assistant either resolves the aggregate-savings question from authoritative evidence or clearly states that the amount reported does not account for unresolved bundle/promo eligibility",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requested several related kitchen products together."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T14",
+              "detail": "Policy references category bundle and brand bundle bonus, suggesting possible aggregate savings conditions."
+            }
+          ],
+          "missing_evidence": [
+            "evidence resolving whether any aggregate savings condition applies to this set",
+            "or explicit framing that any reported amount excludes unresolved bundle/promo eligibility"
+          ],
+          "scope": {
+            "family": "multi_item_bundle_discount_disclosure",
+            "title": "Disclose unresolved bundle or aggregate savings when related items are added together"
+          }
+        }
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "learned_79114d45b12391",
+          "template_id": "ct_b9b70c4349f4bc",
+          "obligation_id": "obl_07649a946ffbb6",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If no aggregate-savings determination is provided for these related items, proactively alert the user that bundle or aggregate savings may matter instead of ending with only a subtotal.",
+          "source": "completion_template:ct_b9b70c4349f4bc",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "multiple related items were added together and no aggregate-savings determination has been provided",
+          "required_evidence": [
+            "observable relation among the items that could matter for bundle or promo eligibility"
+          ],
+          "discharge": "the assistant explicitly flags the potential for bundle or aggregate savings and distinguishes it from the current subtotal",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "Multiple related kitchen items were requested together."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T14",
+              "detail": "Visible policy includes category bundle and brand bundle bonus, so aggregate savings could matter."
+            }
+          ],
+          "missing_evidence": [
+            "assistant communication explicitly flagging potential bundle or aggregate savings, unless authoritative evidence resolves it"
+          ],
+          "scope": {
+            "family": "multi_item_bundle_discount_disclosure",
+            "title": "Disclose unresolved bundle or aggregate savings when related items are added together"
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "learned_79ba3d0807acd1",
+          "template_id": "ct_f3a896820c0b68",
+          "obligation_id": "obl_9edf40f14dc642",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "When reporting current pricing or discount behavior, explain the current side of any visible discount boundary that governs the outcome.",
+          "source": "completion_template:ct_f3a896820c0b68",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "Authoritative offer or pricing evidence includes a boundary condition that is relevant to the current cart state.",
+          "required_evidence": [
+            "current cart state relevant to the threshold",
+            "authoritative terms describing the threshold and its effect"
+          ],
+          "discharge": "The response explains the current boundary status and ties it to the current outcome.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T14",
+              "detail": "Policy exposes transition rules: one promo code per cart, category bundle does not stack with promo codes, and brand bundle bonus stacks."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Current cart has no items, no promo applied, and subtotal 0."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative terms defining whether a threshold, cap, or boundary is currently affecting this cart beyond the stacking rules",
+            "assistant explanation tying the current cart state to the present discount behavior"
+          ],
+          "scope": {
+            "family": "threshold_consequence_disclosure",
+            "title": "Explain current threshold status and the exact next consequence when crossing it would change outcome"
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_834b47a08b8e96",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:21",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 21,
+              "assistant_index": 5,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+            "preview_sequence": 21,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_8cdb6fa66de88b",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:22",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 22,
+              "assistant_index": 5,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3007",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+            "preview_sequence": 22,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 12,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_f5710b8a44bace",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:23",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 23,
+              "assistant_index": 5,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3008",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+            "preview_sequence": 23,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_2c9aead12cd284",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:25",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 25,
+              "assistant_index": 6,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+            "preview_sequence": 25,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_6abbc1eb49c814",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:26",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 26,
+              "assistant_index": 6,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3007",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+            "preview_sequence": 26,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_c807d45381b747",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:27",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 27,
+              "assistant_index": 6,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3008",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+            "preview_sequence": 27,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 16,
+        "event": "item_created",
+        "item": {
+          "id": "learned_2da22fd22a8ae6",
+          "template_id": "ct_2e184fabb0730b",
+          "obligation_id": "obl_383049a0408990",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete item price or resulting cart amount, any reported number for these requested kitchen items or the cart must be grounded in current authoritative product or cart evidence.",
+          "source": "completion_template:ct_2e184fabb0730b",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant is about to state a specific price, subtotal, or cart total.",
+          "required_evidence": [
+            "current product pricing evidence for the requested item or current cart evidence for the resulting total"
+          ],
+          "discharge": "Satisfied when the stated amount matches current authoritative evidence; violated if a concrete amount is asserted without such grounding.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "PowerBlend Pro Blender price is 229."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "CasaGrande Cast-Iron Skillet 12\" price is 89."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T7",
+              "detail": "HomeBrew Pour-Over Coffee Set price is 59."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T21",
+              "detail": "Add result reports cart subtotal 229 after blender add."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T22",
+              "detail": "Add result reports cart subtotal 318 after skillet add."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T23",
+              "detail": "Add result reports cart subtotal 377 after coffee set add."
+            }
+          ],
+          "missing_evidence": [
+            "assistant message actually communicating any concrete price or cart amount with these grounded values, if such a claim is made"
+          ],
+          "scope": {
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "title": "Ground price claims and report the resulting cart state"
+          }
+        }
+      },
+      {
+        "index": 17,
+        "event": "item_created",
+        "item": {
+          "id": "learned_155563b71c44ae",
+          "template_id": "ct_da34e3a18f3e1a",
+          "obligation_id": "obl_1ea5f6b72657ee",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "When presenting an available discount for this cart, report the exact savings and resulting subtotal from authoritative current evidence rather than only a generic description.",
+          "source": "completion_template:ct_da34e3a18f3e1a",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "The agent mentions a currently available promotion or redeemable benefit for the cart.",
+          "required_evidence": [
+            "current cart subtotal or total used by the discount",
+            "authoritative discount rate or redemption rule",
+            "any cap that limits the amount"
+          ],
+          "discharge": "The response includes the exact current discount value and resulting subtotal or states that the exact amount cannot yet be determined from current evidence.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T23",
+              "detail": "Current cart subtotal after all three adds is 377."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T20",
+              "detail": "KITCHEN10 is 10% off kitchen-category purchase."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "Validation reason states promo applied, but estimated_discount is 0 and no post-application cart state is shown."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative current cart or promo state showing the exact discount value and resulting subtotal for this cart, or evidence that the exact amount cannot yet be determined"
+          ],
+          "scope": {
+            "family": "discount_option_amount_and_interaction_reporting",
+            "title": "Report exact discount amounts and interactions from current evidence"
+          }
+        }
+      },
+      {
+        "index": 18,
+        "event": "item_created",
+        "item": {
+          "id": "learned_803e30a92da39b",
+          "template_id": "ct_52a52876040f21",
+          "obligation_id": "obl_03b373f7f2b6cd",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "When the requested cart update is complete, summarize the resulting cart state, including the items added and the pricing change that actually took effect.",
+          "source": "completion_template:ct_52a52876040f21",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The add/apply request has succeeded.",
+          "required_evidence": [
+            "post-change cart item state",
+            "post-change promo/application state"
+          ],
+          "discharge": "The response confirms the successful change and summarizes the resulting cart contents/pricing.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T21",
+              "detail": "Blender add succeeded."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T22",
+              "detail": "Skillet add succeeded."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T23",
+              "detail": "Coffee set add succeeded."
+            }
+          ],
+          "missing_evidence": [
+            "post-change cart promo/application state showing any pricing change that actually took effect",
+            "final assistant message summarizing resulting cart contents and pricing"
+          ],
+          "scope": {
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "title": "Report resulting cart state and any still-unset consequential field"
+          }
+        }
+      },
+      {
+        "index": 19,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8c18f10500fec6",
+          "template_id": "ct_52a52876040f21",
+          "obligation_id": "obl_9c7e9f217a9b2b",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If a consequential cart field remains unset after the requested change and could affect the eventual purchase outcome, explicitly disclose that it is still unset.",
+          "source": "completion_template:ct_52a52876040f21",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "Post-change cart state contains an unset consequential field such as fulfillment/shipping selection.",
+          "required_evidence": [
+            "current cart state showing the field is unset"
+          ],
+          "discharge": "The final reply explicitly notes the still-unset field and avoids implying the purchase is fully configured.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Cart shows shipping_option is null."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative post-change cart state showing whether shipping or another consequential field remains unset after the adds",
+            "final assistant disclosure of any still-unset consequential field if present"
+          ],
+          "scope": {
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "title": "Report resulting cart state and any still-unset consequential field"
+          }
+        }
+      },
+      {
+        "index": 20,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_d27252f0a40d07",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The apply_promo operation completed successfully.",
+          "source": "tool:apply_promo:28",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 28,
+              "assistant_index": 7,
+              "tool": "apply_promo",
+              "status": "applied",
+              "success": true,
+              "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "apply_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            },
+            "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+            "preview_sequence": 28,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_de027a87c78719",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The apply_promo operation completed successfully.",
+          "source": "tool:apply_promo:30",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 30,
+              "assistant_index": 8,
+              "tool": "apply_promo",
+              "status": "applied",
+              "success": true,
+              "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "apply_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            },
+            "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+            "preview_sequence": 30,
+            "assistant_index": 8
+          }
+        }
+      },
+      {
+        "index": 22,
+        "event": "transition",
+        "item_id": "learned_155563b71c44ae",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 23,
+        "event": "transition",
+        "item_id": "learned_8c18f10500fec6",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 24,
+        "event": "transition",
+        "item_id": "learned_8d153956100fbe",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 25,
+        "event": "transition",
+        "item_id": "learned_f9e331efa0b39d",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 26,
+        "event": "item_created",
+        "item": {
+          "id": "learned_3fe97fc634a0eb",
+          "template_id": "ct_2c778aa381f0de",
+          "obligation_id": "obl_e4ccc692449b93",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If the promo has been applied, report the exact discount amount and resulting cart total from current authoritative cart state rather than an estimated percentage-only outcome.",
+          "source": "completion_template:ct_2c778aa381f0de",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A promo application succeeds or changes cart pricing.",
+          "required_evidence": [
+            "post-application cart discount amount",
+            "post-application cart total"
+          ],
+          "discharge": "The final reply includes the exact grounded discount and final total from cart state.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T29",
+              "detail": "Post-application cart shows KITCHEN10 applied with discount_amount 37 and total 340."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T28",
+              "detail": "apply_promo reports status applied with cart_subtotal 377, cart_total 340, discount_amount 37."
+            }
+          ],
+          "missing_evidence": [
+            "final assistant message including the exact grounded discount and final total from cart state"
+          ],
+          "scope": {
+            "family": "cart_promo_completion_grounded_totals",
+            "title": "Grounded promo application and exact cart totals"
+          }
+        }
+      },
+      {
+        "index": 27,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_e8e2dd43b4bf01",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:11",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 11,
+              "assistant_index": 1,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 229, \"cart_total\": 229, \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"product_name\": \"PowerBlend Pro Blender\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 229, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3001\", \"quantity\": 1}]",
+            "preview_sequence": 11,
+            "assistant_index": 1
+          }
+        }
+      },
+      {
+        "index": 28,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_6e7f544b7548c1",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:12",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 12,
+              "assistant_index": 1,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0002\", \"cart_subtotal\": 318, \"cart_total\": 318, \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"product_name\": \"CasaGrande Cast-Iron Skillet 12\\\"\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 89, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3007",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3007\", \"quantity\": 1}]",
+            "preview_sequence": 12,
+            "assistant_index": 1
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_43e6281b63d36a",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:13",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 13,
+              "assistant_index": 1,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0003\", \"cart_subtotal\": 377, \"cart_total\": 377, \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"product_name\": \"HomeBrew Pour-Over Coffee Set\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 59, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3008",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_004\", \"gift_wrap\": false, \"product_id\": \"SP-3008\", \"quantity\": 1}]",
+            "preview_sequence": 13,
+            "assistant_index": 1
+          }
+        }
+      },
+      {
+        "index": 30,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_6907df378d4cef",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The apply_promo operation completed successfully.",
+          "source": "tool:apply_promo:14",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 14,
+              "assistant_index": 1,
+              "tool": "apply_promo",
+              "status": "applied",
+              "success": true,
+              "result": "{\"applied_promo_codes\": [\"KITCHEN10\"], \"cart_subtotal\": 377, \"cart_total\": 340, \"discount_amount\": 37, \"promo_code\": \"KITCHEN10\", \"status\": \"applied\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "apply_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            },
+            "action_key": "[\"apply_promo\", {\"customer_id\": \"shop_004\", \"promo_code\": \"KITCHEN10\"}]",
+            "preview_sequence": 14,
+            "assistant_index": 1
+          }
+        }
+      },
+      {
+        "index": 31,
+        "event": "transition",
+        "item_id": "learned_155563b71c44ae",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 32,
+        "event": "transition",
+        "item_id": "learned_2da22fd22a8ae6",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 33,
+        "event": "transition",
+        "item_id": "learned_3541d98c68a9df",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 34,
+        "event": "transition",
+        "item_id": "learned_3fe97fc634a0eb",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 35,
+        "event": "transition",
+        "item_id": "learned_803e30a92da39b",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 36,
+        "event": "transition",
+        "item_id": "learned_8c18f10500fec6",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 37,
+        "event": "transition",
+        "item_id": "learned_94ec1f33c6c398",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 38,
+        "event": "transition",
+        "item_id": "learned_a493eaa584d410",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 39,
+        "event": "transition",
+        "item_id": "learned_c479e350f24a4b",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 40,
+        "event": "transition",
+        "item_id": "learned_d7b56e1879b5de",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 41,
+        "event": "transition",
+        "item_id": "learned_66c2653f3e071b",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 42,
+        "event": "transition",
+        "item_id": "learned_79114d45b12391",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 43,
+        "event": "transition",
+        "item_id": "learned_79ba3d0807acd1",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 44,
+        "event": "transition",
+        "item_id": "learned_f9e331efa0b39d",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "818bd61d86d4d524fbed64e6457787a33d79b5734ba8b21bb51a6d6194401ec0",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use.",
+        "candidates": [
+          {
+            "id": "ct_2c778aa381f0de",
+            "family": "cart_promo_completion_grounded_totals",
+            "score": 33.047038
+          },
+          {
+            "id": "ct_5fe63cc694d9da",
+            "family": "account_linked_benefit_resolution",
+            "score": 28.08728
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 26.554925
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 27.46539
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 30.098359
+          },
+          {
+            "id": "ct_49463727012560",
+            "family": "optional_add_on_choice_before_cart_change",
+            "score": 29.943191
+          },
+          {
+            "id": "ct_bbc7258226647f",
+            "family": "loyalty_points_purchase_disclosure",
+            "score": 22.372911
+          },
+          {
+            "id": "ct_f5f7dd3125faa3",
+            "family": "promo_choice_and_stack_limit",
+            "score": 24.606862
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "cd8982851677d0bb7176a54036ec36698ca359eb6c29647066a7b818db4e11f6",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use. search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found search_products products product_id SP-3007 name CasaGrande Cast-Iron Skillet 12\" brand CasaGrande category kitchen subcategory cookware price rating review_count in_stock true total_found search_products products...",
+        "candidates": [
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 55.632145
+          },
+          {
+            "id": "ct_da34e3a18f3e1a",
+            "family": "discount_option_amount_and_interaction_reporting",
+            "score": 40.225689
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 40.508595
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 55.102285
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 53.094845
+          },
+          {
+            "id": "ct_2c778aa381f0de",
+            "family": "cart_promo_completion_grounded_totals",
+            "score": 52.964737
+          },
+          {
+            "id": "ct_2e184fabb0730b",
+            "family": "grounded_cart_pricing_and_add_result_reporting",
+            "score": 44.416652
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 44.299647
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "124267f5d87a1b53e301daf3e698fef4d901295e96d0d45991e74c05fad49eee",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use. search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found search_products products product_id SP-3007 name CasaGrande Cast-Iron Skillet 12\" brand CasaGrande category kitchen subcategory cookware price rating review_count in_stock true total_found search_products products...",
+        "candidates": [
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 81.464153
+          },
+          {
+            "id": "ct_bbc7258226647f",
+            "family": "loyalty_points_purchase_disclosure",
+            "score": 62.261185
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 54.396275
+          },
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 72.755825
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 71.337214
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 64.220874
+          },
+          {
+            "id": "ct_da34e3a18f3e1a",
+            "family": "discount_option_amount_and_interaction_reporting",
+            "score": 61.507068
+          },
+          {
+            "id": "ct_2c778aa381f0de",
+            "family": "cart_promo_completion_grounded_totals",
+            "score": 65.375795
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "f2714c5a4777a7a557d60ff51432b3dcd3229ecdb530b67ad6f110aeb01a72c4",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use. search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found search_products products product_id SP-3007 name CasaGrande Cast-Iron Skillet 12\" brand CasaGrande category kitchen subcategory cookware price rating review_count in_stock true total_found search_products products...",
+        "candidates": [
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 84.015363
+          },
+          {
+            "id": "ct_8b4ab6ce1110b8",
+            "family": "promo_threshold_boundary_disclosure",
+            "score": 66.854492
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 68.605455
+          },
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 75.689853
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 71.224435
+          },
+          {
+            "id": "ct_3044c6ba73ed35",
+            "family": "budget_availability_with_protected_cart_confirmation",
+            "score": 43.703049
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 70.42871
+          },
+          {
+            "id": "ct_40653bf9bc84c1",
+            "family": "promotion_and_threshold_grounding_for_price_claims",
+            "score": 64.831875
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "3b50ceaefa44690ccb69b5eb0acdcb4b087f5e65fed50fa2d387c400979ce27e",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use. search_products products product_id SP-3001 name PowerBlend Pro Blender brand PowerBlend category kitchen subcategory blender price rating review_count in_stock true total_found search_products products product_id SP-3007 name CasaGrande Cast-Iron Skillet 12\" brand CasaGrande category kitchen subcategory cookware price rating review_count in_stock true total_found search_products products...",
+        "candidates": [
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 88.71564
+          },
+          {
+            "id": "ct_8b4ab6ce1110b8",
+            "family": "promo_threshold_boundary_disclosure",
+            "score": 71.367663
+          },
+          {
+            "id": "ct_58356c8546d964",
+            "family": "product_overview_with_policy_followup",
+            "score": 68.581331
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 75.676265
+          },
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 75.671906
+          },
+          {
+            "id": "ct_3044c6ba73ed35",
+            "family": "budget_availability_with_protected_cart_confirmation",
+            "score": 43.675286
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 71.19601
+          },
+          {
+            "id": "ct_2cbb25e4d09d24",
+            "family": "cart_state_confirmation_with_exact_totals",
+            "score": 66.516058
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "7c1b8f9542551c5284c499d129afd669a8575023973bec0562b975ca9ac03f55",
+        "query_preview": "Hi — I'm setting up a new kitchen. Can you add the PowerBlend Pro Blender, the CasaGrande Cast-Iron Skillet, and the HomeBrew Pour-Over Coffee Set to my cart? I have a promo code KITCHEN10 I'd like to use. Done — I added all three items and applied KITCHEN10. Cart: - PowerBlend Pro Blender — $229 - CasaGrande Cast-Iron Skillet 12\" — $89 - HomeBrew Pour-Over Coffee Set — $59 Summary: - Subtotal: $377 - Promo: KITCHEN10 applied - Discount: $37 - Total: $340 Note: for these three kitchen items together, the current best confirmed savings in your cart is the 10% kitchen promo. Store policy allo...",
+        "candidates": [
+          {
+            "id": "ct_b9b70c4349f4bc",
+            "family": "multi_item_bundle_discount_disclosure",
+            "score": 100.019937
+          },
+          {
+            "id": "ct_8b4ab6ce1110b8",
+            "family": "promo_threshold_boundary_disclosure",
+            "score": 73.603405
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 98.811181
+          },
+          {
+            "id": "ct_3044c6ba73ed35",
+            "family": "budget_availability_with_protected_cart_confirmation",
+            "score": 51.362184
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 78.228373
+          },
+          {
+            "id": "ct_d8c13b430a675e",
+            "family": "promo_or_adjustment_boundary_with_supported_alternatives",
+            "score": 73.557042
+          },
+          {
+            "id": "ct_aa31b766512ba7",
+            "family": "purchase_decision_value_check",
+            "score": 80.151553
+          },
+          {
+            "id": "ct_662a5373f92c34",
+            "family": "final_cart_state_reporting",
+            "score": 75.812507
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "155c26d506c5df8e6476f9f9cbd803f00d54fa7a87a4410b6139758877165207",
+        "candidate_ids": [
+          "ct_2c778aa381f0de",
+          "ct_5fe63cc694d9da",
+          "ct_f3a896820c0b68",
+          "ct_6462ba60d12fda",
+          "ct_52a52876040f21",
+          "ct_49463727012560",
+          "ct_bbc7258226647f",
+          "ct_f5f7dd3125faa3"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 3653,
+          "output_tokens": 431
+        },
+        "response_sha256": "646b5b69856d27848247a2818c3f7b3717e7a38ee194c198a41963e2ca810fe1",
+        "returned_items": 3
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "4feab9ce2f3d3080cebf789161355587f6a7db474967d9936cc0a3cc249f2cc5",
+        "candidate_ids": [
+          "ct_b9b70c4349f4bc",
+          "ct_da34e3a18f3e1a",
+          "ct_f3a896820c0b68",
+          "ct_6462ba60d12fda",
+          "ct_aa31b766512ba7",
+          "ct_2c778aa381f0de",
+          "ct_2e184fabb0730b",
+          "ct_58356c8546d964"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6387,
+          "output_tokens": 832
+        },
+        "response_sha256": "f0debd4d9c93f6fae3695402a0982b2969ff745709081c30a1e606dd96501c9e",
+        "returned_items": 4
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "23209e3ff3a610b0916fb8740514c214be741e339987882c3ad757048e935dc9",
+        "candidate_ids": [
+          "ct_6462ba60d12fda",
+          "ct_bbc7258226647f",
+          "ct_f3a896820c0b68",
+          "ct_b9b70c4349f4bc",
+          "ct_aa31b766512ba7",
+          "ct_52a52876040f21",
+          "ct_da34e3a18f3e1a",
+          "ct_2c778aa381f0de",
+          "ct_2e184fabb0730b"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8472,
+          "output_tokens": 1785
+        },
+        "response_sha256": "df408395d0b41a91274734a23a091ed5cb65046eda3383bb43eecb8bd386582e",
+        "returned_items": 10
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "b5618c52b5ca3c672bedaa3f11532c755ad6231b57c372f290c762a6c48c9696",
+        "candidate_ids": [
+          "ct_6462ba60d12fda",
+          "ct_8b4ab6ce1110b8",
+          "ct_58356c8546d964",
+          "ct_b9b70c4349f4bc",
+          "ct_aa31b766512ba7",
+          "ct_3044c6ba73ed35",
+          "ct_52a52876040f21",
+          "ct_40653bf9bc84c1",
+          "ct_da34e3a18f3e1a",
+          "ct_bbc7258226647f",
+          "ct_2e184fabb0730b",
+          "ct_2c778aa381f0de",
+          "ct_f3a896820c0b68"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 13891,
+          "output_tokens": 2464
+        },
+        "response_sha256": "70469ef0631f6db55f0f9e1127406d9f640589aa51487e32539977369012a3e9",
+        "returned_items": 13
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "5ee9e2f830d6dc3400463305c64df4889ab7d14301246ba48141e6abc1db9ed1",
+        "candidate_ids": [
+          "ct_6462ba60d12fda",
+          "ct_8b4ab6ce1110b8",
+          "ct_58356c8546d964",
+          "ct_52a52876040f21",
+          "ct_b9b70c4349f4bc",
+          "ct_3044c6ba73ed35",
+          "ct_aa31b766512ba7",
+          "ct_2cbb25e4d09d24",
+          "ct_da34e3a18f3e1a",
+          "ct_bbc7258226647f",
+          "ct_2e184fabb0730b",
+          "ct_2c778aa381f0de",
+          "ct_f3a896820c0b68"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 16831,
+          "output_tokens": 2322
+        },
+        "response_sha256": "2c64e5ff32790d81d9ca2542862aac4da18e0c97652009e2e9c43aabb5925080",
+        "returned_items": 13
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "07a512507b8abb4838971dab7d562450088aa9a7442380bc151e0f015fb29af3",
+        "candidate_ids": [
+          "ct_b9b70c4349f4bc",
+          "ct_8b4ab6ce1110b8",
+          "ct_6462ba60d12fda",
+          "ct_3044c6ba73ed35",
+          "ct_b3d7ebef646e89",
+          "ct_d8c13b430a675e",
+          "ct_aa31b766512ba7",
+          "ct_662a5373f92c34",
+          "ct_da34e3a18f3e1a",
+          "ct_bbc7258226647f",
+          "ct_52a52876040f21",
+          "ct_2e184fabb0730b",
+          "ct_2c778aa381f0de",
+          "ct_f3a896820c0b68"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 15973,
+          "output_tokens": 1681
+        },
+        "response_sha256": "62bffa1b28020368dc8ea760ba173d86916b13f899486b85f752518b9a036c3e",
+        "returned_items": 14
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "2bb85be83ff555e8d30339a0471b1f88caa299487b445f36c95a3150946a0954",
+        "exposure_signature": "04dcfad3a021a301b486834fefff9457d7651766cea623d6bbccffc2a0cf7082",
+        "exposed_items": [
+          "learned_94ec1f33c6c398"
+        ],
+        "pending_items": [
+          "learned_8d153956100fbe",
+          "learned_94ec1f33c6c398",
+          "learned_a493eaa584d410"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "search_products",
+            "arguments": {
+              "category": "kitchen",
+              "in_stock_only": true,
+              "query": "PowerBlend Pro Blender"
+            }
+          },
+          {
+            "name": "search_products",
+            "arguments": {
+              "category": "kitchen",
+              "in_stock_only": true,
+              "query": "CasaGrande Cast-Iron Skillet"
+            }
+          },
+          {
+            "name": "search_products",
+            "arguments": {
+              "category": "kitchen",
+              "in_stock_only": true,
+              "query": "HomeBrew Pour-Over Coffee Set"
+            }
+          },
+          {
+            "name": "get_cart",
+            "arguments": {
+              "customer_id": "shop_004"
+            }
+          },
+          {
+            "name": "validate_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "5672b40510eb1d2da3da2304be84872b19e2ff5378f95ebe5a86e730c01627c0",
+        "exposure_signature": "f37f86eb0ac47fd65ac716db17da4104f8b26224d1edda39d80be740bfa7059c",
+        "exposed_items": [
+          "learned_94ec1f33c6c398"
+        ],
+        "pending_items": [
+          "learned_8d153956100fbe",
+          "learned_94ec1f33c6c398",
+          "learned_a493eaa584d410",
+          "learned_d7b56e1879b5de"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 3,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3001"
+            }
+          },
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3007"
+            }
+          },
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-3008"
+            }
+          },
+          {
+            "name": "get_customer_account",
+            "arguments": {
+              "customer_id": "shop_004"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "promo_stacking"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "859ff3869e04f2fa7b73ad45182815ef047c14130bf9d5f8ed20bda5fb7dcfcd",
+        "exposure_signature": "4c370dff6759fe0c68a4f3b9dde74014228ff7689f3612cbffbe712adda7391f",
+        "exposed_items": [
+          "learned_94ec1f33c6c398",
+          "learned_f9e331efa0b39d",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391"
+        ],
+        "pending_items": [
+          "learned_8d153956100fbe",
+          "learned_94ec1f33c6c398",
+          "learned_a493eaa584d410",
+          "learned_d7b56e1879b5de",
+          "learned_c479e350f24a4b",
+          "learned_3541d98c68a9df",
+          "learned_f9e331efa0b39d",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391",
+          "learned_79ba3d0807acd1"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 5,
+          "pending_evidence": 5,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_promotions",
+            "arguments": {
+              "category": "kitchen"
+            }
+          },
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3001",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          },
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3007",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          },
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_004",
+              "product_id": "SP-3008",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "859ff3869e04f2fa7b73ad45182815ef047c14130bf9d5f8ed20bda5fb7dcfcd",
+        "exposure_signature": "4c370dff6759fe0c68a4f3b9dde74014228ff7689f3612cbffbe712adda7391f",
+        "exposed_items": [
+          "learned_94ec1f33c6c398",
+          "learned_f9e331efa0b39d",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391"
+        ],
+        "pending_items": [
+          "learned_8d153956100fbe",
+          "learned_94ec1f33c6c398",
+          "learned_a493eaa584d410",
+          "learned_d7b56e1879b5de",
+          "learned_c479e350f24a4b",
+          "learned_3541d98c68a9df",
+          "learned_f9e331efa0b39d",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391",
+          "learned_79ba3d0807acd1",
+          "learned_2da22fd22a8ae6",
+          "learned_155563b71c44ae",
+          "learned_803e30a92da39b",
+          "learned_8c18f10500fec6"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 7,
+          "pending_evidence": 7,
+          "satisfied": 6,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "apply_promo",
+            "arguments": {
+              "customer_id": "shop_004",
+              "promo_code": "KITCHEN10"
+            }
+          },
+          {
+            "name": "get_cart",
+            "arguments": {
+              "customer_id": "shop_004"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "9b2b49f12a3627d990190ff5ad7e88225ab2b8e9115c4319a9a5fcaaad88e2ee",
+        "exposure_signature": "1a350ac325565684b2dcddbd69f5eaf27774d0e9fcd3e803660bfba87efebd84",
+        "exposed_items": [
+          "learned_94ec1f33c6c398",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391",
+          "learned_79ba3d0807acd1"
+        ],
+        "pending_items": [
+          "learned_94ec1f33c6c398",
+          "learned_a493eaa584d410",
+          "learned_d7b56e1879b5de",
+          "learned_c479e350f24a4b",
+          "learned_3541d98c68a9df",
+          "learned_f9e331efa0b39d",
+          "learned_66c2653f3e071b",
+          "learned_79114d45b12391",
+          "learned_79ba3d0807acd1",
+          "learned_2da22fd22a8ae6",
+          "learned_155563b71c44ae",
+          "learned_803e30a92da39b",
+          "learned_8c18f10500fec6",
+          "learned_3fe97fc634a0eb"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 10,
+          "pending_evidence": 4,
+          "satisfied": 9,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 5,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 6,
+      "regenerations": 0,
+      "exposures": 5,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 4,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 1,
+      "tool_calls": 16,
+      "bookkeeper_input_tokens": 65207,
+      "bookkeeper_output_tokens": 9515,
+      "bookkeeper_total_tokens": 74722,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 87795,
+    "cached_input_tokens": 0,
+    "output_tokens": 10149,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 97944,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 87795,
+  "cached_input_tokens": 0,
+  "output_tokens": 10149,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 97944,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_004",
+          "product_id": "SP-3001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0002": {
+          "cart_item_id": "CI-0002",
+          "customer_id": "shop_004",
+          "product_id": "SP-3007",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        },
+        "CI-0003": {
+          "cart_item_id": "CI-0003",
+          "customer_id": "shop_004",
+          "product_id": "SP-3008",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_004": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001",
+              "CI-0002",
+              "CI-0003"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 340
+          },
+          "discount_amount": {
+            "old": 0,
+            "new": 37
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 377
+          },
+          "applied_promo_codes": {
+            "old": [],
+            "new": [
+              "KITCHEN10"
+            ]
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "applied_promo_codes",
+      "expected_value": [
+        "KITCHEN10"
+      ]
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "discount_amount",
+      "expected_value": 37
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "subtotal",
+      "expected_value": 377
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_004",
+      "field": "total",
+      "expected_value": 340
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3007",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_004",
+        "product_id": "SP-3008",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 3,
+  "ux_response_density": 4,
+  "ux_base_score": 2.7,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.09,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 1,
+  "ux_tool_call_count": 16,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 1,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 4,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

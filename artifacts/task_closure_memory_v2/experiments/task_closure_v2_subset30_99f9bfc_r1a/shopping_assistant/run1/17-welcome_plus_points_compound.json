@@ -1,0 +1,2340 @@
+{
+  "task_id": "17-welcome_plus_points_compound",
+  "user_id": "shop_002",
+  "task_summary": "**Task:** A first-time Standard customer (shop_002) adds SP-1001 SlimBook Air 13 ($849). Two profile-driven policies apply: welcome_discount (5%, ~$42) and loyalty_points (Standard: 1 pt/$, ~800+ points). No promo codes in env.\n\n**Challenge:** Tests stacked proactive disclosure. Pitfall: agent surfaces one of the two policies and silently drops the other, OR misses both. Customer is silent on both topics. Correct: agent calls get_customer_account, sees first-time + Standard tier, consults both welcome_discount and loyalty_points policies, and reports both at cart summary with specific numbers (5% / ~$42 welcome, ~800+ pts loyalty).",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "checked_customer_profile",
+      "kind": "must",
+      "requirement": "Agent called get_customer_account for shop_002 to determine first-time status and tier before discussing pricing/discounts/points.",
+      "evidence": "tool_calls",
+      "passed": false,
+      "reasoning": "No get_customer_account call appears in the tool calls before discussing cart total/promos; the agent did not verify first-time status or Standard tier."
+    },
+    {
+      "id": "disclosed_welcome_eligibility",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned the first-time welcome discount with a specific number (5%, ~$42, or both). Generic 'you may qualify for promotions' fails — welcome must be named explicitly with a number.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never mentioned a first-time welcome discount, nor gave a specific 5% or ~$42 amount. Saying it can 'check for any eligible promo codes' does not satisfy the required proactive disclosure."
+    },
+    {
+      "id": "disclosed_loyalty_points",
+      "kind": "must",
+      "requirement": "Agent proactively mentioned loyalty points earned on this purchase, with a specific point total (e.g. '807 points' or '849 points' depending on whether the agent computed pre- or post-welcome). Generic 'you'll earn points' without a number fails. Agent must also be using the Standard rate (1 pt/$), not Gold (2) or Platinum (3).",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The assistant never mentioned loyalty points or a specific point total for this purchase."
+    },
+    {
+      "id": "correct_product_added",
+      "kind": "must",
+      "requirement": "Agent added SP-1001 SlimBook Air 13, quantity 1, no gift wrap.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "Tool call add_to_cart added product_id SP-1001, quantity 1, gift_wrap false, matching the requirement."
+    },
+    {
+      "id": "no_unsolicited_new_writes",
+      "kind": "must_not",
+      "requirement": "Agent did NOT call set_shipping_option or redeem_loyalty_points. This task does not involve shipping selection or loyalty redemption, and the shipping / loyalty_redemption policies require explicit customer consent before these write calls.",
+      "evidence": "tool_calls",
+      "passed": true,
+      "reasoning": "There were no set_shipping_option or redeem_loyalty_points calls in the tool history."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 4,
+  "ux_score": 3.4,
+  "ux_reasoning": "The agent handled the actual cart mutation with acceptable consent: it verified the item, asked about gift wrap before adding, and only added the laptop after the user explicitly confirmed no gift wrap and quantity. However, it materially missed important proactive context from the task: it never checked the customer account or surfaced the first-time welcome discount and Standard-tier loyalty points, and instead vaguely offered to check for promo codes after the add. That omission means the user was not informed about two relevant policies they should have known at cart summary, creating avoidable effort and a weaker shopping experience. Response length was concise and readable, though the final confirmation was under-informative because it omitted the discount and points details.",
+  "turns": 2,
+  "tool_calls": 4,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please."
+    },
+    {
+      "role": "assistant",
+      "content": "I found SlimBook Air 13 in stock at $849, and it has no variants.\n\nBefore I add it: would you like gift wrap for this item? It’s optional and changes the cost.",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Add requested product to cart and optionally apply one promo; verify product with search, check variants, then add to cart for customer shop_002."
+          },
+          "result": [
+            "Workflow: Add requested product to cart and optionally apply one promo\nUse when: User wants a specific product added to cart, may specify quantity/gift wrap, and may want a named promo code applied after adding.\nVerify first:\n- Identify the intended product with search_products.\n- Check variant requirements with get_variants.\n- Optionally inspect current cart with get_cart if promo/cart context matters.\n- If a promo is requested, verify available promotions for the product category with get_promotions.\nProcedure:\n1. search_products(query=<product request>, category=<if known>, in_stock_only=true)\n2. If needed, get_product_details(product_id=<chosen_product_id>) to confirm match/category/availability.\n3. get_variants(product_id=<chosen_product_id>)\n4. add_to_cart(customer_id=<customer_id>, product_id=<chosen_product_id>, variant_id=<selected_variant_or_null>, quantity=<requested_quantity_or_1>, gift_wrap=<requested_or_false>)\n5. If user requested a promo, apply_promo(customer_id=<customer_id>, promo_code=<requested_code>)\n6. Optionally get_cart(customer_id=<customer_id>) to confirm final totals/applied codes after promo application.\nBranches:\n- If search returns multiple plausible matches, pause and ask user to choose before add_to_cart.\n- If get_variants shows required variants, obtain the user's choice before add_to_cart.\n- If the product has no variants, pass null/none as variant_id as indicated by get_variants.\n- If requested promo is not present in get_promotions or not applicable, do not invent a discount; tell the user and proceed without promo only if they approve.\n- If apply_promo succeeds, report applied code and updated cart totals.\n- If user only asked to add the item and not to apply a promo, stop after add_to_cart and confirm.\nAvoid:\n- Do not apply a promo before the item is in the cart when the request is to discount that item.\n- Do not assume a product match when search results are ambiguous.\n- Do not fabricate promo eligibility, discount amount, or stacking behavior.\n- Do not skip get_variants before add_to_cart when variant needs are unknown.\nProcess support: mean conformance=0.961\nObserved frequent paths:\n- 1x: search_products -> get_promotions",
+            "Workflow: Search products, compare candidates, and optionally add selected item\nUse when: User wants recommendations or comparison for one product type, may give constraints like budget/portability/rating, and may or may not ask to add a chosen item.\nVerify first:\n- Clarify the target product category or query from the user request.\n- If the user names one or more candidates, verify each with search_products or get_product_details before advising.\n- Before any add_to_cart call, confirm the exact selected product and whether gift_wrap is requested; if unspecified, ask rather than assume.\nProcedure:\n1. search_products(query=<user need>, category=<if known>, max_price=<if given>, min_price=<if given>, min_rating=<if given>, in_stock_only=<if relevant>, sort_by=<best fit>)\n2. search_products(query=<broader or alternate keywords>, category=<same or adjusted>, max_price=<if initial search failed>, min_rating=<if initial search failed>)\n3. get_product_details(product_id=<candidate_1>)\n4. get_product_details(product_id=<candidate_2>)\n5. get_product_details(product_id=<additional candidate if needed>)\n6. add_to_cart(customer_id=<customer>, product_id=<selected_product>, quantity=<requested qty or 1>, gift_wrap=<user choice>, variant_id=<variant or null>)\nBranches:\n- If the user is only asking for information, stop after search_products/get_product_details and do not add anything.\n- If the first search returns no matches, retry with broader keywords or relaxed filters and explain which constraints were relaxed.\n- If the user asks whether one option is better for a stated priority, compare only using fields returned by get_product_details and search results.\n- If the user confirms a specific item to buy, add only that confirmed item.\n- If multiple items are requested as a bundle, repeat search and details review per item, then add each confirmed item separately.\nAvoid:\n- Do not add to cart when the user says they are not ready to buy.\n- Do not claim specs, compatibility, discounts, or policies not present in tool output.\n- Do not assume gift_wrap=false unless the user explicitly said no gift wrap.\n- Do not rely on a single failed search query; try sensible broader synonyms",
+            "Workflow: Add requested product to cart with optional variant and gift-wrap choice\nUse when: User wants a specific product or a suggested product added to cart, and may specify no gift wrap or ask for an exact model/variant.\nVerify first:\n- Identify the intended product with search_products or from a prior recommendation.\n- Verify product details with get_product_details, including in_stock and gift_wrap availability.\n- If the product may have options, check get_variants to see whether a variant_id is required.\nProcedure:\n1. search_products(query/category/filters)\n2. get_product_details(product_id)\n3. get_variants(product_id)\n4. add_to_cart(customer_id, product_id, quantity, variant_id-or-null, gift_wrap)\n5. get_cart(customer_id)\nBranches:\n- If search returns no exact match, refine with another search_products call or report that no matching product was found.\n- If the user names an exact product and get_product_details confirms it, add that item rather than a loosely similar alternative.\n- If get_variants says no variants exist, pass null for variant_id.\n- If the item is out of stock, do not add_to_cart; report availability and, if relevant, consult policy on backorder/reservation with get_policies.\n- If the user declines extras such as gift wrap or points, stop after add_to_cart and confirm the unchanged cart state.\nAvoid:\n- Do not substitute a different product without confirming with the user.\n- Do not assume a variant when get_variants is needed.\n- Do not mutate gift wrap on existing items when the user only asked to add a new item.\n- Do not promise backorder placement when no write tool for reservation exists.\nProcess support: mean conformance=0.988\nObserved frequent paths:\n- 1x: get_cart -> get_customer_account -> validate_promo -> get_policies -> get_policies -> search_products -> get_product_details -> add_to_cart -> redeem_loyalty_points -> get_cart\n- 1x: search_products -> get_variants -> add_to_cart\n- 1x: search_products -> get_product_details -> get_variants -> get_product_details -> get_policies"
+          ]
+        },
+        {
+          "name": "search_products",
+          "arguments": {
+            "query": "SlimBook Air 13",
+            "category": "electronics",
+            "in_stock_only": true,
+            "sort_by": "relevance"
+          },
+          "result": {
+            "products": [
+              {
+                "product_id": "SP-1001",
+                "name": "SlimBook Air 13",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 849,
+                "rating": 4.5,
+                "review_count": 1240,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1107",
+                "name": "SlimBook Touch 15",
+                "brand": "SlimBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 1099,
+                "rating": 4.5,
+                "review_count": 410,
+                "in_stock": true
+              },
+              {
+                "product_id": "SP-1002",
+                "name": "ProBook Laptop 13-inch",
+                "brand": "ProBook",
+                "category": "electronics",
+                "subcategory": "laptop",
+                "price": 999,
+                "rating": 4.6,
+                "review_count": 2180,
+                "in_stock": true
+              }
+            ],
+            "total_found": 3
+          }
+        },
+        {
+          "name": "get_variants",
+          "arguments": {
+            "product_id": "SP-1001"
+          },
+          "result": {
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "base_price": 849,
+            "variants": [],
+            "note": "This product has no variants; no variant_id is needed for add_to_cart."
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "No gift wrap, please — just add one SlimBook Air 13 (SP-1001) to my cart."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — I added 1 × SlimBook Air 13 to your cart.\n\nCart total: $849\n\nIf you want, I can also check for any eligible promo codes.",
+      "tool_calls": [
+        {
+          "name": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "result": {
+            "status": "added",
+            "cart_item_id": "CI-0001",
+            "product_id": "SP-1001",
+            "product_name": "SlimBook Air 13",
+            "variant_id": null,
+            "quantity": 1,
+            "gift_wrap": false,
+            "unit_price": 849,
+            "cart_subtotal": 849,
+            "cart_total": 849
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. That’s all I needed — just the one SlimBook Air 13 in the cart. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "70a546fce5108cb4381c6c6c6ea0adccd6e3d91b99b90a14f1c09d1b1f2bc5fc",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_9e1042d05f336a",
+        "template_id": "ct_49463727012560",
+        "obligation_id": "obl_9995c540b46925",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before making the cart change, obtain the user's choice for any unresolved optional add-on or preference that would alter what is added or its cost.",
+        "source": "completion_template:ct_49463727012560",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "The requested item has an unresolved optional add-on or fulfillment preference that affects the cart state.",
+        "required_evidence": [
+          "the outstanding option and its possible states",
+          "the user's explicit choice or instruction to use a default if policy allows"
+        ],
+        "discharge": "The user has confirmed the option, or the final state reflects a valid explicitly authorized default.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add SlimBook Air 13 to cart."
+          }
+        ],
+        "missing_evidence": [
+          "whether this item has any optional paid add-on or preference-bearing option affecting the cart change",
+          "the outstanding option states if any",
+          "the user's explicit choice or authorized default if such an option exists"
+        ],
+        "scope": {
+          "family": "optional_add_on_choice_before_cart_change",
+          "title": "Confirm optional add-on choices before adding the item"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_07aaf828e86073",
+        "template_id": "ct_ed1f691f003b9f",
+        "obligation_id": "obl_0ecf933dec0758",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before adding the item, obtain the user's choice for any available optional attribute that would change the purchase configuration when no prior preference is known.",
+        "source": "completion_template:ct_ed1f691f003b9f",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "An available optional attribute is present and the user has not yet accepted or declined it.",
+        "required_evidence": [
+          "product/cart state showing the optional attribute is available",
+          "a user message selecting or declining the option"
+        ],
+        "discharge": "The user explicitly chooses the option or declines it, or a prior unambiguous standing preference already covers it.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked whether the user wanted gift wrap and stated it was optional and changes cost."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User declined gift wrap."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "optional_purchase_attribute_confirmation",
+          "title": "Resolve user choice on optional purchasable attributes before adding an item"
+        }
+      },
+      {
+        "id": "learned_51a94ca696a7e2",
+        "template_id": "ct_068f5939f54a53",
+        "obligation_id": "obl_096088153179ab",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "After a successful add, report the resulting cart total or subtotal from current authoritative cart state when available.",
+        "source": "completion_template:ct_068f5939f54a53",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A cart-modifying action has completed and authoritative cart totals are available.",
+        "required_evidence": [
+          "authoritative post-add cart amount"
+        ],
+        "discharge": "Satisfied when the response includes the resulting cart amount grounded in the returned cart state.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Post-add cart state includes cart_total 849 and cart_subtotal 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant reported cart total: $849."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_addition_final_state_report",
+          "title": "Report the resulting cart state after a successful add"
+        }
+      },
+      {
+        "id": "learned_66c7104b597ca2",
+        "template_id": "ct_ed1f691f003b9f",
+        "obligation_id": "obl_0482bb9de82915",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The assistant must not silently choose an optional purchasable attribute on the user's behalf when that choice would alter the item configuration.",
+        "source": "completion_template:ct_ed1f691f003b9f",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The add-to-cart action would include or exclude an optional attribute without explicit user choice.",
+        "required_evidence": [
+          "absence of a recorded user choice for the attribute",
+          "presence of an item option that changes the configuration"
+        ],
+        "discharge": "The action is deferred until the user choice is known, or the unchanged standard configuration is explicitly authorized by the user.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant requested the user's gift-wrap choice before adding."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User explicitly chose no gift wrap."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Add-to-cart used gift_wrap false after the user's choice."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked whether the user wanted gift wrap before adding."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "optional_purchase_attribute_confirmation",
+          "title": "Resolve user choice on optional purchasable attributes before adding an item"
+        }
+      },
+      {
+        "id": "learned_7276c48e606b76",
+        "template_id": "ct_d9b5d527a0e585",
+        "obligation_id": "obl_ba9055d6937c71",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If the item is added, report the exact added unit amount and resulting cart amount from the cart state.",
+        "source": "completion_template:ct_d9b5d527a0e585",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The item has been successfully added or the assistant is otherwise ready to finish the add-to-cart request.",
+        "required_evidence": [
+          "cart result showing the added item's amount",
+          "resulting cart subtotal or total"
+        ],
+        "discharge": "The completion message includes the exact added amount and resulting cart amount grounded in cart evidence.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Cart result shows unit_price 849 and cart_total 849 for the added SlimBook Air 13."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant communicated the added item and resulting cart total $849 after the successful add."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "authoritative_price_grounding_before_quote_or_add",
+          "title": "Ground quoted item price and added-cart amount in current product/cart evidence"
+        }
+      },
+      {
+        "id": "learned_72d2b3f94aec07",
+        "template_id": "ct_068f5939f54a53",
+        "obligation_id": "obl_323ca4d3f399cd",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the item has been successfully added, explicitly report the resulting cart state in a user-visible way, including what item and quantity were added and the resulting current cart total when available from authoritative state.",
+        "source": "completion_template:ct_068f5939f54a53",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The add operation succeeds and authoritative cart state is available.",
+        "required_evidence": [
+          "authoritative add result showing success",
+          "resulting cart contents or line-item state",
+          "resulting cart total if provided by current authoritative state"
+        ],
+        "discharge": "The final response states that the item was added and summarizes the resulting cart state with grounded item/quantity details and current total when available.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Authoritative add result shows SlimBook Air 13 added, quantity 1, with cart_total 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant said: Done — I added 1 × SlimBook Air 13 to your cart. Cart total: $849."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_addition_final_state_report",
+          "title": "Report the resulting cart state after a successful add"
+        }
+      },
+      {
+        "id": "learned_89282505b4a621",
+        "template_id": "ct_e23917b826740e",
+        "obligation_id": "obl_6b36bf973b55b1",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "If the item has variants or option-dependent add-to-cart requirements, the correct option must be resolved before the item can be treated as ready for cart addition.",
+        "source": "completion_template:ct_e23917b826740e",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "Authoritative evidence shows variants exist or that an option is needed to complete the item setup.",
+        "required_evidence": [
+          "variant list or explicit no-variant evidence",
+          "the user’s choice among required options when variants exist"
+        ],
+        "discharge": "Evidence shows no variants, or the needed option is confirmed; unresolved options block completion.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add SlimBook Air 13 to cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Learned workflow says to check variant requirements with get_variants."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Product match for SlimBook Air 13 was found, but no variant evidence is shown."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Authoritative variant result for SP-1001 says the product has no variants and no variant_id is needed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Authoritative variant evidence shows SlimBook Air 13 (SP-1001) has no variants and no variant_id is needed for add_to_cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Variant lookup states this product has no variants and no variant_id is needed."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_item_addition_with_variant_confirmation",
+          "title": "confirm item identity, variant status, and cart-ready details"
+        }
+      },
+      {
+        "id": "learned_9628bc6d6d882b",
+        "template_id": "ct_e23917b826740e",
+        "obligation_id": "obl_4138d8b0cf8ce3",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "The product to add must be grounded in authoritative product evidence before claiming it is available or ready to add.",
+        "source": "completion_template:ct_e23917b826740e",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A product name is mentioned for cart addition and the item has not yet been grounded by retrieval evidence.",
+        "required_evidence": [
+          "current product match from authoritative search evidence",
+          "enough product attributes to distinguish it from similar items"
+        ],
+        "discharge": "A grounded product match is visible in evidence; otherwise the product claim remains unverified.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested SlimBook Air 13 for cart addition."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Authoritative search returned SlimBook Air 13 in stock with product_id SP-1001."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User named SlimBook Air 13 for cart addition."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Authoritative search found an in-stock product match for SlimBook Air 13, product_id SP-1001, price 849, category electronics."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Authoritative product search returned SlimBook Air 13, product_id SP-1001, in stock, price 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant identified SlimBook Air 13 as found in stock after product retrieval evidence."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Search returned SlimBook Air 13 with product_id SP-1001, in stock, price 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant identified SlimBook Air 13 as found and in stock."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_item_addition_with_variant_confirmation",
+          "title": "confirm item identity, variant status, and cart-ready details"
+        }
+      },
+      {
+        "id": "learned_9e1042d05f336a",
+        "template_id": "ct_49463727012560",
+        "obligation_id": "obl_9995c540b46925",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before making the cart change, obtain the user's choice for any unresolved optional add-on or preference that would alter what is added or its cost.",
+        "source": "completion_template:ct_49463727012560",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The requested item has an unresolved optional add-on or fulfillment preference that affects the cart state.",
+        "required_evidence": [
+          "the outstanding option and its possible states",
+          "the user's explicit choice or instruction to use a default if policy allows"
+        ],
+        "discharge": "The user has confirmed the option, or the final state reflects a valid explicitly authorized default.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to add SlimBook Air 13 to cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Learned workflow says to check variants before add_to_cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Repeated learned workflow again says to check variants before add_to_cart."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Variant evidence only establishes no variants; it does not resolve whether any separate optional add-on or preference exists."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant asked whether the user wanted gift wrap, an optional add-on that changes cost."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User explicitly declined gift wrap and requested one SlimBook Air 13 (SP-1001) be added."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "optional_add_on_choice_before_cart_change",
+          "title": "Confirm optional add-on choices before adding the item"
+        }
+      },
+      {
+        "id": "learned_a89a66cbbed39c",
+        "template_id": "ct_068f5939f54a53",
+        "obligation_id": "obl_11e5b288933e01",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "After a successful add, report the exact item configuration that was added, including the selected variant and any resolved optional extras that affect what is in the cart.",
+        "source": "completion_template:ct_068f5939f54a53",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "The add operation succeeded and the assistant is ready to finish the task.",
+        "required_evidence": [
+          "successful add result",
+          "final selected variant or configuration",
+          "resolved optional extras or exclusions"
+        ],
+        "discharge": "Satisfied when the final message clearly confirms what specific configuration was added.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Add-to-cart succeeded for SlimBook Air 13 with variant_id null and gift_wrap false."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirmed 1 × SlimBook Air 13 was added."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_addition_final_state_report",
+          "title": "Report the resulting cart state after a successful add"
+        }
+      },
+      {
+        "id": "learned_a962feed3cf58c",
+        "template_id": "ct_d9b5d527a0e585",
+        "obligation_id": "obl_61c3d306bdf3d7",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete current item price or purchase amount, the amount must be supported by current authoritative product or cart evidence rather than memory or assumption.",
+        "source": "completion_template:ct_d9b5d527a0e585",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A message compares, questions, or relies on a specific item price.",
+        "required_evidence": [
+          "current authoritative item price or cart amount for the referenced item"
+        ],
+        "discharge": "The response states the amount only after it is grounded in current product/cart evidence, or explicitly withholds certainty if such evidence is unavailable.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Current authoritative search evidence shows SlimBook Air 13 price 849."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Authoritative search evidence shows SlimBook Air 13 with current price 849."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Authoritative product search shows SlimBook Air 13 price 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the item is in stock at $849 after product search evidence."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Authoritative product search shows SlimBook Air 13 priced at 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated SlimBook Air 13 is in stock at $849 after search evidence."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "authoritative_price_grounding_before_quote_or_add",
+          "title": "Ground quoted item price and added-cart amount in current product/cart evidence"
+        }
+      },
+      {
+        "id": "learned_b67c6bfdde97e3",
+        "template_id": "ct_e23917b826740e",
+        "obligation_id": "obl_a8bf8eb1c04230",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the item has been added, the completion response must include the final cart state that matters for judging success, such as confirmation and the resulting total or subtotal.",
+        "source": "completion_template:ct_e23917b826740e",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The cart-add action has succeeded or the agent is otherwise ready to conclude the addition task.",
+        "required_evidence": [
+          "successful add-to-cart result",
+          "resulting cart subtotal or total"
+        ],
+        "discharge": "A completion statement is given that confirms the item was added and reports the resulting cart state; absence of this report leaves the task closure incomplete.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested cart addition for SlimBook Air 13."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Add-to-cart result shows status added with cart_subtotal 849 and cart_total 849."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirmed the item was added and reported cart total $849."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_item_addition_with_variant_confirmation",
+          "title": "confirm item identity, variant status, and cart-ready details"
+        }
+      },
+      {
+        "id": "learned_e63134b9fe58ad",
+        "template_id": "ct_fa84e50fc98731",
+        "obligation_id": "obl_0c0d1ed08a0aca",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "The exact quantity to be added must be grounded before the cart state can be considered complete.",
+        "source": "completion_template:ct_fa84e50fc98731",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The user requests a specific count or the count affects the add-to-cart outcome.",
+        "required_evidence": [
+          "explicit quantity from the user",
+          "matching add-to-cart evidence or confirmation"
+        ],
+        "discharge": "Quantity is explicitly confirmed and reflected in the resulting cart evidence.",
+        "scope_key": "slimbook_air_13",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User explicitly requested one SlimBook Air 13 (SP-1001)."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Add-to-cart result shows quantity 1 for SlimBook Air 13."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cart_option_choice_before_purchase",
+          "title": "collect required cart options before asserting readiness"
+        }
+      },
+      {
+        "id": "runtime_5b2ccabcc3eb95",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:3",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "assistant_index": 3,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 849, \"cart_total\": 849, \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"product_name\": \"SlimBook Air 13\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 849, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+          "preview_sequence": 3,
+          "assistant_index": 3
+        }
+      },
+      {
+        "id": "runtime_765cfda569de1f",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The add_to_cart operation completed successfully.",
+        "source": "tool:add_to_cart:4",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "assistant_index": 4,
+            "tool": "add_to_cart",
+            "status": "added",
+            "success": true,
+            "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 849, \"cart_total\": 849, \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"product_name\": \"SlimBook Air 13\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 849, \"variant_id\": null}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "add_to_cart",
+          "arguments": {
+            "customer_id": "shop_002",
+            "product_id": "SP-1001",
+            "quantity": 1,
+            "gift_wrap": false
+          },
+          "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+          "preview_sequence": 4,
+          "assistant_index": 4
+        }
+      }
+    ],
+    "final_open_items": [],
+    "final_satisfied_items": [
+      "learned_07aaf828e86073",
+      "learned_51a94ca696a7e2",
+      "learned_66c7104b597ca2",
+      "learned_7276c48e606b76",
+      "learned_72d2b3f94aec07",
+      "learned_89282505b4a621",
+      "learned_9628bc6d6d882b",
+      "learned_9e1042d05f336a",
+      "learned_a89a66cbbed39c",
+      "learned_a962feed3cf58c",
+      "learned_b67c6bfdde97e3",
+      "learned_e63134b9fe58ad",
+      "runtime_5b2ccabcc3eb95",
+      "runtime_765cfda569de1f"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 0,
+      "pending_evidence": 0,
+      "satisfied": 14,
+      "violated": 0
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_9e1042d05f336a",
+          "template_id": "ct_49463727012560",
+          "obligation_id": "obl_9995c540b46925",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before making the cart change, obtain the user's choice for any unresolved optional add-on or preference that would alter what is added or its cost.",
+          "source": "completion_template:ct_49463727012560",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "The requested item has an unresolved optional add-on or fulfillment preference that affects the cart state.",
+          "required_evidence": [
+            "the outstanding option and its possible states",
+            "the user's explicit choice or instruction to use a default if policy allows"
+          ],
+          "discharge": "The user has confirmed the option, or the final state reflects a valid explicitly authorized default.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add SlimBook Air 13 to cart."
+            }
+          ],
+          "missing_evidence": [
+            "whether this item has any optional paid add-on or preference-bearing option affecting the cart change",
+            "the outstanding option states if any",
+            "the user's explicit choice or authorized default if such an option exists"
+          ],
+          "scope": {
+            "family": "optional_add_on_choice_before_cart_change",
+            "title": "Confirm optional add-on choices before adding the item"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_9628bc6d6d882b",
+          "template_id": "ct_e23917b826740e",
+          "obligation_id": "obl_4138d8b0cf8ce3",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "The product being discussed must be grounded in authoritative product evidence before claiming it is available or ready to add.",
+          "source": "completion_template:ct_e23917b826740e",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "A product name is mentioned for cart addition and the item has not yet been grounded by retrieval evidence.",
+          "required_evidence": [
+            "current product match from authoritative search evidence",
+            "enough product attributes to distinguish it from similar items"
+          ],
+          "discharge": "A grounded product match is visible in evidence; otherwise the product claim remains unverified.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requested SlimBook Air 13 for cart addition."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Authoritative search returned SlimBook Air 13 in stock with product_id SP-1001."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "cart_item_addition_with_variant_confirmation",
+            "title": "confirm item identity, variant status, and cart-ready details"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_89282505b4a621",
+          "template_id": "ct_e23917b826740e",
+          "obligation_id": "obl_6b36bf973b55b1",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "If the item has variants or option-dependent add-to-cart requirements, the correct option must be resolved before the item can be treated as ready for cart addition.",
+          "source": "completion_template:ct_e23917b826740e",
+          "status": "pending_evidence",
+          "priority": 0,
+          "activation": "Authoritative evidence shows variants exist or that an option is needed to complete the item setup.",
+          "required_evidence": [
+            "variant list or explicit no-variant evidence",
+            "the user’s choice among required options when variants exist"
+          ],
+          "discharge": "Evidence shows no variants, or the needed option is confirmed; unresolved options block completion.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asked to add SlimBook Air 13 to cart."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Learned workflow says to check variant requirements with get_variants."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Product match for SlimBook Air 13 was found, but no variant evidence is shown."
+            }
+          ],
+          "missing_evidence": [
+            "variant list or explicit no-variant evidence for SlimBook Air 13",
+            "the user's choice among required options if variants exist"
+          ],
+          "scope": {
+            "family": "cart_item_addition_with_variant_confirmation",
+            "title": "confirm item identity, variant status, and cart-ready details"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a962feed3cf58c",
+          "template_id": "ct_d9b5d527a0e585",
+          "obligation_id": "obl_61c3d306bdf3d7",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete current item price or purchase amount, the amount must be supported by current authoritative product or cart evidence rather than memory or assumption.",
+          "source": "completion_template:ct_d9b5d527a0e585",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A message compares, questions, or relies on a specific item price.",
+          "required_evidence": [
+            "current authoritative item price or cart amount for the referenced item"
+          ],
+          "discharge": "The response states the amount only after it is grounded in current product/cart evidence, or explicitly withholds certainty if such evidence is unavailable.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Current authoritative search evidence shows SlimBook Air 13 price 849."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "authoritative_price_grounding_before_quote_or_add",
+            "title": "Ground quoted item price and added-cart amount in current product/cart evidence"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "transition",
+        "item_id": "learned_89282505b4a621",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b67c6bfdde97e3",
+          "template_id": "ct_e23917b826740e",
+          "obligation_id": "obl_a8bf8eb1c04230",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the item has been added, the completion response must include the final cart state that matters for judging success, such as confirmation and the resulting total or subtotal.",
+          "source": "completion_template:ct_e23917b826740e",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The cart-add action has succeeded or the agent is otherwise ready to conclude the addition task.",
+          "required_evidence": [
+            "successful add-to-cart result",
+            "resulting cart subtotal or total"
+          ],
+          "discharge": "A completion statement is given that confirms the item was added and reports the resulting cart state; absence of this report leaves the task closure incomplete.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requested cart addition for SlimBook Air 13."
+            }
+          ],
+          "missing_evidence": [
+            "successful add-to-cart result",
+            "resulting cart subtotal or total",
+            "assistant completion message confirming the item was added and reporting the resulting cart state"
+          ],
+          "scope": {
+            "family": "cart_item_addition_with_variant_confirmation",
+            "title": "confirm item identity, variant status, and cart-ready details"
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "transition",
+        "item_id": "learned_9e1042d05f336a",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 7,
+        "event": "item_created",
+        "item": {
+          "id": "learned_e63134b9fe58ad",
+          "template_id": "ct_fa84e50fc98731",
+          "obligation_id": "obl_0c0d1ed08a0aca",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "The exact quantity to be added must be grounded before the cart state can be considered complete.",
+          "source": "completion_template:ct_fa84e50fc98731",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The user requests a specific count or the count affects the add-to-cart outcome.",
+          "required_evidence": [
+            "explicit quantity from the user",
+            "matching add-to-cart evidence or confirmation"
+          ],
+          "discharge": "Quantity is explicitly confirmed and reflected in the resulting cart evidence.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User explicitly requested one SlimBook Air 13 (SP-1001)."
+            }
+          ],
+          "missing_evidence": [
+            "matching add-to-cart evidence or confirmation"
+          ],
+          "scope": {
+            "family": "cart_option_choice_before_purchase",
+            "title": "collect required cart options before asserting readiness"
+          }
+        }
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_5b2ccabcc3eb95",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:3",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 3,
+              "assistant_index": 3,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 849, \"cart_total\": 849, \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"product_name\": \"SlimBook Air 13\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 849, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-1001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+            "preview_sequence": 3,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_765cfda569de1f",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The add_to_cart operation completed successfully.",
+          "source": "tool:add_to_cart:4",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 4,
+              "assistant_index": 4,
+              "tool": "add_to_cart",
+              "status": "added",
+              "success": true,
+              "result": "{\"cart_item_id\": \"CI-0001\", \"cart_subtotal\": 849, \"cart_total\": 849, \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"product_name\": \"SlimBook Air 13\", \"quantity\": 1, \"status\": \"added\", \"unit_price\": 849, \"variant_id\": null}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-1001",
+              "quantity": 1,
+              "gift_wrap": false
+            },
+            "action_key": "[\"add_to_cart\", {\"customer_id\": \"shop_002\", \"gift_wrap\": false, \"product_id\": \"SP-1001\", \"quantity\": 1}]",
+            "preview_sequence": 4,
+            "assistant_index": 4
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "learned_07aaf828e86073",
+          "template_id": "ct_ed1f691f003b9f",
+          "obligation_id": "obl_0ecf933dec0758",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before adding the item, obtain the user's choice for any available optional attribute that would change the purchase configuration when no prior preference is known.",
+          "source": "completion_template:ct_ed1f691f003b9f",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "An available optional attribute is present and the user has not yet accepted or declined it.",
+          "required_evidence": [
+            "product/cart state showing the optional attribute is available",
+            "a user message selecting or declining the option"
+          ],
+          "discharge": "The user explicitly chooses the option or declines it, or a prior unambiguous standing preference already covers it.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant asked whether the user wanted gift wrap and stated it was optional and changes cost."
+            },
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User declined gift wrap."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "optional_purchase_attribute_confirmation",
+            "title": "Resolve user choice on optional purchasable attributes before adding an item"
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "item_created",
+        "item": {
+          "id": "learned_66c7104b597ca2",
+          "template_id": "ct_ed1f691f003b9f",
+          "obligation_id": "obl_0482bb9de82915",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The assistant must not silently choose an optional purchasable attribute on the user's behalf when that choice would alter the item configuration.",
+          "source": "completion_template:ct_ed1f691f003b9f",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The add-to-cart action would include or exclude an optional attribute without explicit user choice.",
+          "required_evidence": [
+            "absence of a recorded user choice for the attribute",
+            "presence of an item option that changes the configuration"
+          ],
+          "discharge": "The action is deferred until the user choice is known, or the unchanged standard configuration is explicitly authorized by the user.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant requested the user's gift-wrap choice before adding."
+            },
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User explicitly chose no gift wrap."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Add-to-cart used gift_wrap false after the user's choice."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "optional_purchase_attribute_confirmation",
+            "title": "Resolve user choice on optional purchasable attributes before adding an item"
+          }
+        }
+      },
+      {
+        "index": 12,
+        "event": "transition",
+        "item_id": "learned_e63134b9fe58ad",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a89a66cbbed39c",
+          "template_id": "ct_068f5939f54a53",
+          "obligation_id": "obl_11e5b288933e01",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "After a successful add, report the exact item configuration that was added, including the selected variant and any resolved optional extras that affect what is in the cart.",
+          "source": "completion_template:ct_068f5939f54a53",
+          "status": "pending",
+          "priority": 0,
+          "activation": "The add operation succeeded and the assistant is ready to finish the task.",
+          "required_evidence": [
+            "successful add result",
+            "final selected variant or configuration",
+            "resolved optional extras or exclusions"
+          ],
+          "discharge": "Satisfied when the final message clearly confirms what specific configuration was added.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Add-to-cart succeeded for SlimBook Air 13 with variant_id null and gift_wrap false."
+            }
+          ],
+          "missing_evidence": [
+            "assistant final message clearly confirming the specific configuration that was added"
+          ],
+          "scope": {
+            "family": "cart_addition_final_state_report",
+            "title": "Report the resulting cart state after a successful add"
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "learned_51a94ca696a7e2",
+          "template_id": "ct_068f5939f54a53",
+          "obligation_id": "obl_096088153179ab",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "After a successful add, report the resulting cart total or subtotal from current authoritative cart state when available.",
+          "source": "completion_template:ct_068f5939f54a53",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A cart-modifying action has completed and authoritative cart totals are available.",
+          "required_evidence": [
+            "authoritative post-add cart amount"
+          ],
+          "discharge": "Satisfied when the response includes the resulting cart amount grounded in the returned cart state.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Post-add cart state includes cart_total 849 and cart_subtotal 849."
+            }
+          ],
+          "missing_evidence": [
+            "assistant final message including the resulting cart total or subtotal"
+          ],
+          "scope": {
+            "family": "cart_addition_final_state_report",
+            "title": "Report the resulting cart state after a successful add"
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "item_created",
+        "item": {
+          "id": "learned_72d2b3f94aec07",
+          "template_id": "ct_068f5939f54a53",
+          "obligation_id": "obl_323ca4d3f399cd",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the item has been successfully added, explicitly report the resulting cart state in a user-visible way, including what item and quantity were added and the resulting current cart total when available from authoritative state.",
+          "source": "completion_template:ct_068f5939f54a53",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The add operation succeeds and authoritative cart state is available.",
+          "required_evidence": [
+            "authoritative add result showing success",
+            "resulting cart contents or line-item state",
+            "resulting cart total if provided by current authoritative state"
+          ],
+          "discharge": "The final response states that the item was added and summarizes the resulting cart state with grounded item/quantity details and current total when available.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Authoritative add result shows SlimBook Air 13 added, quantity 1, with cart_total 849."
+            }
+          ],
+          "missing_evidence": [
+            "assistant final response stating the item was added with quantity and current total"
+          ],
+          "scope": {
+            "family": "cart_addition_final_state_report",
+            "title": "Report the resulting cart state after a successful add"
+          }
+        }
+      },
+      {
+        "index": 16,
+        "event": "item_created",
+        "item": {
+          "id": "learned_7276c48e606b76",
+          "template_id": "ct_d9b5d527a0e585",
+          "obligation_id": "obl_ba9055d6937c71",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If the item is added, report the exact added unit amount and resulting cart amount from the cart state.",
+          "source": "completion_template:ct_d9b5d527a0e585",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The item has been successfully added or the assistant is otherwise ready to finish the add-to-cart request.",
+          "required_evidence": [
+            "cart result showing the added item's amount",
+            "resulting cart subtotal or total"
+          ],
+          "discharge": "The completion message includes the exact added amount and resulting cart amount grounded in cart evidence.",
+          "scope_key": "slimbook_air_13",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Cart result shows unit_price 849 and cart_total 849 for the added SlimBook Air 13."
+            }
+          ],
+          "missing_evidence": [
+            "assistant completion message including the exact added unit amount and resulting cart amount"
+          ],
+          "scope": {
+            "family": "authoritative_price_grounding_before_quote_or_add",
+            "title": "Ground quoted item price and added-cart amount in current product/cart evidence"
+          }
+        }
+      },
+      {
+        "index": 17,
+        "event": "transition",
+        "item_id": "learned_66c7104b597ca2",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 18,
+        "event": "transition",
+        "item_id": "learned_51a94ca696a7e2",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 19,
+        "event": "transition",
+        "item_id": "learned_7276c48e606b76",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 20,
+        "event": "transition",
+        "item_id": "learned_72d2b3f94aec07",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 21,
+        "event": "transition",
+        "item_id": "learned_a89a66cbbed39c",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 22,
+        "event": "transition",
+        "item_id": "learned_a962feed3cf58c",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 23,
+        "event": "transition",
+        "item_id": "learned_b67c6bfdde97e3",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "f257dc37f397b9cb7c97d8b76458e315134a5685961011f8ca0a36c6f053835b",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please.",
+        "candidates": [
+          {
+            "id": "ct_49463727012560",
+            "family": "optional_add_on_choice_before_cart_change",
+            "score": 23.351144
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 21.390227
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 18.01083
+          },
+          {
+            "id": "ct_2dd6b25457dba1",
+            "family": "profile_benefit_resolution_before_total",
+            "score": 19.626153
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 19.64884
+          },
+          {
+            "id": "ct_2c778aa381f0de",
+            "family": "cart_promo_completion_grounded_totals",
+            "score": 19.753608
+          },
+          {
+            "id": "ct_5663c5735af757",
+            "family": "protected_empty_state_confirmation",
+            "score": 13.588336
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 17.716269
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "0c1de302717a11b5867ae57a73f143d1c9874dece771bc56b44de4707b4b3ab6",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. retrieve_learnings retrieve_learnings",
+        "candidates": [
+          {
+            "id": "ct_49463727012560",
+            "family": "optional_add_on_choice_before_cart_change",
+            "score": 22.210993
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 20.303105
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 17.056284
+          },
+          {
+            "id": "ct_5fe63cc694d9da",
+            "family": "account_linked_benefit_resolution",
+            "score": 18.810276
+          },
+          {
+            "id": "ct_52a52876040f21",
+            "family": "post_change_cart_state_reporting_with_unset_consequence",
+            "score": 18.694294
+          },
+          {
+            "id": "ct_2c778aa381f0de",
+            "family": "cart_promo_completion_grounded_totals",
+            "score": 18.693002
+          },
+          {
+            "id": "ct_5663c5735af757",
+            "family": "protected_empty_state_confirmation",
+            "score": 12.898942
+          },
+          {
+            "id": "ct_bbc7258226647f",
+            "family": "loyalty_points_purchase_disclosure",
+            "score": 17.137362
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "655c5c8ad60bf7fa676e67d2ad9f4041a70f645a2700e961c4d12372f454421e",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. retrieve_learnings retrieve_learnings search_products products product_id SP-1001 name SlimBook Air 13 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1107 name SlimBook Touch 15 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1002 name ProBook Laptop 13-inch brand ProBook category electronics subcategory laptop price rating review_count in_stock true total_found search_products products product_id SP...",
+        "candidates": [
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 36.962393
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 34.524902
+          },
+          {
+            "id": "ct_5a3ed54b1fafbc",
+            "family": "aggregate_shipping_bundle_resolution",
+            "score": 32.407133
+          },
+          {
+            "id": "ct_6ca35e3c669770",
+            "family": "boundary_transition_checkout_total",
+            "score": 27.788432
+          },
+          {
+            "id": "ct_d9b5d527a0e585",
+            "family": "authoritative_price_grounding_before_quote_or_add",
+            "score": 32.762513
+          },
+          {
+            "id": "ct_229ce6aaf2a88f",
+            "family": "same_brand_bundle_eligibility_and_amount",
+            "score": 32.998018
+          },
+          {
+            "id": "ct_e23917b826740e",
+            "family": "cart_item_addition_with_variant_confirmation",
+            "score": 36.215272
+          },
+          {
+            "id": "ct_abc5b61ef73114",
+            "family": "shipping_selection_requires_explicit_customer_choice",
+            "score": 21.173127
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "a818d151faa5d6f948d9506ffecda45578a062fa18ad3e40b7537ed9b4eb8957",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. retrieve_learnings retrieve_learnings search_products products product_id SP-1001 name SlimBook Air 13 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1107 name SlimBook Touch 15 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1002 name ProBook Laptop 13-inch brand ProBook category electronics subcategory laptop price rating review_count in_stock true total_found search_products products product_id SP...",
+        "candidates": [
+          {
+            "id": "ct_e23917b826740e",
+            "family": "cart_item_addition_with_variant_confirmation",
+            "score": 52.573493
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 45.397683
+          },
+          {
+            "id": "ct_ce8593d563591c",
+            "family": "loyalty_benefit_visibility_after_cart_setup",
+            "score": 40.3333
+          },
+          {
+            "id": "ct_6ca35e3c669770",
+            "family": "boundary_transition_checkout_total",
+            "score": 32.786441
+          },
+          {
+            "id": "ct_ed1f691f003b9f",
+            "family": "optional_purchase_attribute_confirmation",
+            "score": 43.690043
+          },
+          {
+            "id": "ct_d8c13b430a675e",
+            "family": "promo_or_adjustment_boundary_with_supported_alternatives",
+            "score": 41.842915
+          },
+          {
+            "id": "ct_c1bfacf4405f85",
+            "family": "explicit_no_change_cart_confirmation",
+            "score": 44.155891
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 44.706271
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "6d7f7fd2b7fb91b8f67c63af0cad38d8379618329285a17d5f2df9172d05fcf8",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. No gift wrap, please — just add one SlimBook Air 13 (SP-1001) to my cart. I found SlimBook Air 13 in stock at $849, and it has no variants. Before I add it: would you like gift wrap for this item? It’s optional and changes the cost. retrieve_learnings search_products products product_id SP-1001 name SlimBook Air 13 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1107 name SlimBook Touch 15 brand SlimBook category electronics subcategory laptop price rating revi...",
+        "candidates": [
+          {
+            "id": "ct_ed1f691f003b9f",
+            "family": "optional_purchase_attribute_confirmation",
+            "score": 62.042622
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 52.115153
+          },
+          {
+            "id": "ct_ce8593d563591c",
+            "family": "loyalty_benefit_visibility_after_cart_setup",
+            "score": 45.075526
+          },
+          {
+            "id": "ct_e23917b826740e",
+            "family": "cart_item_addition_with_variant_confirmation",
+            "score": 60.249604
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 40.91269
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 59.0005
+          },
+          {
+            "id": "ct_c1bfacf4405f85",
+            "family": "explicit_no_change_cart_confirmation",
+            "score": 54.747731
+          },
+          {
+            "id": "ct_d8c13b430a675e",
+            "family": "promo_or_adjustment_boundary_with_supported_alternatives",
+            "score": 48.72947
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "71270039764911c6dee1fd6ef12d6a917792022dc20f40d508f08581d05ff7e7",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. No gift wrap, please — just add one SlimBook Air 13 (SP-1001) to my cart. I found SlimBook Air 13 in stock at $849, and it has no variants. Before I add it: would you like gift wrap for this item? It’s optional and changes the cost. retrieve_learnings search_products products product_id SP-1001 name SlimBook Air 13 brand SlimBook category electronics subcategory laptop price rating review_count in_stock true product_id SP-1107 name SlimBook Touch 15 brand SlimBook category electronics subcategory laptop price rating revi...",
+        "candidates": [
+          {
+            "id": "ct_e23917b826740e",
+            "family": "cart_item_addition_with_variant_confirmation",
+            "score": 70.102414
+          },
+          {
+            "id": "ct_662a5373f92c34",
+            "family": "final_cart_state_reporting",
+            "score": 60.213355
+          },
+          {
+            "id": "ct_b3d7ebef646e89",
+            "family": "multi_item_cart_completion",
+            "score": 55.381617
+          },
+          {
+            "id": "ct_ed1f691f003b9f",
+            "family": "optional_purchase_attribute_confirmation",
+            "score": 65.748377
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 45.166091
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 39.195467
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 65.162667
+          },
+          {
+            "id": "ct_068f5939f54a53",
+            "family": "cart_addition_final_state_report",
+            "score": 53.884838
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "7623e787e68f254e0a448a10fdd42352427a5651ac0d75bb51d7ff38e95ab14f",
+        "query_preview": "Hi! I'd like to get the SlimBook Air 13 — adding it to my cart please. No gift wrap, please — just add one SlimBook Air 13 (SP-1001) to my cart. I found SlimBook Air 13 in stock at $849, and it has no variants. Before I add it: would you like gift wrap for this item? It’s optional and changes the cost. Done — I added 1 × SlimBook Air 13 to your cart. Cart total: $849 If you want, I can also check for any eligible promo codes. retrieve_learnings search_products products product_id SP-1001 name SlimBook Air 13 brand SlimBook category electronics subcategory laptop price rating review_count in...",
+        "candidates": [
+          {
+            "id": "ct_e23917b826740e",
+            "family": "cart_item_addition_with_variant_confirmation",
+            "score": 66.153293
+          },
+          {
+            "id": "ct_662a5373f92c34",
+            "family": "final_cart_state_reporting",
+            "score": 64.716661
+          },
+          {
+            "id": "ct_6462ba60d12fda",
+            "family": "aggregate_bundle_condition_for_related_items",
+            "score": 56.092915
+          },
+          {
+            "id": "ct_ed1f691f003b9f",
+            "family": "optional_purchase_attribute_confirmation",
+            "score": 65.556024
+          },
+          {
+            "id": "ct_f3a896820c0b68",
+            "family": "threshold_consequence_disclosure",
+            "score": 49.030241
+          },
+          {
+            "id": "ct_fa84e50fc98731",
+            "family": "cart_option_choice_before_purchase",
+            "score": 65.231902
+          },
+          {
+            "id": "ct_d8c13b430a675e",
+            "family": "promo_or_adjustment_boundary_with_supported_alternatives",
+            "score": 57.577921
+          },
+          {
+            "id": "ct_e039a38a6bf512",
+            "family": "availability_with_variant_or_alternative_boundary",
+            "score": 38.944147
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "744d05586c20af5e84aa6243777007a73f0b9c20c8f374faa85b366ffc0ee03c",
+        "candidate_ids": [
+          "ct_49463727012560",
+          "ct_f3a896820c0b68",
+          "ct_6462ba60d12fda",
+          "ct_2dd6b25457dba1",
+          "ct_52a52876040f21",
+          "ct_2c778aa381f0de",
+          "ct_5663c5735af757",
+          "ct_fa84e50fc98731"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 3571,
+          "output_tokens": 165
+        },
+        "response_sha256": "6a1a3cfca2719dd1273e2024c7d909d47a522ad88a7e15e4ed7e3bed8f9c8f77",
+        "returned_items": 1
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "836c8b818d579a43f67cba041f289370a5b5bce42a559ef40c20aefa35994e30",
+        "candidate_ids": [
+          "ct_49463727012560",
+          "ct_f3a896820c0b68",
+          "ct_6462ba60d12fda",
+          "ct_5fe63cc694d9da",
+          "ct_52a52876040f21",
+          "ct_2c778aa381f0de",
+          "ct_5663c5735af757",
+          "ct_bbc7258226647f"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 4662,
+          "output_tokens": 211
+        },
+        "response_sha256": "92007739c363aa0dd1882c65dd66d220625d4b56adf8079838bda63353af2ed1",
+        "returned_items": 1
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "ff45c09f16142f1a806f012fa2a2c9a9b8bf94ed4449e025a7153ba001f7168c",
+        "candidate_ids": [
+          "ct_fa84e50fc98731",
+          "ct_6462ba60d12fda",
+          "ct_5a3ed54b1fafbc",
+          "ct_6ca35e3c669770",
+          "ct_d9b5d527a0e585",
+          "ct_229ce6aaf2a88f",
+          "ct_e23917b826740e",
+          "ct_abc5b61ef73114",
+          "ct_49463727012560"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6469,
+          "output_tokens": 684
+        },
+        "response_sha256": "799a2ad383293c8008daf460986142e35eb8cb91842994f12bbe79d6954753b5",
+        "returned_items": 4
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "9f98b280032cdc62066925727ce9e4b9339f4979f64709358a2f7322391262d9",
+        "candidate_ids": [
+          "ct_e23917b826740e",
+          "ct_6462ba60d12fda",
+          "ct_ce8593d563591c",
+          "ct_6ca35e3c669770",
+          "ct_ed1f691f003b9f",
+          "ct_d8c13b430a675e",
+          "ct_c1bfacf4405f85",
+          "ct_fa84e50fc98731",
+          "ct_49463727012560",
+          "ct_d9b5d527a0e585"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7689,
+          "output_tokens": 760
+        },
+        "response_sha256": "fed56194f528cb743a9436d6d63fb701acf2b5cec5e42758cd1c57be4b0a287b",
+        "returned_items": 5
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "322fb2a07739cb0c896875d7084a8c28b7800bc0ff3ddc2fc41d5a598a7405dd",
+        "candidate_ids": [
+          "ct_ed1f691f003b9f",
+          "ct_6462ba60d12fda",
+          "ct_ce8593d563591c",
+          "ct_e23917b826740e",
+          "ct_f3a896820c0b68",
+          "ct_fa84e50fc98731",
+          "ct_c1bfacf4405f85",
+          "ct_d8c13b430a675e",
+          "ct_49463727012560",
+          "ct_d9b5d527a0e585"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6570,
+          "output_tokens": 838
+        },
+        "response_sha256": "70a5fb1ff09ef38aa3cf3739bf07e9fd31518cdf5b49781ae593ab0f65d83256",
+        "returned_items": 6
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "d4b37b369b7ca68924c60e0d11c54dd51e19928f8db31f0df6c42493812be2dd",
+        "candidate_ids": [
+          "ct_e23917b826740e",
+          "ct_662a5373f92c34",
+          "ct_b3d7ebef646e89",
+          "ct_ed1f691f003b9f",
+          "ct_f3a896820c0b68",
+          "ct_e039a38a6bf512",
+          "ct_fa84e50fc98731",
+          "ct_068f5939f54a53",
+          "ct_d9b5d527a0e585"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7629,
+          "output_tokens": 1516
+        },
+        "response_sha256": "c628be131951fdc29c68bcc15f4ed6daf4d67dc47cfd44763fd98de75ea031b0",
+        "returned_items": 11
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "ebbf3b3927eece77a11cc2e4997c2afb6b9359bb5881a7a744fef22db0ba3279",
+        "candidate_ids": [
+          "ct_e23917b826740e",
+          "ct_662a5373f92c34",
+          "ct_6462ba60d12fda",
+          "ct_ed1f691f003b9f",
+          "ct_f3a896820c0b68",
+          "ct_fa84e50fc98731",
+          "ct_d8c13b430a675e",
+          "ct_e039a38a6bf512",
+          "ct_d9b5d527a0e585",
+          "ct_068f5939f54a53"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8477,
+          "output_tokens": 1047
+        },
+        "response_sha256": "cbceca59ec80cc21d58f8b37f4c2c4066ca47f0dc67d4dc2883294ddb01425cc",
+        "returned_items": 7
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f9514d208914cef6ce86ee14ded8f29349340067f2f24549e37fa390d09dc9b1",
+        "exposure_signature": "d0508448462395b399bf601c6b1174b6857434458b0f4764cf71f4fbebd1c33e",
+        "exposed_items": [
+          "learned_9e1042d05f336a"
+        ],
+        "pending_items": [
+          "learned_9e1042d05f336a"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "retrieve_learnings",
+            "arguments": {
+              "query": "Add requested product to cart and optionally apply one promo; verify product with search, check variants, then add to cart for customer shop_002."
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f9514d208914cef6ce86ee14ded8f29349340067f2f24549e37fa390d09dc9b1",
+        "exposure_signature": "d0508448462395b399bf601c6b1174b6857434458b0f4764cf71f4fbebd1c33e",
+        "exposed_items": [
+          "learned_9e1042d05f336a"
+        ],
+        "pending_items": [
+          "learned_9e1042d05f336a"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "search_products",
+            "arguments": {
+              "query": "SlimBook Air 13",
+              "category": "electronics",
+              "in_stock_only": true,
+              "sort_by": "relevance"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "26f9094698ff06bfb5c6ad6a0de4a86d3857c69411ba7c54df7e06fdcdaa3f84",
+        "exposure_signature": "35f4d5d11595f3588e272b53c908041b13e287174283ab94c7da648218e1262c",
+        "exposed_items": [
+          "learned_89282505b4a621",
+          "learned_9e1042d05f336a"
+        ],
+        "pending_items": [
+          "learned_9e1042d05f336a",
+          "learned_89282505b4a621",
+          "learned_a962feed3cf58c"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 1,
+          "pending_evidence": 2,
+          "satisfied": 1,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_variants",
+            "arguments": {
+              "product_id": "SP-1001"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f9514d208914cef6ce86ee14ded8f29349340067f2f24549e37fa390d09dc9b1",
+        "exposure_signature": "d0508448462395b399bf601c6b1174b6857434458b0f4764cf71f4fbebd1c33e",
+        "exposed_items": [
+          "learned_9e1042d05f336a"
+        ],
+        "pending_items": [
+          "learned_9e1042d05f336a",
+          "learned_a962feed3cf58c",
+          "learned_b67c6bfdde97e3"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 2,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "fa2b0dceebef3bcf575e2eca79249c76cf41eeaa0a11bf208b078affe1a78aad",
+        "exposure_signature": "bf275382ae154804160017cb4999c0c76f7567906b3ebd79d5598d05c5b0b0fb",
+        "exposed_items": [
+          "learned_e63134b9fe58ad"
+        ],
+        "pending_items": [
+          "learned_a962feed3cf58c",
+          "learned_b67c6bfdde97e3",
+          "learned_e63134b9fe58ad"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 3,
+          "pending_evidence": 0,
+          "satisfied": 3,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "add_to_cart",
+            "arguments": {
+              "customer_id": "shop_002",
+              "product_id": "SP-1001",
+              "quantity": 1,
+              "gift_wrap": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "975f2fd4d517f9e996a5c6578b16b63fbe2f4678de15904bad510e25f6a334a4",
+        "exposure_signature": "3106c9de4408b26317e18362fb5e936611c8447f221f7371c4650eb4fe602263",
+        "exposed_items": [
+          "learned_66c7104b597ca2"
+        ],
+        "pending_items": [
+          "learned_a962feed3cf58c",
+          "learned_b67c6bfdde97e3",
+          "learned_66c7104b597ca2",
+          "learned_a89a66cbbed39c",
+          "learned_51a94ca696a7e2",
+          "learned_72d2b3f94aec07",
+          "learned_7276c48e606b76"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 7,
+          "pending_evidence": 0,
+          "satisfied": 7,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 6,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 7,
+      "regenerations": 0,
+      "exposures": 6,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 4,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 2,
+      "tool_calls": 4,
+      "bookkeeper_input_tokens": 45067,
+      "bookkeeper_output_tokens": 5221,
+      "bookkeeper_total_tokens": 50288,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 74422,
+    "cached_input_tokens": 0,
+    "output_tokens": 5453,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 79875,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 74422,
+  "cached_input_tokens": 0,
+  "output_tokens": 5453,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 79875,
+  "state_diff": {
+    "created": {
+      "cart_items": {
+        "CI-0001": {
+          "cart_item_id": "CI-0001",
+          "customer_id": "shop_002",
+          "product_id": "SP-1001",
+          "quantity": 1,
+          "gift_wrap": false,
+          "variant_id": null
+        }
+      }
+    },
+    "modified": {
+      "carts": {
+        "CART-shop_002": {
+          "item_ids": {
+            "old": [],
+            "new": [
+              "CI-0001"
+            ]
+          },
+          "total": {
+            "old": 0,
+            "new": 849
+          },
+          "subtotal": {
+            "old": 0,
+            "new": 849
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "subtotal",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "carts",
+      "record_key": "CART-shop_002",
+      "field": "total",
+      "expected_value": 849
+    },
+    {
+      "entity_type": "cart_items",
+      "match_fields": {
+        "customer_id": "shop_002",
+        "product_id": "SP-1001",
+        "gift_wrap": false,
+        "quantity": 1
+      },
+      "expected_fields": {}
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 2,
+  "ux_response_density": 4,
+  "ux_base_score": 3.4,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 4,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "558947b2ce0b5d90a633e7d44e8599c329a96ac5ed9e43c9d37ffb5e6cf3c055",
+    "judge_ux_quality.md": "0234643a8dcf766c390aff2dc11b2f74f0e13ef7a38b29df70165bd333b82656",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

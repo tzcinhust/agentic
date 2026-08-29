@@ -1,0 +1,3458 @@
+{
+  "task_id": "12-cancel_after_shipment",
+  "user_id": "cust_004",
+  "task_summary": "**Task:** The customer wants to cancel a two-item order that has already shipped. Because the package is in transit, the right handling is to treat this as an intercept cancellation, apply the $10 per-item intercept fee, and complete the cancellation with the resulting $274 refund.\n\n**Challenge:** Shipped-order cancellation requires different reasoning from a simple pre-shipment stop. Weak agents cancel it as if nothing has left the warehouse, fail to mention the $20 intercept cost, or quote the wrong net refund.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "12_cancel_after_shipment_agent_must_mention_intercept_fee",
+      "kind": "must",
+      "requirement": "Agent must mention intercept fee.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Passed. The agent explicitly mentioned the intercept fee in the conversation: 'there’s a $10 intercept fee per item,' later confirming '$10 fee per item for $20 total,' and again noting the '$20 total intercept fee.'"
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled control very well: it previewed the in-transit cancellation first, clearly disclosed the $10 per-item intercept fee and $274 refund, and only executed the cancellation after the user explicitly confirmed in a later turn. User effort was minimal because the agent immediately recognized this as a shipped-order intercept case, surfaced the correct totals, and answered the user's confirmation question directly without any re-steering or correction. Response density was strong throughout: concise, specific, and complete, with the exact items, fees, refund amount, and final refund method stated clearly. This is a clean, user-preferred trajectory with no notable UX flaws.",
+  "turns": 3,
+  "tool_calls": 4,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked your order, and since it’s already in transit I can still cancel it, but there’s a $10 intercept fee per item. For both items together, the total refund would be $274.\n\nIf you want, I can go ahead and cancel the full order now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-6003"
+          },
+          "result": {
+            "order_id": "ORD-6003",
+            "customer_id": "cust_004",
+            "order_date": "2026-06-10T10:00:00",
+            "status": "shipped",
+            "shipping_status": "in_transit",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK85673961",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-06-14T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 294
+            },
+            "subtotal": 294,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 294,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-9020",
+                "order_id": "ORD-6003",
+                "product_id": "PROD-2020",
+                "quantity": 1,
+                "unit_price": 249,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-2020",
+                  "name": "SoundMax Wireless Headphones",
+                  "category": "electronics",
+                  "price": 249,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              },
+              {
+                "item_id": "ITEM-9021",
+                "order_id": "ORD-6003",
+                "product_id": "PROD-2021",
+                "quantity": 1,
+                "unit_price": 45,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-2021",
+                  "name": "7-Port USB-C Hub",
+                  "category": "electronics",
+                  "price": 45,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancellation"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "pre_shipment": "Free cancellation before shipment (pending/processing status).",
+              "in_transit": "$10 intercept fee per item for in-transit orders.",
+              "delivered": "Cannot cancel delivered orders — must use the return process instead.",
+              "partial": "Partial cancellation allowed if items not yet delivered.",
+              "split_payment": "Refund distributed proportionally to original payment methods.",
+              "already_cancelled": "Already cancelled orders cannot be cancelled again."
+            }
+          }
+        },
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-6003"
+          },
+          "result": {
+            "status": "preview",
+            "order_id": "ORD-6003",
+            "items_to_cancel": [
+              "ITEM-9020",
+              "ITEM-9021"
+            ],
+            "cancellation_fee": 20,
+            "refund_amount": 274,
+            "reason": "In-transit cancellation — $10 intercept fee per item"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Just to confirm before you do it: that’s both the headphones and the USB hub on ORD-6003, with a $10 fee per item, $20 total fee, and a $274 refund, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes, that’s correct: both the headphones and the USB hub on ORD-6003, a $10 fee per item for $20 total, and a $274 refund if I cancel the full order. If you want me to proceed, just say “cancel it.”",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Yes, please cancel it."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — that was correct, and I’ve now canceled both items on ORD-6003.\n\nYou’ll receive a $274 refund to your credit card, with the $20 total intercept fee already accounted for.",
+      "tool_calls": [
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "confirm": true,
+            "order_id": "ORD-6003",
+            "item_ids": [
+              "ITEM-9020",
+              "ITEM-9021"
+            ]
+          },
+          "result": {
+            "status": "cancelled",
+            "order_id": "ORD-6003",
+            "items_cancelled": [
+              "ITEM-9020",
+              "ITEM-9021"
+            ],
+            "cancellation_fee": 20,
+            "refund_amount": 274,
+            "refund_method": "credit_card"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_3eeddb1cf10264",
+        "template_id": "ct_a5bc0ddea0bacd",
+        "obligation_id": "obl_be7b75ec4ed5ed",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating that all requested issues are handled, have authoritative state for each requested order or item showing the correct eligible outcome for that specific entity.",
+        "source": "completion_template:ct_a5bc0ddea0bacd",
+        "status": "pending",
+        "priority": 1,
+        "activation": "more than one requested order or item is in scope",
+        "required_evidence": [
+          "authoritative order or item state for every requested entity",
+          "policy-backed eligibility for the requested disposition on each entity"
+        ],
+        "discharge": "each requested entity has grounded state supporting the stated disposition, or any unresolved entity is explicitly called out as not completed",
+        "scope_key": "order_ord-6003_items",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User names two items in one cancellation request: headphones and USB hub"
+          }
+        ],
+        "missing_evidence": [
+          "Authoritative order/item state for the headphones",
+          "Authoritative order/item state for the USB hub",
+          "Eligibility or disposition evidence for each requested item if handled separately"
+        ],
+        "scope": {
+          "family": "multi_request_per_item_resolution_and_status",
+          "title": "Resolve and report each requested item separately in a multi-issue support request"
+        }
+      },
+      {
+        "id": "learned_5d1fd2b80907f2",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_0ffca9c9019e35",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "any relevant action result is non-final or failed",
+        "required_evidence": [
+          "a successful final state for the requested action, not merely a preview or attempted confirmation"
+        ],
+        "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel order ORD-6003"
+          }
+        ],
+        "missing_evidence": [
+          "Any authoritative action/result for cancellation status of order ORD-6003",
+          "If communicated, assistant wording that clearly keeps cancellation uncompleted until execution succeeds"
+        ],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_0858a6e9f53cbf",
+        "template_id": "ct_4381c3af064dc2",
+        "obligation_id": "obl_d90f2b688a20c0",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Before stating a concrete action outcome or eligibility, identify the item's current side of the relevant policy boundary and explain why that boundary determines the available path or current consequence.",
+        "source": "completion_template:ct_4381c3af064dc2",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Observable status or timing shows the item is currently before or after a policy-changing threshold.",
+        "required_evidence": [
+          "current authoritative item status or timing",
+          "the policy rule that changes the allowed outcome across that boundary"
+        ],
+        "discharge": "The response explicitly ties the current status side to the currently valid treatment, fee, or ineligibility.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Current authoritative item status is shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy changes cancellation consequence after shipment to in-transit fee treatment"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant identifies the order as already in transit and explains that this is why cancellation still exists but with a fee"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Items are currently shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy changes cancellation treatment after shipment to an intercept-fee path"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explains that because the order is already in transit, cancellation is still possible but with a fee"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "shipping_status_boundary_with_next_consequence",
+          "title": "Ground cancellation/return advice on the current fulfillment boundary and next consequence"
+        }
+      },
+      {
+        "id": "learned_1ebcec839630ea",
+        "template_id": "ct_d3493de6078549",
+        "obligation_id": "obl_feb186746fed16",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "the completion claim must account for every relevant item, item group, or payment source that affects the outcome",
+        "source": "completion_template:ct_d3493de6078549",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "more than one item, line, or payment source is involved",
+        "required_evidence": [
+          "full item list or group status",
+          "refund or cancellation mapping by entity"
+        ],
+        "discharge": "the response explicitly covers all affected entities or states why only a subset is affected",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "Order includes two requested items"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Two items are present in the order"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview identifies both items to cancel"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explicitly says the cancellation/refund outcome covers both items together"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview identifies both ITEM-9020 and ITEM-9021 to cancel"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant says the cancellation/refund outcome covers both items together"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirms both the headphones and the USB hub are included"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order shows two items in ORD-6003"
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests cancellation of headphones and USB hub in ORD-6003"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Confirmed cancellation result names both ITEM-9020 and ITEM-9021 as cancelled"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Confirmed cancellation result names both ITEM-9020 and ITEM-9021 as cancelled"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant says both items on ORD-6003 have now been canceled"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_item_refund_and_cancellation_all_entities",
+          "title": "All linked items or payment sources must be accounted for"
+        }
+      },
+      {
+        "id": "learned_308f58f06fc4fe",
+        "template_id": "ct_c8e178f06fcd6a",
+        "obligation_id": "obl_66dc0e3b6bc120",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "When the user's target scope is the whole order or another multi-item group, compute and distinguish the item-level amounts and the aggregate totals for all items in scope, including any already-cancelled subset where relevant to the stated total.",
+        "source": "completion_template:ct_c8e178f06fcd6a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The requested outcome spans multiple related items or mixes already-finalized and still-pending items.",
+        "required_evidence": [
+          "the full set of items in scope and their statuses",
+          "exact fee and refund amount for each applicable item or subset",
+          "the resulting aggregate totals for the user's requested scope"
+        ],
+        "discharge": "The response clearly states the complete totals for the requested scope and how they relate to any individual item amounts.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states $10 intercept fee per item and a combined refund for both items"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant confirms both items, $10 fee per item, $20 total fee, and $274 refund"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order contains two items"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview covers both items with cancellation_fee 20 and refund_amount 274"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "aggregate_order_cancellation_totals",
+          "title": "Provide complete totals across the requested cancellation scope"
+        }
+      },
+      {
+        "id": "learned_3eeddb1cf10264",
+        "template_id": "ct_a5bc0ddea0bacd",
+        "obligation_id": "obl_be7b75ec4ed5ed",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating that all requested issues are handled, have authoritative state for each requested order or item showing the correct eligible outcome for that specific entity.",
+        "source": "completion_template:ct_a5bc0ddea0bacd",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "more than one requested order or item is in scope",
+        "required_evidence": [
+          "authoritative order or item state for every requested entity",
+          "policy-backed eligibility for the requested disposition on each entity"
+        ],
+        "discharge": "each requested entity has grounded state supporting the stated disposition, or any unresolved entity is explicitly called out as not completed",
+        "scope_key": "order_ord-6003_items",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User names two items in one cancellation request: headphones and USB hub"
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel order ORD-6003 covering headphones and USB hub"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Authoritative order data shows two items in ORD-6003: ITEM-9020 and ITEM-9021, both shipped"
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests cancellation of order ORD-6003 covering headphones and USB hub"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Cancellation policy provides status-dependent rules including pre_shipment, in_transit, delivered, and partial"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview cancellation targets both ITEM-9020 and ITEM-9021"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Authoritative order data shows two items in ORD-6003 and both are shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Cancellation policy gives in-transit rule and partial-cancellation boundary"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states the in-transit cancellation consequence for both requested items"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_request_per_item_resolution_and_status",
+          "title": "Resolve and report each requested item separately in a multi-issue support request"
+        }
+      },
+      {
+        "id": "learned_510f5dde1fa05f",
+        "template_id": "ct_8c6be476639b1e",
+        "obligation_id": "obl_b3d1df1cfe81f8",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "After completed cancellation with refund details, the final communication must report the exact refund amount and refund destination from authoritative evidence.",
+        "source": "completion_template:ct_8c6be476639b1e",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "Completed cancellation result includes refund details.",
+        "required_evidence": [
+          "Completed cancellation result with exact refund amount",
+          "Completed cancellation result with refund method or destination"
+        ],
+        "discharge": "The final response includes the exact grounded refund amount and where it will be refunded.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed cancellation result includes refund_amount 274 and refund_method credit_card"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Completed cancellation result includes refund_amount 274 and refund_method credit_card"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant communicates a $274 refund to the credit card"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_refund_exactness_before_confirmation",
+          "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+        }
+      },
+      {
+        "id": "learned_54eb27f06ad95c",
+        "template_id": "ct_947d9cc0d6a2b1",
+        "obligation_id": "obl_da4c8a3ea553a8",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Ground the free-cancellation claim in the item’s current status, not just the user’s description; if status is ambiguous, keep the requirement open.",
+        "source": "completion_template:ct_947d9cc0d6a2b1",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "a fee-free cancellation outcome is being considered",
+        "required_evidence": [
+          "authoritative item status",
+          "policy for pre-shipment cancellation"
+        ],
+        "discharge": "status and policy together support the no-fee cancellation boundary",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests cancellation"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Authoritative item status shows both requested items are shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy says free cancellation applies before shipment in pending/processing status"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says free cancellation applies before shipment in pending/processing status"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states the order is already in transit rather than treating it as fee-free pre-shipment"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Authoritative order status shows shipped items"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy provides the pre-shipment and in-transit cancellation rules"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant bases the fee outcome on the checked order status"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "pre_shipment_cancellation_boundary",
+          "title": "free cancellation requires pre-shipment evidence and current item status"
+        }
+      },
+      {
+        "id": "learned_5d1fd2b80907f2",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_0ffca9c9019e35",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not state that the cancellation is completed unless a successful final state exists or the assistant clearly says it is not yet completed.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "any relevant action result is non-final or failed",
+        "required_evidence": [
+          "a successful final state for the requested action, not merely a preview or attempted confirmation"
+        ],
+        "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel order ORD-6003"
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests cancellation of order ORD-6003"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Only order retrieval is present; no final cancellation execution result appears"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order retrieval appears, but no cancellation execution result is present"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy retrieval appears, but no final state change result is present"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "cancel_order result is status preview, not a final executed cancellation"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Repeated cancel_order result is also preview"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant says cancellation can be done and offers to go ahead, not that it is already completed"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "cancel_order result is preview, not a final executed cancellation"
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asks assistant to cancel it"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "cancel_order result is status preview, not a final executed cancellation"
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asks assistant to cancel the order"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Authoritative cancel_order result shows status cancelled for ORD-6003 and both items"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Before execution, assistant only says it can proceed if user confirms"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Earlier cancel_order result was only a preview"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Before execution, assistant said it would proceed only if user confirmed"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Authoritative cancel_order result shows status cancelled for ORD-6003 and both items"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states the order has now been canceled after final result exists"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_5e7cc1a9d70728",
+        "template_id": "ct_8c6be476639b1e",
+        "obligation_id": "obl_4209dfd8e9bf62",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "Before stating that a cancellable order has been cancelled, the cancellation must actually be in the completed state rather than only previewed or inferred from policy.",
+        "source": "completion_template:ct_8c6be476639b1e",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Agent is about to say the order was cancelled.",
+        "required_evidence": [
+          "Authoritative post-action state showing cancellation completed"
+        ],
+        "discharge": "A completed cancellation state exists and supports the success claim.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel the order"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "cancel_order returned status preview"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "repeat cancel_order returned status preview"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant has not stated that the order was cancelled"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "cancel_order returned status preview"
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asks to proceed with cancellation"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "cancel_order with confirm=true returned status cancelled for ORD-6003"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Initial cancel_order result was preview only"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Final cancel_order result shows status cancelled"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant claims cancellation only after final cancelled result exists"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_refund_exactness_before_confirmation",
+          "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+        }
+      },
+      {
+        "id": "learned_6efe320e7c16a5",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_40d3c12e070194",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+        "required_evidence": [
+          "final executed status for each claimed change"
+        ],
+        "discharge": "authoritative results show the claimed state change completed for each affected entity",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Final executed status shows both items cancelled on ORD-6003"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reports the completed cancellation after executed result"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_8425c19c78b2c6",
+        "template_id": "ct_30fa76709ee736",
+        "obligation_id": "obl_012bf78755e82b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before claiming a cancellation fee, eligibility, or likely outcome, establish which side of the relevant fulfillment or timing boundary currently applies to the targeted item(s).",
+        "source": "completion_template:ct_30fa76709ee736",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A policy or order state shows different consequences on different sides of a shipment/timing boundary.",
+        "required_evidence": [
+          "current authoritative item/order status or timing state",
+          "applicable policy text for each relevant boundary side"
+        ],
+        "discharge": "The response ties the claimed current consequence to verified current-side status under the governing policy.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel order ORD-6003"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Both targeted items currently show shipped status"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Cancellation policy distinguishes pre_shipment, in_transit, delivered, and partial outcomes"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview uses in-transit cancellation fee and reason"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Cancellation policy distinguishes pre_shipment and in_transit outcomes"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant ties the stated fee/outcome to the order being already in transit"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Both items are in shipped status"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says in-transit orders have a $10 intercept fee per item and delivered orders cannot be cancelled"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant ties the in-transit state to the cancellation outcome"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Both items in ORD-6003 have item_status shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy distinguishes in_transit from pre_shipment and delivered states"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant ties the in-transit fee outcome to the current shipped/in-transit state"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "shipment_boundary_fee_disclosure",
+          "title": "Resolve shipment-status boundary before stating cancellation cost or outcome"
+        }
+      },
+      {
+        "id": "learned_98b3a059e52f63",
+        "template_id": "ct_947d9cc0d6a2b1",
+        "obligation_id": "obl_3063c88a9168cc",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "If the item is near a shipment/delivery boundary, resolve the boundary by comparing current status to the policy threshold and disclose the consequence of crossing it.",
+        "source": "completion_template:ct_947d9cc0d6a2b1",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "latent boundary transition signal is present or shipment timing matters",
+        "required_evidence": [
+          "current status",
+          "threshold policy consequence from authoritative evidence"
+        ],
+        "discharge": "comparison shows whether the item is before or past the cancellation boundary and what that means",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel the order"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Both items in ORD-6003 have item_status 'shipped'"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Both items in ORD-6003 have item_status shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy states free cancellation before shipment and $10 intercept fee per item for in-transit orders"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview states in-transit cancellation with $10 intercept fee per item"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy states free cancellation before shipment and $10 intercept fee per item for in-transit orders"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explains that because the order is already in transit, a $10 intercept fee per item applies"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Current status is shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy distinguishes free cancellation before shipment from in-transit cancellation with $10 fee per item"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states that since the order is already in transit, the intercept fee applies"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "pre_shipment_cancellation_boundary",
+          "title": "free cancellation requires pre-shipment evidence and current item status"
+        }
+      },
+      {
+        "id": "learned_ab93f487c37845",
+        "template_id": "ct_8c6be476639b1e",
+        "obligation_id": "obl_fc75d069c7c0a9",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Any concrete refund amount, fee, or refund method stated for this cancellation must be supported by current authoritative evidence.",
+        "source": "completion_template:ct_8c6be476639b1e",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "Agent is about to give specific refund details for a cancellation outcome.",
+        "required_evidence": [
+          "Current cancellation result and/or policy-grounded order facts supporting the stated details"
+        ],
+        "discharge": "Any specific amount or method stated is traceable to current authoritative evidence; otherwise it remains unstated.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requests cancellation"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy supports $10 intercept fee per item for in-transit orders"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview includes cancellation_fee 20 and refund_amount 274 but no executed result or refund method"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy supports $10 intercept fee per item for in-transit orders"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview includes cancellation_fee 20 and refund_amount 274"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states the same fee and refund figures supported by policy-backed status and preview evidence"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order evidence supports two shipped items"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant states $10 fee per item, $20 total fee, and $274 refund consistent with policy-backed status and preview evidence"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy states $10 intercept fee per item for in-transit orders and split-payment rule exists"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview supports $20 cancellation fee and $274 refund before execution"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed cancellation result supports $20 fee, $274 refund, and refund_method credit_card"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated $10 fee per item and $274 refund"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant restated $10 fee per item, $20 total fee, and $274 refund"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy states $10 intercept fee per item for in-transit orders"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states $10 fee per item and $274 refund consistent with policy-backed status and preview evidence"
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant restates $10 fee per item, $20 total fee, and $274 refund"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Completed cancellation result supports $20 fee, $274 refund, and refund_method credit_card"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states $274 refund to credit card with $20 fee accounted for"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_refund_exactness_before_confirmation",
+          "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+        }
+      },
+      {
+        "id": "learned_afb8fca2c471bb",
+        "template_id": "ct_30fa76709ee736",
+        "obligation_id": "obl_81585604d782cb",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Explain why the current side of the boundary produces the stated consequence, rather than giving the fee or eligibility result without the governing rationale.",
+        "source": "completion_template:ct_30fa76709ee736",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The assistant is about to state a concrete cancellation cost, refundability, or eligibility outcome that depends on shipment/timing status.",
+        "required_evidence": [
+          "current-side status",
+          "policy rule connecting that status to the consequence"
+        ],
+        "discharge": "The response states the current-side reason in plain language, grounded in policy.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Current status is shipped/in transit"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy rule says in-transit orders incur a $10 intercept fee per item"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explains that since the order is already in transit, it can still be cancelled but with the intercept fee"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order items are shipped"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy connects in-transit status to a $10 intercept fee per item"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explains that because the order is already in transit, cancellation still has a $10 intercept fee per item"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order items are in shipped state"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says in-transit orders incur a $10 intercept fee per item"
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explains that because the order is already in transit, cancellation is still possible but incurs the fee"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "shipment_boundary_fee_disclosure",
+          "title": "Resolve shipment-status boundary before stating cancellation cost or outcome"
+        }
+      },
+      {
+        "id": "learned_b45a4e23e637f9",
+        "template_id": "ct_c8e178f06fcd6a",
+        "obligation_id": "obl_14e1262687a588",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "Before closing, report the exact total cancellation fee and exact total refund for the final requested scope, not only the last item processed.",
+        "source": "completion_template:ct_c8e178f06fcd6a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "At least one cancellation in the requested scope is finalized or the user asks for final totals.",
+        "required_evidence": [
+          "finalized or verified amounts for each affected item in scope",
+          "the summed total fee and summed total refund for that scope"
+        ],
+        "discharge": "The closing message includes the exact total fee and exact total refund for the full scope requested by the user.",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant communicates $20 total fee and $274 refund for the full order scope"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview provides cancellation_fee 20 and refund_amount 274 for both items"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "aggregate_order_cancellation_totals",
+          "title": "Provide complete totals across the requested cancellation scope"
+        }
+      },
+      {
+        "id": "learned_f4dfff76e613a2",
+        "template_id": "ct_d3493de6078549",
+        "obligation_id": "obl_caaac63d00b874",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "report the exact grounded aggregate total and, when applicable, the distribution across original payment methods or item groups",
+        "source": "completion_template:ct_d3493de6078549",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "the authoritative result includes a total plus per-entity allocation",
+        "required_evidence": [
+          "authoritative total",
+          "allocation/split details"
+        ],
+        "discharge": "the final communication states the total and its split/aggregate only as supported by evidence",
+        "scope_key": "order_ord-6003",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says refund is distributed proportionally to original payment methods"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Preview provides only total refund_amount 274, with no payment-method allocation"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Policy says split-payment refunds are distributed proportionally to original payment methods"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed cancellation result provides total refund 274 and refund_method credit_card"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Completed cancellation result provides total refund 274 and refund_method credit_card"
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant communicates the exact $274 refund and destination credit card"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_item_refund_and_cancellation_all_entities",
+          "title": "All linked items or payment sources must be accounted for"
+        }
+      },
+      {
+        "id": "runtime_7504f7995df6ad",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The cancel_order operation completed successfully.",
+        "source": "tool:cancel_order:3",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "assistant_index": 5,
+            "tool": "cancel_order",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_cancelled\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"refund_amount\": 274, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "confirm": true,
+            "order_id": "ORD-6003",
+            "item_ids": [
+              "ITEM-9020",
+              "ITEM-9021"
+            ]
+          },
+          "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+          "preview_sequence": 3,
+          "assistant_index": 5
+        }
+      },
+      {
+        "id": "runtime_978faff30b4ac3",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The cancel_order operation completed successfully.",
+        "source": "tool:cancel_order:4",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "assistant_index": 6,
+            "tool": "cancel_order",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_cancelled\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"refund_amount\": 274, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "confirm": true,
+            "order_id": "ORD-6003",
+            "item_ids": [
+              "ITEM-9020",
+              "ITEM-9021"
+            ]
+          },
+          "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+          "preview_sequence": 4,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_ba49209469bb5c",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The previewed cancel_order operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+        "source": "tool:cancel_order:4",
+        "status": "awaiting_confirmation",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "assistant_index": 5,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "assistant_index": 6,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 2,
+            "assistant_index": 1,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-6003"
+          },
+          "action_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+          "preview_sequence": 2,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_dc939614e70f4a",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed cancel_order operation.",
+        "source": "tool:cancel_order:4",
+        "status": "pending",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "assistant_index": 5,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-6003"
+          },
+          "action_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+          "preview_sequence": 4,
+          "assistant_index": 5
+        }
+      }
+    ],
+    "final_open_items": [
+      "runtime_ba49209469bb5c",
+      "runtime_dc939614e70f4a"
+    ],
+    "final_satisfied_items": [
+      "learned_0858a6e9f53cbf",
+      "learned_1ebcec839630ea",
+      "learned_308f58f06fc4fe",
+      "learned_3eeddb1cf10264",
+      "learned_510f5dde1fa05f",
+      "learned_54eb27f06ad95c",
+      "learned_5d1fd2b80907f2",
+      "learned_5e7cc1a9d70728",
+      "learned_6efe320e7c16a5",
+      "learned_8425c19c78b2c6",
+      "learned_98b3a059e52f63",
+      "learned_ab93f487c37845",
+      "learned_afb8fca2c471bb",
+      "learned_b45a4e23e637f9",
+      "learned_f4dfff76e613a2",
+      "runtime_7504f7995df6ad",
+      "runtime_978faff30b4ac3"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 1,
+      "invalidated": 0,
+      "pending": 1,
+      "pending_evidence": 0,
+      "satisfied": 17,
+      "violated": 0
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5d1fd2b80907f2",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_0ffca9c9019e35",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "any relevant action result is non-final or failed",
+          "required_evidence": [
+            "a successful final state for the requested action, not merely a preview or attempted confirmation"
+          ],
+          "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel order ORD-6003"
+            }
+          ],
+          "missing_evidence": [
+            "Any authoritative action/result for cancellation status of order ORD-6003",
+            "If communicated, assistant wording that clearly keeps cancellation uncompleted until execution succeeds"
+          ],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_3eeddb1cf10264",
+          "template_id": "ct_a5bc0ddea0bacd",
+          "obligation_id": "obl_be7b75ec4ed5ed",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating that all requested issues are handled, have authoritative state for each requested order or item showing the correct eligible outcome for that specific entity.",
+          "source": "completion_template:ct_a5bc0ddea0bacd",
+          "status": "pending",
+          "priority": 1,
+          "activation": "more than one requested order or item is in scope",
+          "required_evidence": [
+            "authoritative order or item state for every requested entity",
+            "policy-backed eligibility for the requested disposition on each entity"
+          ],
+          "discharge": "each requested entity has grounded state supporting the stated disposition, or any unresolved entity is explicitly called out as not completed",
+          "scope_key": "order_ord-6003_items",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User names two items in one cancellation request: headphones and USB hub"
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative order/item state for the headphones",
+            "Authoritative order/item state for the USB hub",
+            "Eligibility or disposition evidence for each requested item if handled separately"
+          ],
+          "scope": {
+            "family": "multi_request_per_item_resolution_and_status",
+            "title": "Resolve and report each requested item separately in a multi-issue support request"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_98b3a059e52f63",
+          "template_id": "ct_947d9cc0d6a2b1",
+          "obligation_id": "obl_3063c88a9168cc",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "Because cancellation depends on whether the items are before or past the shipment boundary, compare current item status to the pre-shipment cancellation boundary and disclose the consequence of being shipped.",
+          "source": "completion_template:ct_947d9cc0d6a2b1",
+          "status": "pending",
+          "priority": 50,
+          "activation": "latent boundary transition signal is present or shipment timing matters",
+          "required_evidence": [
+            "current status",
+            "threshold policy consequence from authoritative evidence"
+          ],
+          "discharge": "comparison shows whether the item is before or past the cancellation boundary and what that means",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel the order"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Both items in ORD-6003 have item_status 'shipped'"
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative policy consequence for cancellation once an item is shipped",
+            "Assistant disclosure comparing current shipped status to the cancellation boundary and explaining the consequence"
+          ],
+          "scope": {
+            "family": "pre_shipment_cancellation_boundary",
+            "title": "free cancellation requires pre-shipment evidence and current item status"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_54eb27f06ad95c",
+          "template_id": "ct_947d9cc0d6a2b1",
+          "obligation_id": "obl_da4c8a3ea553a8",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Ground the free-cancellation claim in the item’s current status, not just the user’s description; if status is ambiguous, keep the requirement open.",
+          "source": "completion_template:ct_947d9cc0d6a2b1",
+          "status": "pending",
+          "priority": 50,
+          "activation": "a fee-free cancellation outcome is being considered",
+          "required_evidence": [
+            "authoritative item status",
+            "policy for pre-shipment cancellation"
+          ],
+          "discharge": "status and policy together support the no-fee cancellation boundary",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requests cancellation"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Authoritative item status shows both requested items are shipped"
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative pre-shipment cancellation policy",
+            "Any assistant communication grounding a no-fee or not-available cancellation outcome in status plus policy"
+          ],
+          "scope": {
+            "family": "pre_shipment_cancellation_boundary",
+            "title": "free cancellation requires pre-shipment evidence and current item status"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8425c19c78b2c6",
+          "template_id": "ct_30fa76709ee736",
+          "obligation_id": "obl_012bf78755e82b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before claiming a cancellation fee, eligibility, or likely outcome, establish which side of the relevant fulfillment or timing boundary currently applies to the targeted item(s).",
+          "source": "completion_template:ct_30fa76709ee736",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A policy or order state shows different consequences on different sides of a shipment/timing boundary.",
+          "required_evidence": [
+            "current authoritative item/order status or timing state",
+            "applicable policy text for each relevant boundary side"
+          ],
+          "discharge": "The response ties the claimed current consequence to verified current-side status under the governing policy.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel order ORD-6003"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Both targeted items currently show shipped status"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Cancellation policy distinguishes pre_shipment, in_transit, delivered, and partial outcomes"
+            }
+          ],
+          "missing_evidence": [
+            "Evidence resolving how the current shipped status maps to the relevant policy boundary side",
+            "Any assistant communication tying a claimed consequence to the verified current-side status under policy"
+          ],
+          "scope": {
+            "family": "shipment_boundary_fee_disclosure",
+            "title": "Resolve shipment-status boundary before stating cancellation cost or outcome"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_ba49209469bb5c",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed cancel_order operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:cancel_order:4",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 4,
+              "assistant_index": 5,
+              "tool": "cancel_order",
+              "status": "preview",
+              "success": true,
+              "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-6003"
+            },
+            "action_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+            "preview_sequence": 4,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_dc939614e70f4a",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed cancel_order operation.",
+          "source": "tool:cancel_order:4",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 4,
+              "assistant_index": 5,
+              "tool": "cancel_order",
+              "status": "preview",
+              "success": true,
+              "result": "{\"cancellation_fee\": 20, \"items_to_cancel\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"reason\": \"In-transit cancellation — $10 intercept fee per item\", \"refund_amount\": 274, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-6003"
+            },
+            "action_key": "[\"cancel_order\", {\"order_id\": \"ORD-6003\"}]",
+            "preview_sequence": 4,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 7,
+        "event": "preview_refreshed",
+        "item_id": "runtime_ba49209469bb5c",
+        "tool": "cancel_order",
+        "sequence": 5
+      },
+      {
+        "index": 8,
+        "event": "transition",
+        "item_id": "learned_8425c19c78b2c6",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5e7cc1a9d70728",
+          "template_id": "ct_8c6be476639b1e",
+          "obligation_id": "obl_4209dfd8e9bf62",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "Before stating that the order was cancelled, the cancellation must actually be in a completed state rather than only previewed.",
+          "source": "completion_template:ct_8c6be476639b1e",
+          "status": "pending",
+          "priority": 1,
+          "activation": "Agent is about to say the order was cancelled.",
+          "required_evidence": [
+            "Authoritative post-action state showing cancellation completed"
+          ],
+          "discharge": "A completed cancellation state exists and supports the success claim.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel the order"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "cancel_order returned status preview"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "repeat cancel_order returned status preview"
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative post-action state showing cancellation completed"
+          ],
+          "scope": {
+            "family": "cancellation_refund_exactness_before_confirmation",
+            "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ab93f487c37845",
+          "template_id": "ct_8c6be476639b1e",
+          "obligation_id": "obl_fc75d069c7c0a9",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Do not state a concrete refund amount, fee, or refund method for the cancellation unless supported by current authoritative cancellation or policy-backed order evidence.",
+          "source": "completion_template:ct_8c6be476639b1e",
+          "status": "pending",
+          "priority": 3,
+          "activation": "Agent is about to give specific refund details for a cancellation outcome.",
+          "required_evidence": [
+            "Current cancellation result and/or policy-grounded order facts supporting the stated details"
+          ],
+          "discharge": "Any specific amount or method stated is traceable to current authoritative evidence; otherwise it remains unstated.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User requests cancellation"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Policy supports $10 intercept fee per item for in-transit orders"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Preview includes cancellation_fee 20 and refund_amount 274 but no executed result or refund method"
+            }
+          ],
+          "missing_evidence": [
+            "Any assistant communication stating specific refund or fee details",
+            "Current authoritative cancellation result or policy-backed order facts supporting any stated refund method or exact finalized refund details"
+          ],
+          "scope": {
+            "family": "cancellation_refund_exactness_before_confirmation",
+            "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1ebcec839630ea",
+          "template_id": "ct_d3493de6078549",
+          "obligation_id": "obl_feb186746fed16",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "Any completion claim must account for every relevant item or payment source that affects the cancellation or refund outcome.",
+          "source": "completion_template:ct_d3493de6078549",
+          "status": "pending",
+          "priority": 50,
+          "activation": "more than one item, line, or payment source is involved",
+          "required_evidence": [
+            "full item list or group status",
+            "refund or cancellation mapping by entity"
+          ],
+          "discharge": "the response explicitly covers all affected entities or states why only a subset is affected",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "Order includes two requested items"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Two items are present in the order"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Preview identifies both items to cancel"
+            }
+          ],
+          "missing_evidence": [
+            "Any assistant communication explicitly covering all affected entities or stating why only a subset is affected",
+            "Refund or cancellation mapping by payment source if such allocation becomes part of the final result"
+          ],
+          "scope": {
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "title": "All linked items or payment sources must be accounted for"
+          }
+        }
+      },
+      {
+        "index": 12,
+        "event": "preview_refreshed",
+        "item_id": "runtime_ba49209469bb5c",
+        "tool": "cancel_order",
+        "sequence": 2
+      },
+      {
+        "index": 13,
+        "event": "transition",
+        "item_id": "learned_1ebcec839630ea",
+        "previous": "pending",
+        "status": "pending_evidence",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 14,
+        "event": "transition",
+        "item_id": "learned_3eeddb1cf10264",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 15,
+        "event": "transition",
+        "item_id": "learned_54eb27f06ad95c",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 16,
+        "event": "transition",
+        "item_id": "learned_5d1fd2b80907f2",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 17,
+        "event": "transition",
+        "item_id": "learned_8425c19c78b2c6",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 18,
+        "event": "transition",
+        "item_id": "learned_98b3a059e52f63",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 19,
+        "event": "item_created",
+        "item": {
+          "id": "learned_afb8fca2c471bb",
+          "template_id": "ct_30fa76709ee736",
+          "obligation_id": "obl_81585604d782cb",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Explain why the current side of the boundary produces the stated consequence, rather than giving the fee or eligibility result without the governing rationale.",
+          "source": "completion_template:ct_30fa76709ee736",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "The assistant is about to state a concrete cancellation cost, refundability, or eligibility outcome that depends on shipment/timing status.",
+          "required_evidence": [
+            "current-side status",
+            "policy rule connecting that status to the consequence"
+          ],
+          "discharge": "The response states the current-side reason in plain language, grounded in policy.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Current status is shipped/in transit"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Policy rule says in-transit orders incur a $10 intercept fee per item"
+            },
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant explains that since the order is already in transit, it can still be cancelled but with the intercept fee"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "shipment_boundary_fee_disclosure",
+            "title": "Resolve shipment-status boundary before stating cancellation cost or outcome"
+          }
+        }
+      },
+      {
+        "index": 20,
+        "event": "item_created",
+        "item": {
+          "id": "learned_0858a6e9f53cbf",
+          "template_id": "ct_4381c3af064dc2",
+          "obligation_id": "obl_d90f2b688a20c0",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Before stating a concrete action outcome or eligibility, identify the item's current side of the relevant policy boundary and explain why that boundary determines the available path or current consequence.",
+          "source": "completion_template:ct_4381c3af064dc2",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "Observable status or timing shows the item is currently before or after a policy-changing threshold.",
+          "required_evidence": [
+            "current authoritative item status or timing",
+            "the policy rule that changes the allowed outcome across that boundary"
+          ],
+          "discharge": "The response explicitly ties the current status side to the currently valid treatment, fee, or ineligibility.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Current authoritative item status is shipped"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Policy changes cancellation consequence after shipment to in-transit fee treatment"
+            },
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant identifies the order as already in transit and explains that this is why cancellation still exists but with a fee"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "shipping_status_boundary_with_next_consequence",
+            "title": "Ground cancellation/return advice on the current fulfillment boundary and next consequence"
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": "item_created",
+        "item": {
+          "id": "learned_308f58f06fc4fe",
+          "template_id": "ct_c8e178f06fcd6a",
+          "obligation_id": "obl_66dc0e3b6bc120",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "When the user's target scope is the whole order or another multi-item group, compute and distinguish the item-level amounts and the aggregate totals for all items in scope, including any already-cancelled subset where relevant to the stated total.",
+          "source": "completion_template:ct_c8e178f06fcd6a",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "The requested outcome spans multiple related items or mixes already-finalized and still-pending items.",
+          "required_evidence": [
+            "the full set of items in scope and their statuses",
+            "exact fee and refund amount for each applicable item or subset",
+            "the resulting aggregate totals for the user's requested scope"
+          ],
+          "discharge": "The response clearly states the complete totals for the requested scope and how they relate to any individual item amounts.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant states $10 intercept fee per item and a combined refund for both items"
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant confirms both items, $10 fee per item, $20 total fee, and $274 refund"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order contains two items"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Preview covers both items with cancellation_fee 20 and refund_amount 274"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "aggregate_order_cancellation_totals",
+            "title": "Provide complete totals across the requested cancellation scope"
+          }
+        }
+      },
+      {
+        "index": 22,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b45a4e23e637f9",
+          "template_id": "ct_c8e178f06fcd6a",
+          "obligation_id": "obl_14e1262687a588",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "Before closing, report the exact total cancellation fee and exact total refund for the final requested scope, not only the last item processed.",
+          "source": "completion_template:ct_c8e178f06fcd6a",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "At least one cancellation in the requested scope is finalized or the user asks for final totals.",
+          "required_evidence": [
+            "finalized or verified amounts for each affected item in scope",
+            "the summed total fee and summed total refund for that scope"
+          ],
+          "discharge": "The closing message includes the exact total fee and exact total refund for the full scope requested by the user.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant communicates $20 total fee and $274 refund for the full order scope"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Preview provides cancellation_fee 20 and refund_amount 274 for both items"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "aggregate_order_cancellation_totals",
+            "title": "Provide complete totals across the requested cancellation scope"
+          }
+        }
+      },
+      {
+        "index": 23,
+        "event": "item_created",
+        "item": {
+          "id": "learned_f4dfff76e613a2",
+          "template_id": "ct_d3493de6078549",
+          "obligation_id": "obl_caaac63d00b874",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "report the exact grounded aggregate total and, when applicable, the distribution across original payment methods or item groups",
+          "source": "completion_template:ct_d3493de6078549",
+          "status": "pending_evidence",
+          "priority": 50,
+          "activation": "the authoritative result includes a total plus per-entity allocation",
+          "required_evidence": [
+            "authoritative total",
+            "allocation/split details"
+          ],
+          "discharge": "the final communication states the total and its split/aggregate only as supported by evidence",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Policy says refund is distributed proportionally to original payment methods"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Preview provides only total refund_amount 274, with no payment-method allocation"
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative cancellation result or order evidence showing whether refund allocation by original payment method applies and, if so, the exact split"
+          ],
+          "scope": {
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "title": "All linked items or payment sources must be accounted for"
+          }
+        }
+      },
+      {
+        "index": 24,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_7504f7995df6ad",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The cancel_order operation completed successfully.",
+          "source": "tool:cancel_order:3",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 3,
+              "assistant_index": 5,
+              "tool": "cancel_order",
+              "status": "cancelled",
+              "success": true,
+              "result": "{\"cancellation_fee\": 20, \"items_cancelled\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"refund_amount\": 274, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "confirm": true,
+              "order_id": "ORD-6003",
+              "item_ids": [
+                "ITEM-9020",
+                "ITEM-9021"
+              ]
+            },
+            "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+            "preview_sequence": 3,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 25,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_978faff30b4ac3",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The cancel_order operation completed successfully.",
+          "source": "tool:cancel_order:4",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 4,
+              "assistant_index": 6,
+              "tool": "cancel_order",
+              "status": "cancelled",
+              "success": true,
+              "result": "{\"cancellation_fee\": 20, \"items_cancelled\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\", \"refund_amount\": 274, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "confirm": true,
+              "order_id": "ORD-6003",
+              "item_ids": [
+                "ITEM-9020",
+                "ITEM-9021"
+              ]
+            },
+            "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-9020\", \"ITEM-9021\"], \"order_id\": \"ORD-6003\"}]",
+            "preview_sequence": 4,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 26,
+        "event": "transition",
+        "item_id": "learned_5e7cc1a9d70728",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 27,
+        "event": "item_created",
+        "item": {
+          "id": "learned_510f5dde1fa05f",
+          "template_id": "ct_8c6be476639b1e",
+          "obligation_id": "obl_b3d1df1cfe81f8",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "When a cancellation has completed and the authoritative result provides a refund, report the exact refund amount and refund destination from current authoritative evidence rather than a generic promise.",
+          "source": "completion_template:ct_8c6be476639b1e",
+          "status": "pending",
+          "priority": 2,
+          "activation": "Completed cancellation result includes refund details.",
+          "required_evidence": [
+            "Completed cancellation result with exact refund amount",
+            "Completed cancellation result with refund method or destination"
+          ],
+          "discharge": "The final response includes the exact grounded refund amount and where it will be refunded.",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Completed cancellation result includes refund_amount 274 and refund_method credit_card"
+            }
+          ],
+          "missing_evidence": [
+            "Assistant final message communicating the exact $274 refund and refund destination credit_card"
+          ],
+          "scope": {
+            "family": "cancellation_refund_exactness_before_confirmation",
+            "title": "Pre-shipment cancellation must be executed and reported with exact grounded refund details"
+          }
+        }
+      },
+      {
+        "index": 28,
+        "event": "transition",
+        "item_id": "learned_1ebcec839630ea",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 29,
+        "event": "transition",
+        "item_id": "learned_510f5dde1fa05f",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 30,
+        "event": "transition",
+        "item_id": "learned_5d1fd2b80907f2",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 31,
+        "event": "transition",
+        "item_id": "learned_ab93f487c37845",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 32,
+        "event": "transition",
+        "item_id": "learned_f4dfff76e613a2",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 33,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6efe320e7c16a5",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_40d3c12e070194",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+          "required_evidence": [
+            "final executed status for each claimed change"
+          ],
+          "discharge": "authoritative results show the claimed state change completed for each affected entity",
+          "scope_key": "order_ord-6003",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Final executed status shows both items cancelled on ORD-6003"
+            },
+            {
+              "kind": "message",
+              "ref": "M5",
+              "detail": "Assistant reports the completed cancellation after executed result"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "394b455d5781532b5502efd14953a375b133ce89875ad11f3164dc30c6fc164e",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore.",
+        "candidates": [
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 22.3686
+          },
+          {
+            "id": "ct_3c54ead3829ceb",
+            "family": "account_linked_benefit_resolution_before_total",
+            "score": 17.937032
+          },
+          {
+            "id": "ct_d383aea2f08334",
+            "family": "return_window_boundary_consequence_disclosure",
+            "score": 18.78583
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 11.308262
+          },
+          {
+            "id": "ct_a5bc0ddea0bacd",
+            "family": "multi_request_per_item_resolution_and_status",
+            "score": 20.500683
+          },
+          {
+            "id": "ct_3393c76e9f3ae9",
+            "family": "benefit_and_threshold_effects_must_be_resolved_and_disclosed",
+            "score": 19.506931
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 14.847734
+          },
+          {
+            "id": "ct_0250b31d92d99e",
+            "family": "irreversible_claim_filing_confirmation",
+            "score": 11.676698
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "36db6f4ac15ae52829f208b71ecb8a4b0762418cceb7e02ecfff5d2b399340ae",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. get_order order_id ORD-6003 customer_id cust_004 order_date 2026-06-10T10:00:00 status shipped shipping_status in_transit shipping_method standard shipping_cost tracking_number TRK85673961 delivery_date delivery_promised_date 2026-06-14T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-9020 order_id ORD-6003 product_id PROD-2020 quantity uni...",
+        "candidates": [
+          {
+            "id": "ct_3393c76e9f3ae9",
+            "family": "benefit_and_threshold_effects_must_be_resolved_and_disclosed",
+            "score": 29.147575
+          },
+          {
+            "id": "ct_19f6e62fc0aeef",
+            "family": "threshold_or_relation_adjustment_disclosure",
+            "score": 28.814815
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 28.206182
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 20.490112
+          },
+          {
+            "id": "ct_87d91d0ebc0f42",
+            "family": "return_threshold_clawback_boundary_disclosure",
+            "score": 25.62235
+          },
+          {
+            "id": "ct_f17ce188ff16c0",
+            "family": "multi_item_bundle_condition_resolution",
+            "score": 26.386922
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 26.376532
+          },
+          {
+            "id": "ct_aece14ec297318",
+            "family": "exchange_policy_grounding_and_difference_resolution",
+            "score": 25.733278
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "e93bfc272c825bac850f90b7dc1b073e0a48fdea5affee1a4dd5e7eb21477d0f",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. get_order order_id ORD-6003 customer_id cust_004 order_date 2026-06-10T10:00:00 status shipped shipping_status in_transit shipping_method standard shipping_cost tracking_number TRK85673961 delivery_date delivery_promised_date 2026-06-14T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-9020 order_id ORD-6003 product_id PROD-2020 quantity uni...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 110.986384
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 97.790687
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 73.484883
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 95.722621
+          },
+          {
+            "id": "ct_8c6be476639b1e",
+            "family": "cancellation_refund_exactness_before_confirmation",
+            "score": 66.582873
+          },
+          {
+            "id": "ct_d3493de6078549",
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "score": 70.116646
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 69.997301
+          },
+          {
+            "id": "ct_f462765a53c60b",
+            "family": "already_resolved_state_reporting",
+            "score": 69.152774
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "5af5820c378652f2e00e6757e0e1670ae4d4df3eea518438532be0c09134e9a3",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. get_order order_id ORD-6003 customer_id cust_004 order_date 2026-06-10T10:00:00 status shipped shipping_status in_transit shipping_method standard shipping_cost tracking_number TRK85673961 delivery_date delivery_promised_date 2026-06-14T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-9020 order_id ORD-6003 product_id PROD-2020 quantity uni...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 110.940084
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 102.214911
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 77.948029
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 100.30657
+          },
+          {
+            "id": "ct_8c6be476639b1e",
+            "family": "cancellation_refund_exactness_before_confirmation",
+            "score": 71.4683
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 76.57497
+          },
+          {
+            "id": "ct_d3493de6078549",
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "score": 74.983033
+          },
+          {
+            "id": "ct_cf4a2891c8cfa6",
+            "family": "boundary_transition_cancellation_window",
+            "score": 92.332429
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "c027a450ed8e8b0d366821c6da2099fa93e7c09d4909fd96a04407d2c22f2543",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. Thanks. Just to confirm before you do it: that’s both the headphones and the USB hub on ORD-6003, with a $10 fee per item, $20 total fee, and a $274 refund, right? I checked your order, and since it’s already in transit I can still cancel it, but there’s a $10 intercept fee per item. For both items together, the total refund would be $274. If you want, I can go ahead and cancel the full order now. get_order order_id ORD-6003 customer_id cust_004 order_date 2026-06-10T10:00:00 status shipped...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 116.026393
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 92.816139
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 74.368037
+          },
+          {
+            "id": "ct_f462765a53c60b",
+            "family": "already_resolved_state_reporting",
+            "score": 76.149445
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 76.308887
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 82.86889
+          },
+          {
+            "id": "ct_d3493de6078549",
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "score": 72.158117
+          },
+          {
+            "id": "ct_4381c3af064dc2",
+            "family": "shipping_status_boundary_with_next_consequence",
+            "score": 92.027419
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "6e2d6d84b29f70a4a0b8db80282d9ffc9d113266400bd85d3b0c76cb84a6ad7d",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. Thanks. Just to confirm before you do it: that’s both the headphones and the USB hub on ORD-6003, with a $10 fee per item, $20 total fee, and a $274 refund, right? Yes, please cancel it. I checked your order, and since it’s already in transit I can still cancel it, but there’s a $10 intercept fee per item. For both items together, the total refund would be $274. If you want, I can go ahead and cancel the full order now. Yes, that’s correct: both the headphones and the USB hub on ORD-6003, a...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 119.544611
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 92.769975
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 77.18654
+          },
+          {
+            "id": "ct_f462765a53c60b",
+            "family": "already_resolved_state_reporting",
+            "score": 79.630358
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 82.546968
+          },
+          {
+            "id": "ct_4381c3af064dc2",
+            "family": "shipping_status_boundary_with_next_consequence",
+            "score": 98.529578
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 82.826368
+          },
+          {
+            "id": "ct_c8e178f06fcd6a",
+            "family": "aggregate_order_cancellation_totals",
+            "score": 73.531375
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "c36bbe08ffda614a0377951d4a2d452ff154fc9b2f38dfe459d6a3b62f725674",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. Thanks. Just to confirm before you do it: that’s both the headphones and the USB hub on ORD-6003, with a $10 fee per item, $20 total fee, and a $274 refund, right? Yes, please cancel it. I checked your order, and since it’s already in transit I can still cancel it, but there’s a $10 intercept fee per item. For both items together, the total refund would be $274. If you want, I can go ahead and cancel the full order now. Yes, that’s correct: both the headphones and the USB hub on ORD-6003, a...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 119.537952
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 94.593153
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 79.023507
+          },
+          {
+            "id": "ct_a5bc0ddea0bacd",
+            "family": "multi_request_per_item_resolution_and_status",
+            "score": 80.561245
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 83.781745
+          },
+          {
+            "id": "ct_4381c3af064dc2",
+            "family": "shipping_status_boundary_with_next_consequence",
+            "score": 100.380206
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 84.734445
+          },
+          {
+            "id": "ct_c8e178f06fcd6a",
+            "family": "aggregate_order_cancellation_totals",
+            "score": 75.632828
+          }
+        ]
+      },
+      {
+        "index": 7,
+        "query_sha256": "801ac5769f9debb1dc11124a19a46a818012748b48145db223d17667aad232d7",
+        "query_preview": "I need to cancel my order ORD-6003. I ordered headphones and a USB hub but I don't need them anymore. Thanks. Just to confirm before you do it: that’s both the headphones and the USB hub on ORD-6003, with a $10 fee per item, $20 total fee, and a $274 refund, right? Yes, please cancel it. I checked your order, and since it’s already in transit I can still cancel it, but there’s a $10 intercept fee per item. For both items together, the total refund would be $274. If you want, I can go ahead and cancel the full order now. Yes, that’s correct: both the headphones and the USB hub on ORD-6003, a...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 121.692699
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 104.760695
+          },
+          {
+            "id": "ct_30fa76709ee736",
+            "family": "shipment_boundary_fee_disclosure",
+            "score": 80.276257
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 85.602502
+          },
+          {
+            "id": "ct_d3493de6078549",
+            "family": "multi_item_refund_and_cancellation_all_entities",
+            "score": 86.408073
+          },
+          {
+            "id": "ct_a5bc0ddea0bacd",
+            "family": "multi_request_per_item_resolution_and_status",
+            "score": 85.699927
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 84.634057
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 89.430751
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "5e287b6bc400828dbe0697ea1d5407a491807358e4679b0419765e3170825d80",
+        "candidate_ids": [
+          "ct_15a009f16ad57c",
+          "ct_3c54ead3829ceb",
+          "ct_d383aea2f08334",
+          "ct_a9abbdaf2ef046",
+          "ct_a5bc0ddea0bacd",
+          "ct_3393c76e9f3ae9",
+          "ct_7a4b6afc158086",
+          "ct_0250b31d92d99e"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 5953,
+          "output_tokens": 318
+        },
+        "response_sha256": "254bf2f893105d5f4ddfc39e039ec36d8126815f4293c16bbc9e85185789822b",
+        "returned_items": 2
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "33480274291a441f746dd3d39bbef6b7f99e139295f239a9824325704a2541db",
+        "candidate_ids": [
+          "ct_3393c76e9f3ae9",
+          "ct_19f6e62fc0aeef",
+          "ct_947d9cc0d6a2b1",
+          "ct_0b1e20f93fcff9",
+          "ct_87d91d0ebc0f42",
+          "ct_f17ce188ff16c0",
+          "ct_c199d66bf695ff",
+          "ct_aece14ec297318",
+          "ct_a5bc0ddea0bacd",
+          "ct_15a009f16ad57c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6858,
+          "output_tokens": 705
+        },
+        "response_sha256": "624e696cdaa83259d799965caf1a81a96f6b1817695ccfa887610a3fdc9f9e80",
+        "returned_items": 4
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "1ac5aaf6df9984cfbc72c86805c504e78f080196c2a05306a688755b2eb487e1",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_947d9cc0d6a2b1",
+          "ct_8c6be476639b1e",
+          "ct_d3493de6078549",
+          "ct_7a4b6afc158086",
+          "ct_f462765a53c60b",
+          "ct_a5bc0ddea0bacd",
+          "ct_15a009f16ad57c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8778,
+          "output_tokens": 1002
+        },
+        "response_sha256": "ce43a99dfd530733c2ad2032f4a05d2a0b00cf849ed8d6a211d702e779fe7a53",
+        "returned_items": 5
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "e67b399444702916f04b0ffbf221722864fdcec0fade83a5bbb27b57a9a33597",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_947d9cc0d6a2b1",
+          "ct_8c6be476639b1e",
+          "ct_7a4b6afc158086",
+          "ct_d3493de6078549",
+          "ct_cf4a2891c8cfa6",
+          "ct_a5bc0ddea0bacd",
+          "ct_15a009f16ad57c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9741,
+          "output_tokens": 1528
+        },
+        "response_sha256": "455d91b39237a6aee57c7d6561c140f03bfa9f0af17cc827029610540b795238",
+        "returned_items": 8
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "185bc5d0b4f69b98ce4b526677b849a82699e5fe33debdf5a9b1c736ac422c8b",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_f462765a53c60b",
+          "ct_7a4b6afc158086",
+          "ct_947d9cc0d6a2b1",
+          "ct_d3493de6078549",
+          "ct_4381c3af064dc2",
+          "ct_15a009f16ad57c",
+          "ct_a5bc0ddea0bacd",
+          "ct_8c6be476639b1e"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10178,
+          "output_tokens": 1614
+        },
+        "response_sha256": "584593632b46a5c3ba11806a4dcde18a5ffcfb332b38a2520e1f30564381b104",
+        "returned_items": 10
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "7dbe72f148d9f44fc6ec68a06685482a117c74052ece7ba6c49ffe32c873f11d",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_f462765a53c60b",
+          "ct_7a4b6afc158086",
+          "ct_4381c3af064dc2",
+          "ct_947d9cc0d6a2b1",
+          "ct_c8e178f06fcd6a",
+          "ct_8c6be476639b1e",
+          "ct_15a009f16ad57c",
+          "ct_d3493de6078549"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8856,
+          "output_tokens": 1978
+        },
+        "response_sha256": "b2c445f93055065833807643ffae8f120d41c1bfafb835179b047f30dd5809f1",
+        "returned_items": 12
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "7e963838abf731cd7f94df10af3cb03e3a76f7718ef18c29bc05308f8d339e97",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_a5bc0ddea0bacd",
+          "ct_7a4b6afc158086",
+          "ct_4381c3af064dc2",
+          "ct_947d9cc0d6a2b1",
+          "ct_c8e178f06fcd6a",
+          "ct_8c6be476639b1e",
+          "ct_15a009f16ad57c",
+          "ct_d3493de6078549"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9776,
+          "output_tokens": 1033
+        },
+        "response_sha256": "9f24663fedb0d2315e18ee77064b314e7495138424441286ebef34c120280448",
+        "returned_items": 6
+      },
+      {
+        "index": 7,
+        "input_fingerprint": "0a45f2a4686f1a692a6cddb5ef47d4d25cbbd1a8b6ce3f712f4c978e74c3a26b",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_30fa76709ee736",
+          "ct_4a4df1297027fb",
+          "ct_d3493de6078549",
+          "ct_a5bc0ddea0bacd",
+          "ct_7a4b6afc158086",
+          "ct_947d9cc0d6a2b1",
+          "ct_8c6be476639b1e",
+          "ct_15a009f16ad57c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9369,
+          "output_tokens": 1461
+        },
+        "response_sha256": "4779dcf4942f98bfb228955d0cc7d44fcd5f98ae5f586064e07afb76638e1d93",
+        "returned_items": 9
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "f13a86454c0a9e56ba32ccf05db8d45593433ddbe9c7633d961f349513acf411",
+        "exposure_signature": "1f0431002dd060e6daaf1e1fe1bdc519f324c982e6397406a26a850efdcd3353",
+        "exposed_items": [
+          "learned_5d1fd2b80907f2"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "learned_3eeddb1cf10264"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 1,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_order",
+            "arguments": {
+              "order_id": "ORD-6003"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "f13a86454c0a9e56ba32ccf05db8d45593433ddbe9c7633d961f349513acf411",
+        "exposure_signature": "1f0431002dd060e6daaf1e1fe1bdc519f324c982e6397406a26a850efdcd3353",
+        "exposed_items": [
+          "learned_5d1fd2b80907f2"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "learned_3eeddb1cf10264",
+          "learned_98b3a059e52f63",
+          "learned_54eb27f06ad95c"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 3,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "cancellation"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "986c09ff91960fd3ab948b174beee58c262444cc4219af84b2afea343843cd80",
+        "exposure_signature": "4511ac64c6455791d0fc02643c131dd945e856c39145a2aa1159a5cfc8cfb9c1",
+        "exposed_items": [
+          "learned_5d1fd2b80907f2",
+          "learned_8425c19c78b2c6"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "learned_3eeddb1cf10264",
+          "learned_98b3a059e52f63",
+          "learned_54eb27f06ad95c",
+          "learned_8425c19c78b2c6"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 3,
+          "pending_evidence": 2,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-6003"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f84de36711b37fe065ba670f0d25a406471a45e71f4be832621b4040e9c3de2d",
+        "exposure_signature": "ef952c903a1d3b43435d5c508503b0b1b778610430b7a1d7fe150daffa28c5af",
+        "exposed_items": [
+          "runtime_ba49209469bb5c",
+          "learned_5e7cc1a9d70728"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "learned_3eeddb1cf10264",
+          "learned_98b3a059e52f63",
+          "learned_54eb27f06ad95c",
+          "learned_8425c19c78b2c6",
+          "runtime_ba49209469bb5c",
+          "runtime_dc939614e70f4a",
+          "learned_5e7cc1a9d70728",
+          "learned_ab93f487c37845",
+          "learned_1ebcec839630ea"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 8,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "f84de36711b37fe065ba670f0d25a406471a45e71f4be832621b4040e9c3de2d",
+        "exposure_signature": "ef952c903a1d3b43435d5c508503b0b1b778610430b7a1d7fe150daffa28c5af",
+        "exposed_items": [
+          "runtime_ba49209469bb5c",
+          "learned_5e7cc1a9d70728"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "runtime_ba49209469bb5c",
+          "runtime_dc939614e70f4a",
+          "learned_5e7cc1a9d70728",
+          "learned_ab93f487c37845",
+          "learned_1ebcec839630ea"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 1,
+          "satisfied": 6,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "d1e47e02535583a0c14d4c209e1ba0f089901dc92b00879a0cd68777af8242f0",
+        "exposure_signature": "d3462f5649b74f83c689fec8e3411369bdd3ff2e01c1147b64a56bf86f1bc1fa",
+        "exposed_items": [
+          "runtime_ba49209469bb5c",
+          "learned_5e7cc1a9d70728"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "runtime_ba49209469bb5c",
+          "runtime_dc939614e70f4a",
+          "learned_5e7cc1a9d70728",
+          "learned_ab93f487c37845",
+          "learned_1ebcec839630ea",
+          "learned_f4dfff76e613a2"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 2,
+          "satisfied": 8,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "confirm": true,
+              "order_id": "ORD-6003",
+              "item_ids": [
+                "ITEM-9020",
+                "ITEM-9021"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 6,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "d717b9a94d1fb7b0e4752f3b2a779b3b7e7e100ef9830f489573e98eeffa4325",
+        "exposure_signature": "031d675ec41470143ce8754046b35fba534538095527302ddb651dcd5b4d9797",
+        "exposed_items": [
+          "runtime_ba49209469bb5c"
+        ],
+        "pending_items": [
+          "learned_5d1fd2b80907f2",
+          "runtime_ba49209469bb5c",
+          "runtime_dc939614e70f4a",
+          "learned_ab93f487c37845",
+          "learned_1ebcec839630ea",
+          "learned_f4dfff76e613a2",
+          "learned_510f5dde1fa05f"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 2,
+          "satisfied": 11,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 7,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 8,
+      "regenerations": 0,
+      "exposures": 7,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 4,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 3,
+      "tool_calls": 4,
+      "bookkeeper_input_tokens": 69509,
+      "bookkeeper_output_tokens": 9639,
+      "bookkeeper_total_tokens": 79148,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 94403,
+    "cached_input_tokens": 0,
+    "output_tokens": 9909,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 104312,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 94403,
+  "cached_input_tokens": 0,
+  "output_tokens": 9909,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 104312,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-9020": {
+          "item_status": {
+            "old": "shipped",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 239
+          },
+          "refund_method": {
+            "old": null,
+            "new": "credit_card"
+          }
+        },
+        "ITEM-9021": {
+          "item_status": {
+            "old": "shipped",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 35
+          },
+          "refund_method": {
+            "old": null,
+            "new": "credit_card"
+          }
+        }
+      },
+      "orders": {
+        "ORD-6003": {
+          "status": {
+            "old": "shipped",
+            "new": "cancelled"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9020",
+      "field": "item_status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9020",
+      "field": "refund_amount",
+      "expected_value": 239
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9020",
+      "field": "refund_method",
+      "expected_value": "credit_card"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9021",
+      "field": "item_status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9021",
+      "field": "refund_amount",
+      "expected_value": 35
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9021",
+      "field": "refund_method",
+      "expected_value": "credit_card"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-6003",
+      "field": "status",
+      "expected_value": "cancelled"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 4,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

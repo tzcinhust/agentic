@@ -1,0 +1,2959 @@
+{
+  "task_id": "44-compound_return_gift_exchange",
+  "user_id": "cust_003",
+  "task_summary": "**Task:** The customer wants to turn a gifted blender into store credit they can use toward a coffee maker later. The correct handling is to return the gift at the current product price and issue that value as store credit rather than sending money back to the gift buyer or another payment method.\n\n**Challenge:** Gift-return valuation and refund-method discipline both matter here. Weak agents use the original purchase price, push cash back to a card, or imply a same-flow purchase action that the support backend does not perform.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "44_compound_return_gift_exchange_agent_must_issue_69_store_credit",
+      "kind": "must",
+      "requirement": "Agent must state that the gift return is issued as $69 store credit based on the current product price (not the original $89).",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "Agent explicitly stated the gift return would be issued as $69 in store credit based on the current product price, not the original $89, and the return tool execution confirmed refund_amount 69 with refund_method store_credit."
+    },
+    {
+      "id": "44_compound_return_gift_exchange_agent_must_not_issue_extra_credit",
+      "kind": "must_not",
+      "requirement": "Agent must not issue, promise, or apply any additional refund, store credit, or purchase credit beyond the $69 gift-return store credit.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "No additional refund, store credit, or purchase credit beyond the $69 gift-return store credit was issued or promised. Conversation and tool calls only show the single $69 store-credit return."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled the gift return exactly as the user needed: it verified eligibility, previewed the outcome before any write, stated the amount as $69 store credit, and waited for explicit approval before confirming the return. It also got the valuation and refund method right for a gift return, using the current product price rather than the original purchase price or cash-to-card refund. The flow was smooth with no need for the user to correct scope or restate preferences, and the responses were concise while still covering the key decision detail. Final state changes were clearly summarized after execution.",
+  "turns": 2,
+  "tool_calls": 7,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked it, and the blender is eligible for return. Because it was a gift, the refund would be issued as **$69 in store credit**; that matches the item’s current price under gift-return policy.\n\nIf you want, I can go ahead and process the return for the blender now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-6046"
+          },
+          "result": {
+            "order_id": "ORD-6046",
+            "customer_id": "cust_003",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 8,
+            "tracking_number": "TRK91650272",
+            "delivery_date": "2026-06-03T14:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 97
+            },
+            "subtotal": 89,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 97,
+            "is_gift": true,
+            "gift_sender": "Aunt Mary",
+            "items": [
+              {
+                "item_id": "ITEM-9325",
+                "order_id": "ORD-6046",
+                "product_id": "PROD-2325",
+                "quantity": 1,
+                "unit_price": 89,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-2325",
+                  "name": "PowerBlend Pro Blender",
+                  "category": "kitchen",
+                  "price": 89,
+                  "current_price": 69,
+                  "return_window_days": 30,
+                  "warranty_months": 6,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_003"
+          },
+          "result": {
+            "customer_id": "cust_003",
+            "name": "Sarah Williams",
+            "email": "sarah.w@example.com",
+            "membership_tier": "gold",
+            "account_created": "2021-11-20",
+            "total_orders": 53,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 45,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "1.5x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "refund"
+          },
+          "result": {
+            "topic": "refund",
+            "rules": {
+              "amount": {
+                "full_refund": "Full refund for defective, wrong item, or damaged in transit.",
+                "promo_redistribution": "If a promo/coupon was used: discount allocated proportionally by item price. Refund = item_price - (discount * item_price / subtotal).",
+                "outside_window": "Outside return window but within store-credit grace: store credit only.",
+                "shipping_refund": "When refunding shipping (defective/wrong/damaged returns, 6+-days-late compensation), refund the actual shipping cost the customer was charged on the order — read order.shipping_cost and refund that amount. Standard policy: $0 on free-shipping orders (subtotal >= $100), $8 otherwise. NOT for buyer's remorse."
+              },
+              "method": {
+                "original_payment": "Default refund method when item was paid for and is being returned for fault.",
+                "store_credit": "Required for: gift returns (at current product price), outside-window grace returns, and exchange-cheaper differences.",
+                "store_credit_only_constraint": "When a return is issued under the store-credit-only rule (gift return OR outside-window grace), the refund method cannot be changed back to original_payment afterward. process_refund will reject any attempt to flip the method on those returns."
+              },
+              "price_match": "If product price drops within 7 days of delivery, refund the difference (no return required).",
+              "goodwill_credit": "Goodwill credits (e.g., fragile-item damage bonus) are issued as a refund with the credit amount."
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "gift return for store credit and possible refund method change after return for order item"
+          },
+          "result": [
+            "Workflow: Return with refund method change or supplemental refund\nUse when: Customer wants a return plus either a different refund method than the return default, or an additional separate refund after/alongside the return.\nVerify first:\n- Use get_order to identify the item and current item status.\n- Use get_policies to verify return rules and any refund-method or supplemental-refund policy.\n- If account details matter, use get_customer before mutation.\n- If the supplemental refund depends on product or warranty conditions, verify with get_product_details and/or get_warranty_status as needed.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='returns/refunds')\n3. get_customer(customer_id) if needed\n4. get_product_details(product_id) and/or get_warranty_status(item_id) if needed for separate compensation eligibility\n5. process_return(amount=<preview call>, confirm=false, item_id=<item_id>, reason=<reason>)\n6. process_return(amount=<net refund from preview>, confirm=true, item_id=<item_id>, reason=<reason>)\n7. process_refund(amount=<preview or approved supplemental amount>, confirm=false, item_id=<item_id>, refund_method=<requested_method>) if changing refund method or issuing a separate refund\n8. process_refund(amount=<approved amount>, confirm=true, item_id=<item_id>, refund_method=<requested_method>) when customer confirms\nBranches:\n- If the customer wants store credit or another method instead of the default return refund method, use process_refund after the return to preview and then apply the refund-method update when supported by the tool.\n- If the customer requests separate goodwill or other supplemental compensation, verify policy basis first, then preview and confirm the separate process_refund.\n- If process_refund preview shows zero or unsupported amount, do not promise compensation; explain the tool result and stop or reassess with additional policy reads.\n- If the user only asks whether a label, no-fee return, or extra compensation would apply, stop at preview/policy explanation without writing.\nAvoid:\n- Do not assume process_return alone can set a non-default refund method.\n- Do not issue a supplemental refund without policy/tool support.\n- Do ",
+            "Workflow: Exchange an order item for a different product variant with no refund preview/commit\nUse when: User wants an exchange rather than a refund, often for size/color/variant changes, and may explicitly ask to confirm there will be no refund or store credit before processing.\nVerify first:\n- Use get_order to verify the order exists and identify the target item and its current product.\n- Verify from the order that the item is in a status that can be exchanged under current tool outputs.\n- Use get_policies on exchange/refund rules to confirm whether exchanges require a different product and how cheaper/same-price/more-expensive exchanges are handled.\n- If the replacement product is not already known, use search_products to find a candidate replacement.\n- Use get_product_details for the original and/or candidate replacement to confirm product identity, stock, and relevant attributes such as price or return window when needed.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange_or_returns')\n3. search_products(query_for_requested_variant_or_replacement)\n4. get_product_details(product_id_of_original_or_candidate_if_needed)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If the user only wants confirmation of outcome/cost, stop after the preview process_exchange call and report the preview without committing.\n- If search results are ambiguous or include the original product, use product details to ensure the replacement is a different product when policy requires that.\n- If the preview shows same price, communicate that no charge and no refund/store credit will occur.\n- If the preview shows the replacement is cheaper, communicate that the difference is handled as store credit if policy says so; do not promise an original-payment refund unless the tool/policy says that.\n- If the preview shows the replacement is more expensive, communicate the amount the customer must pay before committing.\n- If no suitable in-stock replacement is found, return a no-write outcome and ask the user to choose from availabl",
+            "Workflow: Preview and complete exchange for a replacement product\nUse when: User wants to exchange an already ordered item for a different product or size variant, and may ask about stock, price difference, or refund method for the difference.\nVerify first:\n- Use get_order to verify the order/item exists and identify the original item and product.\n- Use get_policies to verify exchange rules, especially different-product requirement and how cheaper/more-expensive exchanges are settled.\n- If the replacement is not uniquely identified, use search_products and optionally get_product_details to find the candidate product and confirm stock/details.\n- If needed for customer-facing explanation, use get_customer to confirm preferred refund method or benefits, but do not assume it overrides policy.\nProcedure:\n1. get_order(order_id)\n2. get_policies(topic='exchange')\n3. search_products(query for requested replacement)\n4. get_product_details(product_id)\n5. process_exchange(confirm=false, item_id=<item_id>, new_product_id=<replacement_product_id>)\n6. process_exchange(confirm=true, item_id=<item_id>, new_product_id=<replacement_product_id>)\nBranches:\n- If search results are ambiguous, stop after search_products/get_product_details and ask the user to choose; do not mutate.\n- If the requested replacement is out of stock, do not force the exchange; offer fallback options supported by the preview/policy, such as return or store credit, and only proceed after user consent.\n- If the exchange preview shows a cheaper replacement, explain that the difference goes to store credit if policy says so; do not promise refund to original payment unless the tool/policy supports it.\n- If the exchange preview shows a more expensive replacement, explain the added amount the customer must pay.\n- If user only wants confirmation, provide the preview outcome and wait; do not finalize until explicit confirmation.\n- If the replacement is effectively the same product and policy disallows self-swap, do not submit an invalid exchange.\nAvoid:\n- Do not invent restock dates or stock guarantees; only report current tool output.\n- Do not convert exchange price differences into a card refund when policy says s"
+          ]
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-9325",
+            "return_eligible": true,
+            "reason": "changed_mind",
+            "refund_amount": 69,
+            "refund_method": "store_credit",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": false,
+            "shipping_refund": false,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — the **$69 is the current product price**, and I’ve now processed the return for the gifted blender as **store credit**.\n\nYour return is complete for item **ITEM-9325**, and the credit amount is **$69**. If you want, I can also help you find a coffee maker to use the credit toward.",
+      "tool_calls": [
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 69
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-9325",
+            "refund_amount": 69,
+            "policy_computed_amount": 69,
+            "refund_method": "store_credit",
+            "restocking_fee": 0,
+            "return_label_issued": false,
+            "shipping_clawback": 0,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that’s exactly what I needed — the gifted blender return was processed and the **$69 store credit** was issued. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_23abaeca0990bb",
+        "template_id": "ct_36643a7ab9144d",
+        "obligation_id": "obl_016a64fd60323b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating the amount the customer will receive for returning the gifted blender for store credit, the exact net amount must be grounded in current authoritative return/refund state, including any adjustments.",
+        "source": "completion_template:ct_36643a7ab9144d",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "A concrete refund or store-credit amount is about to be stated.",
+        "required_evidence": [
+          "current preview or completed return/refund amount from authoritative state",
+          "any applicable adjustment components that explain the net total"
+        ],
+        "discharge": "The response states the exact grounded amount and it matches current authoritative state.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User wants to return a gifted blender for store credit."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative return/refund preview or completed state for the blender",
+          "exact store-credit amount and any applicable adjustments"
+        ],
+        "scope": {
+          "family": "return_credit_amount_and_method_grounded",
+          "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_23abaeca0990bb",
+        "template_id": "ct_36643a7ab9144d",
+        "obligation_id": "obl_016a64fd60323b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Ground the exact store-credit amount and final refund method for the gifted blender return in current authoritative return state.",
+        "source": "completion_template:ct_36643a7ab9144d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A concrete refund or store-credit amount is about to be stated.",
+        "required_evidence": [
+          "current preview or completed return/refund amount from authoritative state",
+          "any applicable adjustment components that explain the net total"
+        ],
+        "discharge": "The response states the exact grounded amount and it matches current authoritative state.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User wants to return a gifted blender for store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order shows gifted blender item ITEM-9325 delivered; refund_amount and refund_method are still null."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Refund policy indicates gift returns use store credit at current product price."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User wants to return gifted blender order ORD-6046 for store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows refund_amount 69 and refund_method store_credit for ITEM-9325."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_credit_amount_and_method_grounded",
+          "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+        }
+      },
+      {
+        "id": "learned_25389f3a131ed6",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_542443d93c2eaa",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "If an account-linked benefit applies to the gifted blender return, the customer-facing response must explain how it affects the return outcome.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "pending",
+        "priority": 2,
+        "activation": "Resolved evidence shows an applicable profile-linked benefit materially affects the return result.",
+        "required_evidence": [
+          "the applicable benefit and its effect on the return outcome",
+          "authoritative evidence for the exact effect"
+        ],
+        "discharge": "The customer-facing explanation clearly discloses the benefit and its concrete impact on the return terms.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has gold-tier benefits including return_window_extension +15 days."
+          }
+        ],
+        "missing_evidence": [
+          "resolved evidence that a specific account-linked benefit applies to this return outcome",
+          "explicit customer-facing explanation of the benefit effect on the return terms"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_2e2ff20c0adb21",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_ff7a016701cd6b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete refund amount, fee, or return eligibility for the gifted blender return, resolve whether any account-linked return benefit applies to this customer and this return.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A profile or customer record exposes a return-related benefit field or tier-linked entitlement.",
+        "required_evidence": [
+          "current customer benefit or tier data",
+          "policy terms connecting that benefit to return fees, refund components, or eligibility",
+          "the return scenario details needed to test applicability"
+        ],
+        "discharge": "The response is grounded in evidence showing either that a specific account benefit applies or that no listed benefit changes this return outcome.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to return the blender for store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Customer profile shows benefits including compensation_multiplier 1.5x, prime_shipping, restocking_fee_waiver false, and return_window_extension +15 days."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Return/refund policy was retrieved, but no evidence yet ties the visible account benefits to this specific gift return outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Policy says gift returns use store credit at current product price."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview shows the return outcome as store_credit 69 with no fees."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer record shows gold tier and return_window_extension +15 days."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Policy links return methods and fees to return rules."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview reflects the return as eligible with refund_amount 69 and store_credit."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated a concrete eligibility and refund outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer record exposes return-related benefit fields including return_window_extension and restocking_fee_waiver."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Profile exposes return-related benefit fields including return_window_extension and restocking_fee_waiver."
+          }
+        ],
+        "missing_evidence": [
+          "policy terms connecting the visible benefit fields to this return scenario",
+          "resolved determination whether any listed account-linked benefit applies to this return outcome"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_31eaf11e910d62",
+        "template_id": "ct_409c5deaed8155",
+        "obligation_id": "obl_42d743a092f025",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If stating a refund outcome for the gifted blender return, report the exact refund amount only when supported by current authoritative evidence including relevant amount components.",
+        "source": "completion_template:ct_409c5deaed8155",
+        "status": "violated",
+        "priority": 2,
+        "activation": "a refund amount or outcome is stated or confirmed",
+        "required_evidence": [
+          "current authoritative refund preview or equivalent amount evidence",
+          "any policy-relevant amount components that could change the net refund"
+        ],
+        "discharge": "the communicated amount matches current evidence or the assistant withholds a concrete amount until grounded",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the refund would be $69 in store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "A later preview showed refund_amount 69 with zero listed deduction components."
+          }
+        ],
+        "missing_evidence": [
+          "current authoritative refund preview or equivalent amount evidence available before M1",
+          "authoritative component evidence supporting the quoted amount before M1"
+        ],
+        "scope": {
+          "family": "return_refund_terms_must_be_grounded",
+          "title": "Ground return/refund promises in current policy preview"
+        }
+      },
+      {
+        "id": "learned_4f99aa204d5014",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_f768f40a624db1",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "Because a visible account-linked benefit signal exists for the gifted blender return, the final communication must explicitly say whether that benefit changes this return outcome or not.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "A profile-benefit signal is observable and could materially change correctness of the quoted return result.",
+        "required_evidence": [
+          "the specific authoritative adjustment or non-applicability tied to the visible benefit signal",
+          "its effect on the final refund or fee outcome"
+        ],
+        "discharge": "The final communication explicitly explains the applicable benefit effect or confirms that the observed benefit signal does not alter this return's amount or fees.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer profile shows gold-tier benefits including return_window_extension +15 days."
+          }
+        ],
+        "missing_evidence": [
+          "resolved applicability or non-applicability of the visible benefit to this return",
+          "explicit assistant disclosure explaining whether the visible benefit changes this return outcome or not"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_4fbd7397d207d2",
+        "template_id": "ct_360f8407c79280",
+        "obligation_id": "obl_16fa0c61cf0843",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete refund outcome or eligibility for the gifted blender return, confirm from current order/policy evidence that the return reason qualifies for the claimed handling.",
+        "source": "completion_template:ct_360f8407c79280",
+        "status": "violated",
+        "priority": 1,
+        "activation": "The assistant is about to promise a specific return entitlement or refund outcome.",
+        "required_evidence": [
+          "authoritative order/item record",
+          "current policy or return-preview evidence linking the reason to the entitlement"
+        ],
+        "discharge": "A response grounds the claimed handling in matching order/policy or preview evidence; unsupported claims remain undisclosed.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says the blender is a gift from order ORD-6046 and wants store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order shows item ITEM-9325 is delivered and the product current price is 69."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Policy says gift returns use store credit at current product price."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the blender is eligible for return and that the refund would be $69 in store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order shows item ITEM-9325 is delivered and is a gift order."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Policy includes gift returns as store credit at current product price."
+          }
+        ],
+        "missing_evidence": [
+          "current authoritative preview or calculation result tied to the exact return handling before the claim in M1"
+        ],
+        "scope": {
+          "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+          "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+        }
+      },
+      {
+        "id": "learned_5a3c8383e439ac",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_3291ea5e50e271",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "If an account-linked return benefit affects the outcome, proactively disclose that the benefit changed the fee, eligibility, deadline, or total.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "Resolved evidence shows an applicable account benefit changes the return result.",
+        "required_evidence": [
+          "the applicable benefit and its effect on the return outcome",
+          "the exact authoritative total or fee after applying the benefit"
+        ],
+        "discharge": "The user is told that an account benefit affected the result, with the adjusted outcome grounded in current evidence.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant told user the refund would be store credit at $69."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has gold tier with return_window_extension +15 days."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows eligibility and refund amount 69."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_6370e447b06129",
+        "template_id": "ct_0b1e20f93fcff9",
+        "obligation_id": "obl_a7b747cee3c74f",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "After the gifted blender adjustment/return was processed, the closing message must state the final status together with the amount and refund method.",
+        "source": "completion_template:ct_0b1e20f93fcff9",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "when the adjustment has been processed or is ready to be summarized",
+        "required_evidence": [
+          "authoritative post-action status",
+          "exact amount",
+          "refund destination or method"
+        ],
+        "discharge": "The closing message reports the final adjustment status together with the amount and method.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant said the return was processed for item ITEM-9325, return is complete, and the credit amount is $69 as store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Confirmed processing shows status returned with refund_amount 69 and refund_method store_credit."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "final_confirmation_of_scope_and_result_after_adjustment",
+          "title": "Confirm unchanged items and final refund state when closing an adjustment request"
+        }
+      },
+      {
+        "id": "learned_82521fc9a30752",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_3110098621fcf2",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "If the observed account-linked benefit or preference is relevant to the gifted blender return outcome, the final explanation must state its effect or clearly state that it does not affect this case.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "A resolved profile benefit or preference could affect, or reasonably be expected to affect, the return outcome.",
+        "required_evidence": [
+          "resolved applicability of the profile-linked feature",
+          "the specific return term it changes or leaves unchanged"
+        ],
+        "discharge": "The final explanation clearly states the effect of the account-linked benefit/preference on the return outcome, or clearly states that it does not affect this case.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has gold-tier benefit signals."
+          }
+        ],
+        "missing_evidence": [
+          "resolved applicability of the profile-linked feature to this return",
+          "explicit disclosure of the benefit effect or clear statement that it does not affect this case"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_8497841d79d86e",
+        "template_id": "ct_409c5deaed8155",
+        "obligation_id": "obl_79320e728e225a",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete return policy outcome or eligibility, the claimed reason classification and resulting terms for the gifted blender return must be supported by current authoritative order/policy or preview evidence rather than assumption.",
+        "source": "completion_template:ct_409c5deaed8155",
+        "status": "violated",
+        "priority": 1,
+        "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+        "required_evidence": [
+          "authoritative evidence for the item/order and applicable return reason",
+          "current policy or preview evidence showing the resulting eligibility and terms"
+        ],
+        "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant claimed eligibility and a specific outcome of $69 in store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Authoritative return preview later used reason changed_mind and showed refund_amount 69 with refund_method store_credit preview status."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative evidence supporting the claimed reason classification and resulting terms before M1"
+        ],
+        "scope": {
+          "family": "return_refund_terms_must_be_grounded",
+          "title": "Ground return/refund promises in current policy preview"
+        }
+      },
+      {
+        "id": "learned_a450544f1e07ed",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_1044b8503ad9f4",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "Because a profile benefit signal is present and could affect return terms, a definitive total should not be presented without resolving the benefit or noting that benefit eligibility must be checked.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A profile benefit signal is present and could affect refund amount, fees, or shipping treatment.",
+        "required_evidence": [
+          "benefit eligibility result or unresolved status",
+          "benefit effect on the customer-facing return terms"
+        ],
+        "discharge": "The response either explains the benefit-driven term change or explicitly withholds a definitive total until eligibility is resolved.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Visible profile benefit signals exist on the customer account."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "The task concerns return terms for a specific item."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Visible account benefits exist."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T10",
+            "detail": "Preview outcome is store credit 69 with no fee changes; visible benefits do not alter the return result here."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Profile benefit signal was checked."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows the concrete return outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Profile benefit signal is present."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant presented a definitive total of $69 in store credit without mentioning any need to check benefit applicability."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has gold-tier benefits including return_window_extension +15 days and restocking_fee_waiver false."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant presented a definitive $69 store-credit outcome."
+          }
+        ],
+        "missing_evidence": [
+          "resolved benefit eligibility result for this return or customer-facing note that benefit eligibility still needed checking",
+          "evidence whether any visible benefit materially changes refund amount, fees, or shipping treatment here"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_d9091644c07df9",
+        "template_id": "ct_360f8407c79280",
+        "obligation_id": "obl_f8e1e376f16c91",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If a refund amount is stated, report the exact previewed net refund and any material zero or nonzero components that determine it, rather than assuming a full item price.",
+        "source": "completion_template:ct_360f8407c79280",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A preview or policy calculation exists and the assistant states a concrete refund amount or no-deduction claim.",
+        "required_evidence": [
+          "authoritative preview or calculation result for the net refund",
+          "component evidence for applicable deductions, discounts, and shipping effects"
+        ],
+        "discharge": "The communicated amount matches the authoritative preview and any material components needed to justify it.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated $69 in store credit for the gift return."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows refund_amount 69 and refund_method store_credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order product current_price is 69."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated a concrete amount of $69 in store credit."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview later showed refund_amount 69 with zero fees and clawbacks."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative preview communicated to the customer with the exact net refund and material components"
+        ],
+        "scope": {
+          "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+          "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+        }
+      },
+      {
+        "id": "learned_d94745b4445e32",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_20212fdfdbc81c",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete refund total, fee, or return cost for the gifted blender return, resolve whether any applicable account-linked benefit is eligible and incorporate only evidence-supported benefit effects into the quoted terms.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "A profile/tier/benefit signal exists and the return terms could change depending on eligibility.",
+        "required_evidence": [
+          "authoritative profile or membership benefit signal",
+          "policy linkage between that benefit and return economics",
+          "preview or other authoritative calculation reflecting whether the benefit applies"
+        ],
+        "discharge": "The stated total or fee is grounded in evidence that eligibility was checked and any applicable benefit was included or excluded correctly.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Authoritative customer profile shows account-linked benefit signals."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Return policy includes fee-related components and mentions examples such as Gold restocking discount in amount computation guidance."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has gold tier and benefits include compensation_multiplier 1.5x, prime_shipping, restocking_fee_waiver false, return_window_extension +15 days."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Policy says store credit is required for gift returns at current product price."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows refund_amount 69 and refund_method store_credit with no fee adjustments."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer profile shows benefit signals."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview shows refund_amount 69 with store_credit and no deductions."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated a concrete refund total."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Authoritative profile signal shows membership benefits that could affect return economics."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Authoritative profile shows membership tier gold and benefit signals."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant quoted a concrete $69 store-credit outcome."
+          }
+        ],
+        "missing_evidence": [
+          "policy linkage between the visible benefit signal and return economics for this scenario",
+          "preview or other authoritative calculation reflecting whether any applicable benefit was included or excluded correctly"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_deecd1d277ea11",
+        "template_id": "ct_360f8407c79280",
+        "obligation_id": "obl_7dd17eb4936a1e",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "execution",
+        "description": "Do not finalize the return unless the confirmed processing state matches the previewed reason and amount previously described to the customer.",
+        "source": "completion_template:ct_360f8407c79280",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "The customer has approved processing after receiving a preview or quoted terms.",
+        "required_evidence": [
+          "customer approval of the previewed terms",
+          "final processing state showing the same reason and exact amount"
+        ],
+        "discharge": "The executed return reflects the approved previewed terms; any mismatch is surfaced before completion.",
+        "scope_key": "gift_blender_return",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User approved processing after hearing quoted terms."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview showed reason changed_mind and refund_amount 69."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Confirmed processing returned status returned with refund_amount 69 and reason changed_mind in the arguments."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+          "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+        }
+      },
+      {
+        "id": "runtime_42a1ffc90b0876",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed process_return operation.",
+        "source": "tool:process_return:10",
+        "status": "satisfied",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 10,
+            "assistant_index": 3,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "user_confirmation",
+            "conversation_index": 2,
+            "text": "Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right?",
+            "bound_preview": "tool:process_return:10"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind"
+          },
+          "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 10,
+          "assistant_index": 3
+        }
+      },
+      {
+        "id": "runtime_4f50f370b196de",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The previewed process_return operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+        "source": "tool:process_return:10",
+        "status": "approved_pending_execution",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 10,
+            "assistant_index": 3,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 11,
+            "assistant_index": 4,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "assistant_index": 1,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "user_confirmation",
+            "conversation_index": 2,
+            "text": "Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right?",
+            "bound_preview": "tool:process_return:10"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind"
+          },
+          "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 5,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_563316305dda36",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The process_return operation completed successfully.",
+        "source": "tool:process_return:7",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 4,
+            "tool": "process_return",
+            "status": "returned",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 69, \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 0, \"status\": \"returned\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 69
+          },
+          "action_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 7,
+          "assistant_index": 4
+        }
+      },
+      {
+        "id": "runtime_7aaad454c479b5",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The process_return operation completed successfully.",
+        "source": "tool:process_return:6",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 3,
+            "tool": "process_return",
+            "status": "returned",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 69, \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 0, \"status\": \"returned\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9325",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 69
+          },
+          "action_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 6,
+          "assistant_index": 3
+        }
+      }
+    ],
+    "final_open_items": [
+      "learned_25389f3a131ed6",
+      "learned_4f99aa204d5014",
+      "learned_82521fc9a30752",
+      "runtime_4f50f370b196de"
+    ],
+    "final_satisfied_items": [
+      "learned_23abaeca0990bb",
+      "learned_2e2ff20c0adb21",
+      "learned_5a3c8383e439ac",
+      "learned_6370e447b06129",
+      "learned_a450544f1e07ed",
+      "learned_d9091644c07df9",
+      "learned_d94745b4445e32",
+      "learned_deecd1d277ea11",
+      "runtime_42a1ffc90b0876",
+      "runtime_563316305dda36",
+      "runtime_7aaad454c479b5"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [
+      "learned_31eaf11e910d62",
+      "learned_4fbd7397d207d2",
+      "learned_8497841d79d86e"
+    ],
+    "status_counts": {
+      "approved_pending_execution": 1,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 1,
+      "pending_evidence": 2,
+      "satisfied": 11,
+      "violated": 3
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_23abaeca0990bb",
+          "template_id": "ct_36643a7ab9144d",
+          "obligation_id": "obl_016a64fd60323b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating the amount the customer will receive for returning the gifted blender for store credit, the exact net amount must be grounded in current authoritative return/refund state, including any adjustments.",
+          "source": "completion_template:ct_36643a7ab9144d",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A concrete refund or store-credit amount is about to be stated.",
+          "required_evidence": [
+            "current preview or completed return/refund amount from authoritative state",
+            "any applicable adjustment components that explain the net total"
+          ],
+          "discharge": "The response states the exact grounded amount and it matches current authoritative state.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User wants to return a gifted blender for store credit."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative return/refund preview or completed state for the blender",
+            "exact store-credit amount and any applicable adjustments"
+          ],
+          "scope": {
+            "family": "return_credit_amount_and_method_grounded",
+            "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_2e2ff20c0adb21",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_ff7a016701cd6b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete refund amount, fee, or return eligibility for the gifted blender return, resolve whether any account-linked return benefit applies to this customer and this return.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A profile or customer record exposes a return-related benefit field or tier-linked entitlement.",
+          "required_evidence": [
+            "current customer benefit or tier data",
+            "policy terms connecting that benefit to return fees, refund components, or eligibility",
+            "the return scenario details needed to test applicability"
+          ],
+          "discharge": "The response is grounded in evidence showing either that a specific account benefit applies or that no listed benefit changes this return outcome.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to return the blender for store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Customer profile shows benefits including compensation_multiplier 1.5x, prime_shipping, restocking_fee_waiver false, and return_window_extension +15 days."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Return/refund policy was retrieved, but no evidence yet ties the visible account benefits to this specific gift return outcome."
+            }
+          ],
+          "missing_evidence": [
+            "current customer benefit or tier data resolved for this return",
+            "policy terms connecting any visible benefit to return fees, refund components, or eligibility for this case",
+            "return scenario details or preview showing whether any account-linked benefit changes the outcome"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a450544f1e07ed",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_1044b8503ad9f4",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If an account-linked benefit materially changes the blender return terms, disclose that it applies; if the visible benefit signal is not yet resolved, do not present a definitive total without noting that the benefit must be checked.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A profile benefit signal is present and could affect refund amount, fees, or shipping treatment.",
+          "required_evidence": [
+            "benefit eligibility result or unresolved status",
+            "benefit effect on the customer-facing return terms"
+          ],
+          "discharge": "The response either explains the benefit-driven term change or explicitly withholds a definitive total until eligibility is resolved.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Visible profile benefit signals exist on the customer account."
+            },
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "The task concerns return terms for a specific item."
+            }
+          ],
+          "missing_evidence": [
+            "benefit eligibility result or unresolved-status communication in an assistant message",
+            "benefit effect on the customer-facing return terms for this return"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_d94745b4445e32",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_20212fdfdbc81c",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete refund total, fee, or return cost for the blender return, resolve whether any applicable account-linked benefit is eligible and incorporate only evidence-supported benefit effects into the quoted terms.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending_evidence",
+          "priority": 3,
+          "activation": "A profile/tier/benefit signal exists and the return terms could change depending on eligibility.",
+          "required_evidence": [
+            "authoritative profile or membership benefit signal",
+            "policy linkage between that benefit and return economics",
+            "preview or other authoritative calculation reflecting whether the benefit applies"
+          ],
+          "discharge": "The stated total or fee is grounded in evidence that eligibility was checked and any applicable benefit was included or excluded correctly.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Authoritative customer profile shows account-linked benefit signals."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T7",
+              "detail": "Return policy includes fee-related components and mentions examples such as Gold restocking discount in amount computation guidance."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative profile or membership benefit signal tied to this return outcome",
+            "policy linkage between the visible benefit and the return economics for this case",
+            "preview or other authoritative calculation reflecting whether the benefit applies"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_4f50f370b196de",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed process_return operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:process_return:10",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 10,
+              "assistant_index": 3,
+              "tool": "process_return",
+              "status": "preview",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind"
+            },
+            "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 10,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_42a1ffc90b0876",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed process_return operation.",
+          "source": "tool:process_return:10",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 10,
+              "assistant_index": 3,
+              "tool": "process_return",
+              "status": "preview",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 0, \"shipping_refund\": false, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind"
+            },
+            "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 10,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "preview_refreshed",
+        "item_id": "runtime_4f50f370b196de",
+        "tool": "process_return",
+        "sequence": 11
+      },
+      {
+        "index": 7,
+        "event": "transition",
+        "item_id": "learned_23abaeca0990bb",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 8,
+        "event": "transition",
+        "item_id": "learned_2e2ff20c0adb21",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 9,
+        "event": "transition",
+        "item_id": "learned_a450544f1e07ed",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 10,
+        "event": "preview_refreshed",
+        "item_id": "runtime_4f50f370b196de",
+        "tool": "process_return",
+        "sequence": 5
+      },
+      {
+        "index": 11,
+        "event": "transition",
+        "item_id": "runtime_4f50f370b196de",
+        "previous": "awaiting_confirmation",
+        "status": "approved_pending_execution",
+        "reason": "scoped_user_confirmation"
+      },
+      {
+        "index": 12,
+        "event": "transition",
+        "item_id": "runtime_42a1ffc90b0876",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "scoped_user_confirmation"
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "learned_4fbd7397d207d2",
+          "template_id": "ct_360f8407c79280",
+          "obligation_id": "obl_16fa0c61cf0843",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete refund outcome or eligibility for the gifted blender return, confirm from current order/policy evidence that the return reason qualifies for the claimed handling.",
+          "source": "completion_template:ct_360f8407c79280",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant is about to promise a specific return entitlement or refund outcome.",
+          "required_evidence": [
+            "authoritative order/item record",
+            "current policy or return-preview evidence linking the reason to the entitlement"
+          ],
+          "discharge": "A response grounds the claimed handling in matching order/policy or preview evidence; unsupported claims remain undisclosed.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User says the blender is a gift from order ORD-6046 and wants store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order shows item ITEM-9325 is delivered and the product current price is 69."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Policy says gift returns use store credit at current product price."
+            }
+          ],
+          "missing_evidence": [
+            "current authoritative preview or calculation result tied to the exact return handling for this item"
+          ],
+          "scope": {
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "learned_d9091644c07df9",
+          "template_id": "ct_360f8407c79280",
+          "obligation_id": "obl_f8e1e376f16c91",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If a refund amount is stated for the gifted blender return, it must match the authoritative previewed net refund and components.",
+          "source": "completion_template:ct_360f8407c79280",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "A preview or policy calculation exists and the assistant states a concrete refund amount or no-deduction claim.",
+          "required_evidence": [
+            "authoritative preview or calculation result for the net refund",
+            "component evidence for applicable deductions, discounts, and shipping effects"
+          ],
+          "discharge": "The communicated amount matches the authoritative preview and any material components needed to justify it.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant stated $69 in store credit for the gift return."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Preview shows refund_amount 69 and refund_method store_credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order product current_price is 69."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "transition",
+        "item_id": "learned_d94745b4445e32",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 16,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5a3c8383e439ac",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_3291ea5e50e271",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If an account-linked return benefit affects the outcome, proactively disclose that the benefit changed the fee, eligibility, deadline, or total.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "Resolved evidence shows an applicable account benefit changes the return result.",
+          "required_evidence": [
+            "the applicable benefit and its effect on the return outcome",
+            "the exact authoritative total or fee after applying the benefit"
+          ],
+          "discharge": "The user is told that an account benefit affected the result, with the adjusted outcome grounded in current evidence.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant told user the refund would be store credit at $69."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer has gold tier with return_window_extension +15 days."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Preview shows eligibility and refund amount 69."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 17,
+        "event": "item_created",
+        "item": {
+          "id": "learned_4f99aa204d5014",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_f768f40a624db1",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If a visible account-linked benefit signal could affect the quoted return result, explicitly disclose whether it changes this return outcome or does not change it.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A profile-benefit signal is observable and could materially change correctness of the quoted return result.",
+          "required_evidence": [
+            "the specific authoritative adjustment or non-applicability tied to the visible benefit signal",
+            "its effect on the final refund or fee outcome"
+          ],
+          "discharge": "The final communication explicitly explains the applicable benefit effect or confirms that the observed benefit signal does not alter this return's amount or fees.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer profile shows gold-tier benefits including return_window_extension +15 days."
+            }
+          ],
+          "missing_evidence": [
+            "explicit assistant disclosure explaining whether the visible benefit changes this return outcome or not"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 18,
+        "event": "item_created",
+        "item": {
+          "id": "learned_25389f3a131ed6",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_542443d93c2eaa",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If an account-linked benefit applies, tell the customer how it affects the return outcome, including any waived deduction, added credit, or changed refund handling.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending",
+          "priority": 2,
+          "activation": "Resolved evidence shows an applicable profile-linked benefit materially affects the return result.",
+          "required_evidence": [
+            "the applicable benefit and its effect on the return outcome",
+            "authoritative evidence for the exact effect"
+          ],
+          "discharge": "The customer-facing explanation clearly discloses the benefit and its concrete impact on the return terms.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer has gold-tier benefits including return_window_extension +15 days."
+            }
+          ],
+          "missing_evidence": [
+            "explicit customer-facing explanation of the benefit effect on the return terms"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 19,
+        "event": "item_created",
+        "item": {
+          "id": "learned_82521fc9a30752",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_3110098621fcf2",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If an account-linked benefit or preference applies or is relevant to the quoted outcome, explicitly disclose its effect on eligibility, fees, timing, or refund method.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A resolved profile benefit or preference could affect, or reasonably be expected to affect, the return outcome.",
+          "required_evidence": [
+            "resolved applicability of the profile-linked feature",
+            "the specific return term it changes or leaves unchanged"
+          ],
+          "discharge": "The final explanation clearly states the effect of the account-linked benefit/preference on the return outcome, or clearly states that it does not affect this case.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer has gold-tier benefit signals."
+            }
+          ],
+          "missing_evidence": [
+            "explicit disclosure of the benefit effect or clear statement that it does not affect this case"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 20,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_7aaad454c479b5",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The process_return operation completed successfully.",
+          "source": "tool:process_return:6",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 3,
+              "tool": "process_return",
+              "status": "returned",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 69, \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 0, \"status\": \"returned\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 69
+            },
+            "action_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 6,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_563316305dda36",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The process_return operation completed successfully.",
+          "source": "tool:process_return:7",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 7,
+              "assistant_index": 4,
+              "tool": "process_return",
+              "status": "returned",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9325\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 69, \"refund_amount\": 69, \"refund_method\": \"store_credit\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 0, \"status\": \"returned\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 69
+            },
+            "action_key": "[\"process_return\", {\"amount\": 69, \"item_id\": \"ITEM-9325\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 7,
+            "assistant_index": 4
+          }
+        }
+      },
+      {
+        "index": 22,
+        "event": "transition",
+        "item_id": "learned_4fbd7397d207d2",
+        "previous": "pending",
+        "status": "violated",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 23,
+        "event": "transition",
+        "item_id": "learned_4f99aa204d5014",
+        "previous": "pending",
+        "status": "pending_evidence",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 24,
+        "event": "transition",
+        "item_id": "learned_82521fc9a30752",
+        "previous": "pending",
+        "status": "pending_evidence",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 25,
+        "event": "transition_ignored",
+        "item_id": "learned_2e2ff20c0adb21",
+        "previous": "satisfied",
+        "requested": "pending_evidence",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 26,
+        "event": "transition_ignored",
+        "item_id": "learned_a450544f1e07ed",
+        "previous": "satisfied",
+        "requested": "violated",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 27,
+        "event": "transition_ignored",
+        "item_id": "learned_d94745b4445e32",
+        "previous": "satisfied",
+        "requested": "pending_evidence",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 28,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8497841d79d86e",
+          "template_id": "ct_409c5deaed8155",
+          "obligation_id": "obl_79320e728e225a",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete return policy outcome or eligibility, the claimed reason classification and resulting terms for the gifted blender return must be supported by current authoritative order/policy or preview evidence rather than assumption.",
+          "source": "completion_template:ct_409c5deaed8155",
+          "status": "violated",
+          "priority": 1,
+          "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+          "required_evidence": [
+            "authoritative evidence for the item/order and applicable return reason",
+            "current policy or preview evidence showing the resulting eligibility and terms"
+          ],
+          "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant claimed eligibility and a specific outcome of $69 in store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Authoritative return preview later used reason changed_mind and showed refund_amount 69 with refund_method store_credit preview status."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative evidence supporting the claimed reason classification and resulting terms before M1"
+          ],
+          "scope": {
+            "family": "return_refund_terms_must_be_grounded",
+            "title": "Ground return/refund promises in current policy preview"
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": "item_created",
+        "item": {
+          "id": "learned_31eaf11e910d62",
+          "template_id": "ct_409c5deaed8155",
+          "obligation_id": "obl_42d743a092f025",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If stating a refund outcome for the gifted blender return, report the exact refund amount only when supported by current authoritative evidence including relevant amount components.",
+          "source": "completion_template:ct_409c5deaed8155",
+          "status": "violated",
+          "priority": 2,
+          "activation": "a refund amount or outcome is stated or confirmed",
+          "required_evidence": [
+            "current authoritative refund preview or equivalent amount evidence",
+            "any policy-relevant amount components that could change the net refund"
+          ],
+          "discharge": "the communicated amount matches current evidence or the assistant withholds a concrete amount until grounded",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant stated the refund would be $69 in store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "A later preview showed refund_amount 69 with zero listed deduction components."
+            }
+          ],
+          "missing_evidence": [
+            "current authoritative refund preview or equivalent amount evidence available before M1",
+            "authoritative component evidence supporting the quoted amount before M1"
+          ],
+          "scope": {
+            "family": "return_refund_terms_must_be_grounded",
+            "title": "Ground return/refund promises in current policy preview"
+          }
+        }
+      },
+      {
+        "index": 30,
+        "event": "transition_ignored",
+        "item_id": "learned_d9091644c07df9",
+        "previous": "satisfied",
+        "requested": "pending",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 31,
+        "event": "item_created",
+        "item": {
+          "id": "learned_deecd1d277ea11",
+          "template_id": "ct_360f8407c79280",
+          "obligation_id": "obl_7dd17eb4936a1e",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "execution",
+          "description": "Do not finalize the return unless the confirmed processing state matches the previewed reason and amount previously described to the customer.",
+          "source": "completion_template:ct_360f8407c79280",
+          "status": "pending",
+          "priority": 3,
+          "activation": "The customer has approved processing after receiving a preview or quoted terms.",
+          "required_evidence": [
+            "customer approval of the previewed terms",
+            "final processing state showing the same reason and exact amount"
+          ],
+          "discharge": "The executed return reflects the approved previewed terms; any mismatch is surfaced before completion.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User approved processing after hearing quoted terms."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Preview showed reason changed_mind and refund_amount 69."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Confirmed processing returned status returned with refund_amount 69 and reason changed_mind in the arguments."
+            }
+          ],
+          "missing_evidence": [
+            "assistant communication confirming to the customer that the finalized return matched the previewed reason and amount"
+          ],
+          "scope": {
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "title": "Ground the return outcome in authoritative preview details before promising a refund result"
+          }
+        }
+      },
+      {
+        "index": 32,
+        "event": "transition",
+        "item_id": "learned_deecd1d277ea11",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 33,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6370e447b06129",
+          "template_id": "ct_0b1e20f93fcff9",
+          "obligation_id": "obl_a7b747cee3c74f",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "After the gifted blender adjustment/return was processed, the closing message must state the final status together with the amount and refund method.",
+          "source": "completion_template:ct_0b1e20f93fcff9",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "when the adjustment has been processed or is ready to be summarized",
+          "required_evidence": [
+            "authoritative post-action status",
+            "exact amount",
+            "refund destination or method"
+          ],
+          "discharge": "The closing message reports the final adjustment status together with the amount and method.",
+          "scope_key": "gift_blender_return",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant said the return was processed for item ITEM-9325, return is complete, and the credit amount is $69 as store credit."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Confirmed processing shows status returned with refund_amount 69 and refund_method store_credit."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "title": "Confirm unchanged items and final refund state when closing an adjustment request"
+          }
+        }
+      },
+      {
+        "index": 34,
+        "event": "transition_ignored",
+        "item_id": "learned_2e2ff20c0adb21",
+        "previous": "satisfied",
+        "requested": "pending_evidence",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 35,
+        "event": "transition_ignored",
+        "item_id": "learned_a450544f1e07ed",
+        "previous": "satisfied",
+        "requested": "pending_evidence",
+        "reason": "terminal_state"
+      },
+      {
+        "index": 36,
+        "event": "transition_ignored",
+        "item_id": "learned_d94745b4445e32",
+        "previous": "satisfied",
+        "requested": "pending_evidence",
+        "reason": "terminal_state"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "7577c15af22be50f4d3358d931ccc5ab9755b237f55e9020cae74adca8b201e9",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker.",
+        "candidates": [
+          {
+            "id": "ct_033157874dd49c",
+            "family": "gift_return_exchange_closure",
+            "score": 22.358471
+          },
+          {
+            "id": "ct_5396d835e67390",
+            "family": "boundary_transition_return_deadline_consequence",
+            "score": 21.271775
+          },
+          {
+            "id": "ct_a9abbdaf2ef046",
+            "family": "gift_exchange_protected_no_refund",
+            "score": 17.405982
+          },
+          {
+            "id": "ct_1de7a3acd08a5e",
+            "family": "account_linked_benefit_resolution_for_return_totals",
+            "score": 17.516332
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 15.942609
+          },
+          {
+            "id": "ct_be37ec54dea6a9",
+            "family": "single_line_return_scope_confirmation",
+            "score": 16.298858
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 15.159771
+          },
+          {
+            "id": "ct_bc9923fcc975ec",
+            "family": "return_boundary_transition_resolution",
+            "score": 15.616425
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "7fe044a8a5b653094ac5f42b938b0e3bf5f07ed3ac88af1c37051917b74eb76c",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker. get_order order_id ORD-6046 customer_id cust_003 order_date 2026-06-01T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK91650272 delivery_date 2026-06-03T14:00:00 delivery_promised_date 2026-06-05T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift true gift_sender Aunt Mary items item_id ITEM-9325 o...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 91.024723
+          },
+          {
+            "id": "ct_7817f5610f763c",
+            "family": "damaged_return_refund_grounding_and_breakdown",
+            "score": 89.042387
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 70.626595
+          },
+          {
+            "id": "ct_87d91d0ebc0f42",
+            "family": "return_threshold_clawback_boundary_disclosure",
+            "score": 68.958083
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 89.906595
+          },
+          {
+            "id": "ct_98f40f96da07dd",
+            "family": "damaged_item_refund_grounded_resolution",
+            "score": 88.551486
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 72.416124
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 83.635049
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "4a6c91066be23279e1e7d8e4a982e78f148c82211c319217f64af8337b2b032f",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker. get_order order_id ORD-6046 customer_id cust_003 order_date 2026-06-01T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK91650272 delivery_date 2026-06-03T14:00:00 delivery_promised_date 2026-06-05T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift true gift_sender Aunt Mary items item_id ITEM-9325 o...",
+        "candidates": [
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 101.661677
+          },
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 92.580862
+          },
+          {
+            "id": "ct_7817f5610f763c",
+            "family": "damaged_return_refund_grounding_and_breakdown",
+            "score": 93.960149
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 70.650558
+          },
+          {
+            "id": "ct_87d91d0ebc0f42",
+            "family": "return_threshold_clawback_boundary_disclosure",
+            "score": 74.061299
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 96.278455
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 77.20957
+          },
+          {
+            "id": "ct_98f40f96da07dd",
+            "family": "damaged_item_refund_grounded_resolution",
+            "score": 90.74229
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "1c22aa137b0e5a0552b0d22e2f53768a48bffbcb5d996f7d6f2ee97b079b475d",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker. Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right? I checked it, and the blender is eligible for return. Because it was a gift, the refund would be issued as **$69 in store credit**; that matches the item’s current price under gift-return policy. If you want, I can go ahead and process the return for the blender now. get_order order_id ORD-6046 customer_id cust_003 order_date...",
+        "candidates": [
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 93.58921
+          },
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 85.761391
+          },
+          {
+            "id": "ct_fc336115a3b954",
+            "family": "threshold_boundary_consequence_disclosure",
+            "score": 77.288385
+          },
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 73.820739
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 65.064464
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 87.727017
+          },
+          {
+            "id": "ct_5396d835e67390",
+            "family": "boundary_transition_return_deadline_consequence",
+            "score": 79.905393
+          },
+          {
+            "id": "ct_bc9923fcc975ec",
+            "family": "return_boundary_transition_resolution",
+            "score": 75.85983
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "86140253c4afa04f13b29431c9d9adf8ac8ccf8254b93f01ab0afb5d2b4b4a4e",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker. Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right? I checked it, and the blender is eligible for return. Because it was a gift, the refund would be issued as **$69 in store credit**; that matches the item’s current price under gift-return policy. If you want, I can go ahead and process the return for the blender now. get_order order_id ORD-6046 customer_id cust_003 order_date...",
+        "candidates": [
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 94.237206
+          },
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 86.13937
+          },
+          {
+            "id": "ct_fc336115a3b954",
+            "family": "threshold_boundary_consequence_disclosure",
+            "score": 77.639264
+          },
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 73.817982
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 65.061695
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 88.340873
+          },
+          {
+            "id": "ct_5396d835e67390",
+            "family": "boundary_transition_return_deadline_consequence",
+            "score": 80.510021
+          },
+          {
+            "id": "ct_bc9923fcc975ec",
+            "family": "return_boundary_transition_resolution",
+            "score": 76.44209
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "dde648f217432628ecf331e57d7b9e684df7db0880f4a0aa46bca439b612fbf2",
+        "query_preview": "I got a blender as a gift from order ORD-6046. I want to return it for store credit that I can use toward a coffee maker. Yes, please process the return as store credit for the gifted blender from ORD-6046. Just to confirm, that $69 is the current product price, right? I checked it, and the blender is eligible for return. Because it was a gift, the refund would be issued as **$69 in store credit**; that matches the item’s current price under gift-return policy. If you want, I can go ahead and process the return for the blender now. Yes — the **$69 is the current product price**, and I’ve no...",
+        "candidates": [
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 95.769795
+          },
+          {
+            "id": "ct_3393c76e9f3ae9",
+            "family": "benefit_and_threshold_effects_must_be_resolved_and_disclosed",
+            "score": 88.365274
+          },
+          {
+            "id": "ct_5396d835e67390",
+            "family": "boundary_transition_return_deadline_consequence",
+            "score": 87.245209
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 78.455616
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 65.036237
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 88.297436
+          },
+          {
+            "id": "ct_bc9923fcc975ec",
+            "family": "return_boundary_transition_resolution",
+            "score": 80.832476
+          },
+          {
+            "id": "ct_fc336115a3b954",
+            "family": "threshold_boundary_consequence_disclosure",
+            "score": 84.151
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "11345f96bb0d7690f9ac3c5fc9176e65283b6e9f464b49848fc734448398fcfc",
+        "candidate_ids": [
+          "ct_033157874dd49c",
+          "ct_5396d835e67390",
+          "ct_a9abbdaf2ef046",
+          "ct_1de7a3acd08a5e",
+          "ct_7a4b6afc158086",
+          "ct_be37ec54dea6a9",
+          "ct_36643a7ab9144d",
+          "ct_bc9923fcc975ec"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 5398,
+          "output_tokens": 149
+        },
+        "response_sha256": "00adf3866025b8c4f2ea13129fbeed62c76f3bb70a17bda0d8800f264f84ceb3",
+        "returned_items": 1
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "808ff7964c00aed36fd9b8e674ce2e6e867eb89a6a24c5384a3049488c9030f1",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_7817f5610f763c",
+          "ct_0b1e20f93fcff9",
+          "ct_87d91d0ebc0f42",
+          "ct_409c5deaed8155",
+          "ct_98f40f96da07dd",
+          "ct_7dc55ddd6d3854",
+          "ct_360f8407c79280",
+          "ct_36643a7ab9144d"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9319,
+          "output_tokens": 808
+        },
+        "response_sha256": "99c60730b655a294a1d894a81d6684b12e225c8742267fba0b50bdd66ae6511e",
+        "returned_items": 4
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "4cb3223e05404ca1ca5052776eee5d20b83026a7b642b97bbaf9f9e8ac4ca60f",
+        "candidate_ids": [
+          "ct_409c5deaed8155",
+          "ct_152097d013cffb",
+          "ct_7817f5610f763c",
+          "ct_0b1e20f93fcff9",
+          "ct_87d91d0ebc0f42",
+          "ct_360f8407c79280",
+          "ct_7dc55ddd6d3854",
+          "ct_98f40f96da07dd",
+          "ct_36643a7ab9144d"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 11036,
+          "output_tokens": 446
+        },
+        "response_sha256": "3eea5db96169cd0c5d50a98a26376b05250722a57ac387514e38cd53e8173e4c",
+        "returned_items": 3
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "d301adb0399fc05dad367e4d3f4b2520cf22739047944df5edc807c860c633d9",
+        "candidate_ids": [
+          "ct_409c5deaed8155",
+          "ct_152097d013cffb",
+          "ct_fc336115a3b954",
+          "ct_a6e72329369c66",
+          "ct_0b1e20f93fcff9",
+          "ct_360f8407c79280",
+          "ct_5396d835e67390",
+          "ct_bc9923fcc975ec"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 8205,
+          "output_tokens": 1504
+        },
+        "response_sha256": "5efe3979ac7467afb3941f64a6e51ac586a0be946a0e804b6a124f7097ea551f",
+        "returned_items": 10
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "221bd788e9f552cd0ec5d2eb87afa65a4886b3b4ba6e33bd6faea2ec77a26d68",
+        "candidate_ids": [
+          "ct_409c5deaed8155",
+          "ct_152097d013cffb",
+          "ct_fc336115a3b954",
+          "ct_a6e72329369c66",
+          "ct_0b1e20f93fcff9",
+          "ct_360f8407c79280",
+          "ct_5396d835e67390",
+          "ct_bc9923fcc975ec"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9550,
+          "output_tokens": 1777
+        },
+        "response_sha256": "9b88435c2a7d3dc4a0a73699c922b7c561a7fba432a410e1b2ef92046c6d4b28",
+        "returned_items": 11
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "6f36523ae791d2f544a20cd0095b2b9ff105bbea43dfbf7f5923abf384ecaab7",
+        "candidate_ids": [
+          "ct_409c5deaed8155",
+          "ct_3393c76e9f3ae9",
+          "ct_5396d835e67390",
+          "ct_7a4b6afc158086",
+          "ct_0b1e20f93fcff9",
+          "ct_360f8407c79280",
+          "ct_bc9923fcc975ec",
+          "ct_fc336115a3b954",
+          "ct_152097d013cffb"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 11711,
+          "output_tokens": 1805
+        },
+        "response_sha256": "954f03779ea883f4d3b92136ae75566d06504ee649ace1eee0003020240412da",
+        "returned_items": 11
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "02f5fe5fff6fbab99986f0c483be339995c2a3da1ec8fb93a633caa3cc40584c",
+        "exposure_signature": "39cee55b8b5d3f470447da85393fa73ecca0a589a9d67083dab9e5381a5a2321",
+        "exposed_items": [
+          "learned_23abaeca0990bb"
+        ],
+        "pending_items": [
+          "learned_23abaeca0990bb"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_order",
+            "arguments": {
+              "order_id": "ORD-6046"
+            }
+          },
+          {
+            "name": "get_customer",
+            "arguments": {
+              "customer_id": "cust_003"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "return"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "refund"
+            }
+          },
+          {
+            "name": "retrieve_learnings",
+            "arguments": {
+              "query": "gift return for store credit and possible refund method change after return for order item"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "0733537d1cb0a2636fdfbd7b8164e315865d63be99dcdc51a1eae7352add360d",
+        "exposure_signature": "60fd0d75270822b86e11b51caac9b31b3f6039f38d1d8f551e97566c7f8307c4",
+        "exposed_items": [
+          "learned_23abaeca0990bb",
+          "learned_2e2ff20c0adb21",
+          "learned_a450544f1e07ed",
+          "learned_d94745b4445e32"
+        ],
+        "pending_items": [
+          "learned_23abaeca0990bb",
+          "learned_2e2ff20c0adb21",
+          "learned_a450544f1e07ed",
+          "learned_d94745b4445e32"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 4,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "9d87650a4e3e745f5f6517bc87bee0c4aceac4eaedd914617629f1419256bc1f",
+        "exposure_signature": "0a1411254321d18bec0fd0d7b084b1eedbeebf4b92f333fe81ee364304e6efae",
+        "exposed_items": [
+          "runtime_4f50f370b196de"
+        ],
+        "pending_items": [
+          "learned_d94745b4445e32",
+          "runtime_4f50f370b196de",
+          "runtime_42a1ffc90b0876"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 1,
+          "pending_evidence": 1,
+          "satisfied": 3,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "cbf794f155ac3df070ad3795c18a0f5bef82f000d6aa318a12e74b914f8d286b",
+        "exposure_signature": "a556476412974d42fcd59ca9804171ca9614fb620f4fd0c2aa825d0d7d6101d1",
+        "exposed_items": [
+          "runtime_4f50f370b196de"
+        ],
+        "pending_items": [
+          "runtime_4f50f370b196de",
+          "learned_4fbd7397d207d2",
+          "learned_4f99aa204d5014",
+          "learned_25389f3a131ed6",
+          "learned_82521fc9a30752"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 1,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 0,
+          "satisfied": 7,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9325",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 69
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "82fbd19983279d39f46369fb42ae1e48884a5044a7673b1a70fd2fd3fca64331",
+        "exposure_signature": "7d4f533891712cce7b9fa47ff613ec26213be3dc275c7746faec7f7144526dba",
+        "exposed_items": [
+          "runtime_4f50f370b196de",
+          "learned_deecd1d277ea11"
+        ],
+        "pending_items": [
+          "runtime_4f50f370b196de",
+          "learned_4f99aa204d5014",
+          "learned_25389f3a131ed6",
+          "learned_82521fc9a30752",
+          "learned_deecd1d277ea11"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 1,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 2,
+          "satisfied": 9,
+          "violated": 3
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 5,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 6,
+      "regenerations": 0,
+      "exposures": 5,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 3,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 2,
+      "tool_calls": 7,
+      "bookkeeper_input_tokens": 55219,
+      "bookkeeper_output_tokens": 6489,
+      "bookkeeper_total_tokens": 61708,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 83262,
+    "cached_input_tokens": 0,
+    "output_tokens": 6806,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 90068,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 83262,
+  "cached_input_tokens": 0,
+  "output_tokens": 6806,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 90068,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-9325": {
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 69
+          },
+          "refund_method": {
+            "old": null,
+            "new": "store_credit"
+          },
+          "store_credit_only": {
+            "old": false,
+            "new": true
+          },
+          "return_reason": {
+            "old": null,
+            "new": "changed_mind"
+          }
+        }
+      },
+      "orders": {
+        "ORD-6046": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "refund_amount",
+      "expected_value": 69
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "refund_method",
+      "expected_value": "store_credit"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "return_reason",
+      "expected_value": "changed_mind"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9325",
+      "field": "store_credit_only",
+      "expected_value": true
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-6046",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 2,
+  "ux_tool_call_count": 7,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

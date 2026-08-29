@@ -1,8 +1,21 @@
-# Cross-Domain Process Workflow Memory for STATE-Bench
+# Cross-Domain Process Workflow Memory and Task-Closure Memory for STATE-Bench
 
 This branch archives the cross-domain Process Workflow Memory experiment run
 on STATE-Bench 0.8.1 at upstream commit
 `5644b1838d96bc4483da29642d058ecaa6f80f7f`.
+
+## Task-Closure Memory v2 probe
+
+This branch also contains the independently induced Task-Closure Memory v2
+implementation and its first fixed 30-task probe. It scored 14/30 versus 12/30
+for the same task IDs in archived PWM run1, but the audit found that 235/239
+main generations received a guard while true Final Closure appeared only three
+times. The result is diagnostic evidence, not a causal improvement or
+leaderboard result.
+
+- [Experiment record](artifacts/task_closure_memory_v2/experiments/task_closure_v2_subset30_99f9bfc_r1a/README.md)
+- [Full mechanism audit](artifacts/task_closure_memory_v2/AUDIT.md)
+- [Machine-readable paired summary](artifacts/task_closure_memory_v2/experiments/task_closure_v2_subset30_99f9bfc_r1a/paired_summary.json)
 
 ## Archived Result
 

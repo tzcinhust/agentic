@@ -1,0 +1,4341 @@
+{
+  "task_id": "6-cancel_within_free_window_intl",
+  "user_id": "user_001",
+  "task_summary": "**Task:** A traveler asks to cancel two international bookings that were made only a few hours apart, one just inside and one just outside the free-cancellation window. Correct resolution: BK-1007 qualifies for free cancellation while BK-1008 does not.\n\n**Challenge:** The agent distinguishes the two booking timestamps correctly, explains why only one qualifies for free cancellation, and does not collapse both bookings into the same window logic.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "state_one_free_one_paid",
+      "kind": "must",
+      "requirement": "Agent must explain that BK-1007 qualifies for free cancellation while BK-1008 does not.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant clearly stated BK-1007 had $0 fee/free cancellation and BK-1008 had a $96 fee."
+    },
+    {
+      "id": "state_timestamp_window_reasoning",
+      "kind": "must",
+      "requirement": "Agent must explain the distinction using the actual booking timing or 48-hour window logic rather than treating both bookings as if they were booked at the same time.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant used the actual booking timestamps and explained BK-1007 was ~46 hours old while BK-1008 was ~50 hours old, distinguishing the 48-hour window correctly."
+    },
+    {
+      "id": "state_not_both_free",
+      "kind": "must_not",
+      "requirement": "Agent must not claim that both international bookings qualify for free cancellation under the same 48-hour window.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The assistant did not claim both bookings were free; it explicitly said only BK-1007 was within the free-cancellation window."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent kept the interaction read-only until it had verified both bookings and previewed each cancellation separately, then waited for an explicit later-turn approval before executing either cancellation. It correctly distinguished the two booking timestamps and explained the 46-hour versus 50-hour timing logic, avoiding the key failure mode of collapsing both bookings into one cancellation-window outcome. The user did not need to correct policy, math, or booking identification, and the responses were concise while still including the exact fees, refunds, and final total refund. Final execution matched the previewed terms cleanly.",
+  "turns": 3,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I need to cancel both my upcoming international flights. Can you help?"
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — I found two upcoming international flight bookings on your account:\n\n- BK-1007: SFO → NRT, 2026-06-28 11:00, business\n- BK-1008: JFK → LHR, 2026-06-30 19:45, economy\n\nI also pulled the cancellation previews:\n\n- BK-1007: fee $0, refund $1,400\n  - Reason: within 48-hour free cancellation window\n- BK-1008: fee $96, refund $384\n  - Reason: international economy cancellation fee\n\nIf you want, I can cancel both now. Please reply with something like: “Cancel both.”",
+      "tool_calls": [
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "Cancel flight bookings after identifying all upcoming international flights from the current user's reservations; verify bookings from reservation list, inspect booking details to find international upcoming flights, preview cancellation terms before canceling, and only execute after explicit user approval."
+          },
+          "result": [
+            "Workflow: Cancel a specific flight booking after identifying it from reservations\nUse when: User wants to cancel a flight and identifies it by booking ID or by trip details such as route/date, and the account may contain multiple flight bookings.\nVerify first:\n- Verify the user's current reservation list includes at least one flight booking.\n- Verify which booking matches the user's requested cancellation target using booking details from reservations.\n- If the user names a booking ID, verify that booking belongs to the user and matches the described trip if they also provided trip details.\nProcedure:\n1. get_user_reservations(user_id)\n2. get_booking(booking_id_from_reservations)\n3. get_booking(other_relevant_booking_id_from_reservations)\n4. cancel_booking(target_booking_id, confirm=false)\n5. cancel_booking(target_booking_id, confirm=true)\nBranches:\n- If only one reservation clearly matches the user's request, preview cancellation for that booking, then cancel after user approval or if the user already explicitly asked to proceed.\n- If multiple bookings exist, inspect as many bookings as needed with get_booking until the requested trip is uniquely identified.\n- If the user asks whether another booking will remain active, verify that other booking with get_booking before confirming.\n- If no reservation matches the requested trip or booking ID, do not call cancel_booking; report that no matching booking was found.\n- If the user has not yet confirmed cancellation and is asking about fees/refund, stop after cancel_booking with confirm=false and present the preview.\nAvoid:\n- Do not cancel a booking without first verifying it from the user's reservations.\n- Do not assume a route/date maps to a booking without checking booking details.\n- Do not claim fees, refund amounts, or final status before the tool returns them.\n- Do not infer the status of another booking without verifying it when the user explicitly asks.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 1x: get_user_reservations -> get_booking -> get_booking -> cancel_booking -> cancel_booking\n- 1x: get_user_reservations -> get_booking -> get_booking -> get_booking -> cancel_booking -> cancel_bo",
+            "Workflow: Confirm booking details and traveler preferences before write\nUse when: User asks for a booking preview or asks the agent to confirm the exact itinerary, cabin, price/payment method, and onboard preferences before finalizing.\nVerify first:\n- Search results must contain a specific candidate flight to summarize.\n- If payment uses loyalty points, verify current user details and relevant policies first.\n- All requested booking preferences must be captured from the conversation: seat type, meal, Wi-Fi, extra legroom, insurance, and paid checked bags.\nProcedure:\n1. search_flights(filters matching the candidate itinerary)\n2. get_user_details(user_id if points-based payment is involved)\n3. get_policies(cabin_class, loyalty_tier, route_type, topic when policy-backed confirmation is needed)\n4. create_booking(only after explicit user approval of the summarized option and preferences)\nBranches:\n- If the searched result does not match the user's expected airline, route, stop count, cabin, or price, do not book; instead report the mismatch and continue searching if requested.\n- If the user confirms the preview as shown, proceed to create_booking with the exact preferences discussed.\n- If the user changes any preference after the preview, update those fields in the eventual create_booking call.\n- If the user never gives final approval, end with a no-write outcome.\nAvoid:\n- Do not present unverified booking details that were not returned by tools.\n- Do not omit user-specified preferences when calling create_booking.\n- Do not treat a user's requested price or airline as confirmed unless the search result matches it.\n- Do not write after merely presenting a preview.\nProcess support: mean conformance=0.979\nObserved frequent paths:\n- 1x: search_flights -> search_flights -> search_flights -> search_flights -> create_booking\n- 1x: get_user_details -> search_flights -> search_flights -> get_policies -> get_policies -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> get_policies -> get_policies -> create_booking -> get_user_details -> create_booking",
+            "Workflow: Execute approved direct flight change while preserving booking preferences\nUse when: User has approved a direct change on an existing booking to a specific replacement flight or date after comparison, and wants current preferences kept unless explicitly changed.\nVerify first:\n- Use get_booking to read all current mutable preferences and ancillaries that should be preserved on update.\n- If needed, use search_flights to confirm the approved replacement flight is still available and matches the requested airline/date/time/stop constraints.\n- If the user references fee or budget confirmation, get a fresh preview with update_booking using confirm=false before committing.\nProcedure:\n1. get_booking\n2. search_flights\n3. update_booking\n4. update_booking\n5. get_booking\nBranches:\n- If the fresh preview no longer matches the approved cost/flight/budget, stop with a no-write outcome and ask for renewed approval.\n- If the approved flight is no longer available, stop and present available alternatives from search_flights.\n- If the user asked to preserve preferences, pass through the existing settings from get_booking when calling update_booking.\n- After confirm=true update, use get_booking to verify the new flight and preserved ancillaries; report any differences only if the tool shows them.\nAvoid:\n- Do not omit existing ancillary fields when the user asked to keep preferences unchanged.\n- Do not commit based only on an old preview if the user conditioned approval on a specific amount and a fresh preview differs.\n- Do not report preserved settings without verifying from get_booking or the update result.\nProcess support: mean conformance=0.943\nObserved frequent paths:\n- 1x: get_user_details -> get_booking -> get_booking -> search_flights -> search_flights -> get_policies -> get_policies -> get_policies -> get_policies -> get_policies -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flights -> search_flight"
+          ]
+        },
+        {
+          "name": "get_user_reservations",
+          "arguments": {
+            "user_id": "user_001"
+          },
+          "result": {
+            "user_id": "user_001",
+            "booking_ids": [
+              "BK-1007",
+              "BK-1008"
+            ],
+            "hotel_ids": [],
+            "car_rental_ids": []
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1007"
+          },
+          "result": {
+            "booking_id": "BK-1007",
+            "user_id": "user_001",
+            "flight_id": "DL100",
+            "status": "confirmed",
+            "cabin_class": "business",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 1400,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-13T12:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "SFO",
+            "destination": "NRT",
+            "departure_time": "2026-06-28T11:00:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "get_booking",
+          "arguments": {
+            "booking_id": "BK-1008"
+          },
+          "result": {
+            "booking_id": "BK-1008",
+            "user_id": "user_001",
+            "flight_id": "DL101",
+            "status": "confirmed",
+            "cabin_class": "economy",
+            "seat_type": "aisle",
+            "meal_preference": "kosher",
+            "add_wifi": true,
+            "add_extra_legroom": true,
+            "add_insurance": false,
+            "price_paid": 480,
+            "payment_method": "credit_card",
+            "points_used": 0,
+            "cash_amount": 0,
+            "booked_at": "2026-06-13T08:00:00",
+            "cancellation_fee": null,
+            "refund_amount": null,
+            "change_fee": null,
+            "fare_difference": null,
+            "delay_compensation": null,
+            "paid_checked_bags": 0,
+            "origin": "JFK",
+            "destination": "LHR",
+            "departure_time": "2026-06-30T19:45:00",
+            "route_type": "international"
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1007",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1007",
+            "cancellation_fee": 0,
+            "refund_amount": 1400,
+            "reason": "Within 48-hour free cancellation window"
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1008",
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "booking_id": "BK-1008",
+            "cancellation_fee": 96,
+            "refund_amount": 384,
+            "reason": "International economy cancellation fee: max($75, 20% of $480) = $96"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "That surprises me a little since I thought both were booked around two days ago. Can you show me the exact booking timestamps or explain how you determined BK-1007 is still within the 48-hour free-cancellation window but BK-1008 is outside it?"
+    },
+    {
+      "role": "assistant",
+      "content": "BK-1007 was booked at 2026-06-13 12:00, and BK-1008 at 2026-06-13 08:00.\n\nSo BK-1007 is about 46 hours before the current time (2026-06-15 10:00), while BK-1008 is about 50 hours before it. That’s why BK-1007 is still within 48 hours and BK-1008 is not.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Got it — that makes sense. Please cancel BK-1007 with the $0 fee and $1,400 refund, and BK-1008 with the $96 fee and $384 refund."
+    },
+    {
+      "role": "assistant",
+      "content": "Both flights are now cancelled.\n\n- BK-1007: cancelled, fee $0, refund $1,400\n- BK-1008: cancelled, fee $96, refund $384\n\nTotal refund: $1,784\n\nIf you want, I can also summarize what remains on your account.",
+      "tool_calls": [
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1007",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "booking_id": "BK-1007",
+            "refund_amount": 1400,
+            "cancellation_fee": 0,
+            "reason": "Within 48-hour free cancellation window"
+          }
+        },
+        {
+          "name": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1008",
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "booking_id": "BK-1008",
+            "refund_amount": 384,
+            "cancellation_fee": 96,
+            "reason": "International economy cancellation fee: max($75, 20% of $480) = $96"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "6a94abedb77e2ec3f3b94a149291bc42a6aeacd5691ef0cb69862b9af923ae3c",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_900d75285f5075",
+        "template_id": "ct_17d6efba9f3b33",
+        "obligation_id": "obl_7733715a4e54b8",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the user later asks for confirmation after both targeted flight reservations are changed, each targeted reservation and any protected related reservation would need explicit final-state reporting.",
+        "source": "completion_template:ct_17d6efba9f3b33",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "the user asks for confirmation after a multi-reservation change",
+        "required_evidence": [
+          "status for each targeted reservation",
+          "status for any related reservation the user asked to protect"
+        ],
+        "discharge": "each targeted item is stated as canceled/modified and the protected item is stated as unchanged/active",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel both upcoming international flights, indicating a multi-reservation change intent."
+          }
+        ],
+        "missing_evidence": [
+          "Whether there is a related reservation the user wants kept active or unchanged",
+          "Any confirmation request after the multi-reservation change",
+          "Authoritative final status for each targeted reservation"
+        ],
+        "scope": {
+          "family": "multi_entity_change_confirmation",
+          "title": "confirm multiple reservations changed while a protected reservation stays unchanged"
+        }
+      },
+      {
+        "id": "learned_e4ba5d7fdf2ec8",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_eb937f230e45ce",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The current reservations must not be represented as changed or cancelled unless the user explicitly authorizes that exact irreversible cancellation and authoritative booking status supports it.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "pending",
+        "priority": 1,
+        "activation": "before confirmation/authorization of cancellation or booking replacement",
+        "required_evidence": [
+          "user authorization specific to the irreversible change",
+          "authoritative status for the current booking"
+        ],
+        "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both upcoming international flights, discussing cancellation of existing reservations."
+          }
+        ],
+        "missing_evidence": [
+          "Explicit authorization for the exact irreversible cancellation action beyond asking for help",
+          "Authoritative current status for the reservations"
+        ],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_ed1dfd37058fb9",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_2992e739c4afee",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the cancellation task is completed or wrapped up, the final response must clearly report whether the original reservations are cancelled or unchanged so nothing was silently altered.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "pending",
+        "priority": 2,
+        "activation": "any completed or pending booking-change conversation involving an existing reservation",
+        "required_evidence": [
+          "authoritative booking status for the original reservation",
+          "authoritative status for any replacement booking"
+        ],
+        "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User is in a booking-change conversation involving existing reservations."
+          }
+        ],
+        "missing_evidence": [
+          "Authoritative booking status for the original reservations",
+          "Any completed cancellation outcome to report"
+        ],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_13d219f83e2ea9",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_2992e739c4afee",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "The final response must clearly report the current protected state or the completed replacement state, so the user can verify nothing was silently altered.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "any completed or pending booking-change conversation involving an existing reservation",
+        "required_evidence": [
+          "authoritative booking status for the original reservation",
+          "authoritative status for any replacement booking"
+        ],
+        "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 currently shows status preview/confirmed state not changed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 cancellation result is only a preview with status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly authorizes cancelling BK-1008."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancellation result shows status cancelled."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states BK-1008 is cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_1c097401687109",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_eb937f230e45ce",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The current reservation state must not be represented as changed, cancelled, or replaced unless explicit authorization for that exact irreversible change exists.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "before confirmation/authorization of cancellation or booking replacement",
+        "required_evidence": [
+          "user authorization specific to the irreversible change",
+          "authoritative status for the current booking"
+        ],
+        "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 status is preview, not cancelled."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly authorizes cancelling BK-1007."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 cancellation result shown so far is only preview, not confirmed cancellation."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancellation result shows status cancelled after confirm=true."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 status cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_24ab33f4efd21b",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_c0d199f06c7790",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "When reporting threshold-based cancellation outcomes here, the response should explain why the fee or refund applies by linking it to the reservation's current position relative to the policy boundary.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+        "required_evidence": [
+          "current-side boundary determination",
+          "policy consequence associated with that side"
+        ],
+        "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "BK-1007 preview gives a boundary-linked reason."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "BK-1008 preview gives a fee reason but not a current boundary-position explanation."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explains BK-1007 is about 46 hours from booking and still within 48 hours, while BK-1008 is about 50 hours and outside it."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview reason says within 48-hour free cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee outcome for international economy cancellation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_253919d9295e1e",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_3a72faf4725065",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete fee, refund, eligibility, or policy outcome, the agent must have current authoritative evidence that the reservation is eligible for that outcome under the applicable cancellation boundary.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+        "required_evidence": [
+          "current reservation details relevant to the boundary",
+          "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+        ],
+        "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96 and refund 384."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Authoritative preview for BK-1008 shows fee 96, refund 384, status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states BK-1008 fee $96 and refund $384 from the preview."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_6d10cf8249ae62",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_95ad2c8e3f1af3",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete cancellation policy outcome, establish from current authoritative evidence which side of the relevant time boundary the reservation is currently on.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+        "required_evidence": [
+          "current reservation timing relevant to the policy boundary",
+          "authoritative policy result or reason showing the active side of the boundary"
+        ],
+        "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asks how BK-1007 is still within the 48-hour free-cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview reason says 'Within 48-hour free cancellation window'."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "BK-1007 booked_at and departure_time are available."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_6d1a4758f5f679",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_f66f8758a7bae2",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If cancellation consequences depend on a timing threshold, report the exact current cancellation consequence from authoritative evidence, including any fee and refund that apply on the current side of the boundary.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+        "required_evidence": [
+          "authoritative current fee amount if any",
+          "authoritative current refund amount if any",
+          "authoritative reason or policy basis for the current outcome"
+        ],
+        "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96, refund 384, reason gives the fee formula."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96, refund 384, and reason text."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 confirmed cancellation shows fee 96, refund 384, and the fee formula reason."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reports BK-1008 fee $96 and refund $384."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Confirmed cancellation shows fee 96, refund 384, reason international economy cancellation fee."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_74eff612c1fa5d",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_95ad2c8e3f1af3",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating concrete cancellation outcomes that depend on a threshold, the response must establish from current authoritative evidence which side of the relevant time boundary the reservations are currently on.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+        "required_evidence": [
+          "current reservation timing relevant to the policy boundary",
+          "authoritative policy result or reason showing the active side of the boundary"
+        ],
+        "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for cancellation help."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Retrieved workflow says to preview cancellation terms before canceling."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel upcoming international flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Preview for BK-1007 gives reason 'Within 48-hour free cancellation window'."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Preview for BK-1008 gives a fee formula but no stated deadline or boundary side."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "BK-1007 booked_at is 2026-06-13T12:00:00."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "BK-1008 booked_at is 2026-06-13T08:00:00."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview reason says within 48-hour free cancellation window."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explains BK-1007 is about 46 hours since booking and BK-1008 about 50 hours, placing them on opposite sides of the 48-hour boundary."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_7a12d854b11c9c",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_3cfee76e4caf16",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "When delaying could cross a live cancellation boundary and materially change the outcome, the response should disclose the exact next consequence after that boundary from current authoritative evidence, or explicitly state that it is not established.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "pending_evidence",
+        "priority": 3,
+        "activation": "The observable policy reason shows a live time boundary whose crossing could change cancellation cost or refund.",
+        "required_evidence": [
+          "current authoritative evidence of the current outcome",
+          "current authoritative evidence of the next post-boundary consequence, or confirmation that it is not presently available"
+        ],
+        "discharge": "The response includes both the current outcome and the exact next consequence after the boundary when supported by evidence, or explicitly notes that the next consequence has not been established.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "BK-1007 preview indicates a live free-cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "BK-1008 preview shows a current fee/refund outcome."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview indicates a live 48-hour free-cancellation window with current fee 0 and refund 1400."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant places BK-1007 at about 46 hours since booking, near the 48-hour boundary."
+          }
+        ],
+        "missing_evidence": [
+          "Current authoritative evidence of the next post-boundary consequence for BK-1007 or authoritative confirmation it is not presently available",
+          "Assistant communication disclosing that next consequence or explicitly stating it is unverified"
+        ],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_826a09233372e7",
+        "template_id": "ct_660479c8bfbd9c",
+        "obligation_id": "obl_7c238665d99b3d",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Before giving concrete cancellation outcomes where a time-based rule matters, the response should explain which side of the cancellation boundary each reservation is currently on and why.",
+        "source": "completion_template:ct_660479c8bfbd9c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "Authoritative results indicate a time-based rule currently determines whether cancellation is free, refundable, or penalized.",
+        "required_evidence": [
+          "the authoritative boundary reason or rule text",
+          "current reservation timing facts needed to place the reservation on the correct side of the boundary"
+        ],
+        "discharge": "The response explicitly states the current status relative to the boundary and ties it to the governing timing rule.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks whether cancellation can be helped with for upcoming flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "BK-1007 preview references a free-cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "BK-1008 preview gives a fee rule but no explicit time boundary text."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview reason references the 48-hour free cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "BK-1007 booked_at is 2026-06-13T12:00:00."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "BK-1008 booked_at is 2026-06-13T08:00:00."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explains BK-1007 is about 46 hours from booking and BK-1008 about 50 hours, so BK-1007 is inside 48 hours and BK-1008 is outside."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "deadline_sensitive_cancellation_boundary_reporting",
+          "title": "Explain current cancellation side of a deadline and the next consequence of waiting"
+        }
+      },
+      {
+        "id": "learned_86ffc4411ec1e1",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_eb937f230e45ce",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The current reservation state must not be represented as changed, cancelled, or replaced unless explicit authorization for that exact irreversible change exists.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "before confirmation/authorization of cancellation or booking replacement",
+        "required_evidence": [
+          "user authorization specific to the irreversible change",
+          "authoritative status for the current booking"
+        ],
+        "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 status is preview, not cancelled."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly authorizes cancelling BK-1008."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 cancellation result shown so far is only preview, not confirmed cancellation."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancellation result shows status cancelled after confirm=true."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 status cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_8bfd955d83a72f",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_f66f8758a7bae2",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If these cancellation consequences depend on a timing threshold, the final communication should report the exact current fee, refund, and policy basis from authoritative evidence for the reservations in scope.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "pending",
+        "priority": 2,
+        "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+        "required_evidence": [
+          "authoritative current fee amount if any",
+          "authoritative current refund amount if any",
+          "authoritative reason or policy basis for the current outcome"
+        ],
+        "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "BK-1007 preview shows fee 0, refund 1400, reason 'Within 48-hour free cancellation window'."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "BK-1008 preview shows fee 96, refund 384, and fee reason text."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview shows fee 0, refund 1400, reason within 48-hour free cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96, refund 384, and fee reason text."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 confirmed cancellation matches fee 0 and refund 1400."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 confirmed cancellation matches fee 96 and refund 384."
+          }
+        ],
+        "missing_evidence": [
+          "Assistant final communication reporting the exact current cancellation consequence and policy basis for the reservations in scope"
+        ],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_900d75285f5075",
+        "template_id": "ct_17d6efba9f3b33",
+        "obligation_id": "obl_7733715a4e54b8",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "If the user later asks for confirmation after multiple reservation changes, each targeted reservation and any protected related reservation would need explicit final-state reporting.",
+        "source": "completion_template:ct_17d6efba9f3b33",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "the user asks for confirmation after a multi-reservation change",
+        "required_evidence": [
+          "status for each targeted reservation",
+          "status for any related reservation the user asked to protect"
+        ],
+        "discharge": "each targeted item is stated as canceled/modified and the protected item is stated as unchanged/active",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel both upcoming international flights, indicating a multi-reservation change intent."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Reservation list shows two booking IDs, consistent with multiple reservations in scope."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel both upcoming international flights, creating a multi-reservation change context."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Reservation list contains two booking IDs."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User authorizes cancellation of both reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancellation result shows status cancelled."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancellation result shows status cancelled."
+          }
+        ],
+        "missing_evidence": [
+          "A confirmation request after multiple reservation changes",
+          "A final assistant confirmation explicitly accounting for each targeted reservation"
+        ],
+        "scope": {
+          "family": "multi_entity_change_confirmation",
+          "title": "confirm multiple reservations changed while a protected reservation stays unchanged"
+        }
+      },
+      {
+        "id": "learned_9093bc1b367431",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_c0d199f06c7790",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Explain why the reported fee or refund applies by linking it to the reservation's current position relative to the policy boundary, not merely quoting an amount.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+        "required_evidence": [
+          "current-side boundary determination",
+          "policy consequence associated with that side"
+        ],
+        "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asks for the explanation of BK-1008's boundary position."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Preview reason gives an international economy cancellation fee formula."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explains BK-1008 is about 50 hours since booking and therefore outside the 48-hour free-cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96 and refund 384."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_9516787592d04e",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_3cfee76e4caf16",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If delay could cross a boundary, disclose the next consequence or note it is unverified.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "The observable policy reason shows a live time boundary whose crossing could change cancellation cost or refund.",
+        "required_evidence": [
+          "current authoritative evidence of the current outcome",
+          "current authoritative evidence of the next post-boundary consequence, or confirmation that it is not presently available"
+        ],
+        "discharge": "The response includes both the current outcome and the exact next consequence after the boundary when supported by evidence, or explicitly notes that the next consequence has not been established.",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "Current preview shows a fee and refund for BK-1008."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant communicated BK-1008 current fee and refund."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_a9da621fe5e853",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_3a72faf4725065",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete fee, refund, eligibility, or policy outcome, the agent must have current authoritative evidence that the reservation is eligible for that outcome under the applicable cancellation boundary.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+        "required_evidence": [
+          "current reservation details relevant to the boundary",
+          "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+        ],
+        "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview shows fee 0 and refund 1400."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Authoritative preview for BK-1007 shows fee 0, refund 1400, status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant states BK-1007 fee $0 and refund $1,400 from the preview."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_b2f93849f505b9",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_c0d199f06c7790",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Explain why the reported fee or refund applies by linking it to the reservation's current position relative to the policy boundary, not merely quoting an amount.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+        "required_evidence": [
+          "current-side boundary determination",
+          "policy consequence associated with that side"
+        ],
+        "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asks for the explanation of BK-1007's boundary position."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Preview reason ties the outcome to the 48-hour free-cancellation window."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_b39e11fe0c22b1",
+        "template_id": "ct_e1bc2bf5ae200a",
+        "obligation_id": "obl_95ad2c8e3f1af3",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete cancellation policy outcome, establish from current authoritative evidence which side of the relevant time boundary the reservation is currently on.",
+        "source": "completion_template:ct_e1bc2bf5ae200a",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+        "required_evidence": [
+          "current reservation timing relevant to the policy boundary",
+          "authoritative policy result or reason showing the active side of the boundary"
+        ],
+        "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+        "scope_key": "bk-1008",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asks how BK-1008 is outside the 48-hour free-cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview gives a fee formula and refund amount."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "BK-1008 booked_at and departure_time are available."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "BK-1008 booked_at is 2026-06-13T08:00:00."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant states BK-1008 is about 50 hours before the current time and therefore outside the 48-hour window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 preview shows fee 96 and reason international economy cancellation fee."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "cancellation_policy_boundary_transition_disclosure",
+          "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+        }
+      },
+      {
+        "id": "learned_c87d462da9e46c",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_3a72faf4725065",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete cancellation fee, refund, eligibility, or policy outcome for these hotel-like cancellation consequences, the assistant would need current authoritative preview or equivalent policy evidence for the reservation outcome.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "pending",
+        "priority": 1,
+        "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+        "required_evidence": [
+          "current reservation details relevant to the boundary",
+          "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+        ],
+        "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to cancel reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Authoritative preview exists for BK-1007 with fee 0 and refund 1400."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "Authoritative preview exists for BK-1008 with fee 96 and refund 384."
+          }
+        ],
+        "missing_evidence": [
+          "Assistant communication of any concrete cancellation consequence, if assessing satisfaction or violation"
+        ],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_d8ba8b17cfa329",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_2992e739c4afee",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "The final response must clearly report the current protected state or the completed replacement state, so the user can verify nothing was silently altered.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "any completed or pending booking-change conversation involving an existing reservation",
+        "required_evidence": [
+          "authoritative booking status for the original reservation",
+          "authoritative status for any replacement booking"
+        ],
+        "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 currently shows status preview/confirmed state not changed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 cancellation result is only a preview with status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly authorizes cancelling BK-1007."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancellation result shows status cancelled."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states BK-1007 is cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_e33f64f5702868",
+        "template_id": "ct_0b72f00a385642",
+        "obligation_id": "obl_f66f8758a7bae2",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If cancellation consequences depend on a timing threshold, report the exact current cancellation consequence from authoritative evidence, including any fee and refund that apply on the current side of the boundary.",
+        "source": "completion_template:ct_0b72f00a385642",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+        "required_evidence": [
+          "authoritative current fee amount if any",
+          "authoritative current refund amount if any",
+          "authoritative reason or policy basis for the current outcome"
+        ],
+        "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+        "scope_key": "bk-1007",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 preview shows fee 0, refund 1400, reason within free cancellation window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 confirmed cancellation shows fee 0, refund 1400, reason within free cancellation window."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reports BK-1007 fee $0 and refund $1,400."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Confirmed cancellation shows fee 0, refund 1400, reason within free cancellation window."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "travel_hotel_cancellation_boundary_grounding",
+          "title": "Ground cancellation outcome in current policy boundary evidence"
+        }
+      },
+      {
+        "id": "learned_e4ba5d7fdf2ec8",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_eb937f230e45ce",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The current reservations must not be represented as changed or cancelled unless the user explicitly authorizes that exact irreversible cancellation and authoritative booking status supports it.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "pending",
+        "priority": 1,
+        "activation": "before confirmation/authorization of cancellation or booking replacement",
+        "required_evidence": [
+          "user authorization specific to the irreversible change",
+          "authoritative status for the current booking"
+        ],
+        "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both upcoming international flights, discussing cancellation of existing reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Retrieved workflow says to preview cancellation terms before canceling and only execute after explicit user approval."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Retrieved workflow again indicates cancellation should only execute after explicit user approval."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Reservation list shows existing bookings BK-1007 and BK-1008."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both upcoming international flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 status is confirmed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 status is confirmed."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks for help canceling both flights."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Workflow says to preview cancellation terms before canceling and only execute after explicit user approval."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "BK-1007 cancellation result is only a preview."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T9",
+            "detail": "BK-1008 cancellation result is only a preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly authorizes cancelling BK-1007 and BK-1008."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 result remains preview only."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 result remains preview only."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancellation result shows status cancelled after confirm=true."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancellation result shows status cancelled after confirm=true."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_ed1dfd37058fb9",
+        "template_id": "ct_359207918e01a8",
+        "obligation_id": "obl_2992e739c4afee",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Final response should report current protected state or completed replacement state clearly.",
+        "source": "completion_template:ct_359207918e01a8",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "any completed or pending booking-change conversation involving an existing reservation",
+        "required_evidence": [
+          "authoritative booking status for the original reservation",
+          "authoritative status for any replacement booking"
+        ],
+        "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User is in a booking-change conversation involving existing reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Reservation list shows two existing booking IDs in scope."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User is discussing cancellation of existing reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 currently shows status confirmed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 currently shows status confirmed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Two existing booking IDs are in scope."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "BK-1007 currently shows confirmed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T5",
+            "detail": "BK-1008 currently shows confirmed."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User has now authorized cancellation of both reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "BK-1007 currently known booking status before execution is confirmed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "BK-1008 currently known booking status before execution is confirmed."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User authorized cancellation of both reservations."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancellation result shows status cancelled."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancellation result shows status cancelled."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states both flights are now cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_booking_state_preservation",
+          "title": "preserve protected booking state until a change is explicitly authorized"
+        }
+      },
+      {
+        "id": "learned_f7fab3d6c086fe",
+        "template_id": "ct_17d6efba9f3b33",
+        "obligation_id": "obl_7733715a4e54b8",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "Explicitly account for each targeted reservation in the final summary.",
+        "source": "completion_template:ct_17d6efba9f3b33",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "the user asks for confirmation after a multi-reservation change",
+        "required_evidence": [
+          "status for each targeted reservation",
+          "status for any related reservation the user asked to protect"
+        ],
+        "discharge": "each targeted item is stated as canceled/modified and the protected item is stated as unchanged/active",
+        "scope_key": "multi_booking_scope",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant states both flights are now cancelled."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "BK-1007 cancelled."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "BK-1008 cancelled."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_entity_change_confirmation",
+          "title": "confirm multiple reservations changed while a protected reservation stays unchanged"
+        }
+      },
+      {
+        "id": "runtime_08e5e91d4c201f",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The cancel_booking operation completed successfully.",
+        "source": "tool:cancel_booking:9",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 9,
+            "assistant_index": 6,
+            "tool": "cancel_booking",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1008",
+            "confirm": true
+          },
+          "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+          "preview_sequence": 9,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_175d511e65310c",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The cancel_booking operation completed successfully.",
+        "source": "tool:cancel_booking:8",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 8,
+            "assistant_index": 6,
+            "tool": "cancel_booking",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1007",
+            "confirm": true
+          },
+          "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+          "preview_sequence": 8,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_1e3725db933f17",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed cancel_booking operation.",
+        "source": "tool:cancel_booking:8",
+        "status": "violated",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 8,
+            "assistant_index": 7,
+            "tool": "cancel_booking",
+            "status": "preview",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 5,
+            "tool": "cancel_booking",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1007",
+            "confirm": false
+          },
+          "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+          "preview_sequence": 8,
+          "assistant_index": 7
+        }
+      },
+      {
+        "id": "runtime_b6c0a8635b710c",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed cancel_booking operation.",
+        "source": "tool:cancel_booking:9",
+        "status": "violated",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 9,
+            "assistant_index": 7,
+            "tool": "cancel_booking",
+            "status": "preview",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 5,
+            "tool": "cancel_booking",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_booking",
+          "arguments": {
+            "booking_id": "BK-1008",
+            "confirm": false
+          },
+          "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+          "preview_sequence": 9,
+          "assistant_index": 7
+        }
+      }
+    ],
+    "final_open_items": [
+      "learned_7a12d854b11c9c",
+      "learned_8bfd955d83a72f",
+      "learned_900d75285f5075",
+      "learned_c87d462da9e46c",
+      "learned_e4ba5d7fdf2ec8"
+    ],
+    "final_satisfied_items": [
+      "learned_13d219f83e2ea9",
+      "learned_1c097401687109",
+      "learned_24ab33f4efd21b",
+      "learned_253919d9295e1e",
+      "learned_6d10cf8249ae62",
+      "learned_6d1a4758f5f679",
+      "learned_74eff612c1fa5d",
+      "learned_826a09233372e7",
+      "learned_86ffc4411ec1e1",
+      "learned_9093bc1b367431",
+      "learned_9516787592d04e",
+      "learned_a9da621fe5e853",
+      "learned_b2f93849f505b9",
+      "learned_b39e11fe0c22b1",
+      "learned_d8ba8b17cfa329",
+      "learned_e33f64f5702868",
+      "learned_ed1dfd37058fb9",
+      "learned_f7fab3d6c086fe",
+      "runtime_08e5e91d4c201f",
+      "runtime_175d511e65310c"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [
+      "runtime_1e3725db933f17",
+      "runtime_b6c0a8635b710c"
+    ],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 3,
+      "pending_evidence": 2,
+      "satisfied": 20,
+      "violated": 2
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_900d75285f5075",
+          "template_id": "ct_17d6efba9f3b33",
+          "obligation_id": "obl_7733715a4e54b8",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the user later asks for confirmation after both targeted flight reservations are changed, each targeted reservation and any protected related reservation would need explicit final-state reporting.",
+          "source": "completion_template:ct_17d6efba9f3b33",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "the user asks for confirmation after a multi-reservation change",
+          "required_evidence": [
+            "status for each targeted reservation",
+            "status for any related reservation the user asked to protect"
+          ],
+          "discharge": "each targeted item is stated as canceled/modified and the protected item is stated as unchanged/active",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel both upcoming international flights, indicating a multi-reservation change intent."
+            }
+          ],
+          "missing_evidence": [
+            "Whether there is a related reservation the user wants kept active or unchanged",
+            "Any confirmation request after the multi-reservation change",
+            "Authoritative final status for each targeted reservation"
+          ],
+          "scope": {
+            "family": "multi_entity_change_confirmation",
+            "title": "confirm multiple reservations changed while a protected reservation stays unchanged"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_e4ba5d7fdf2ec8",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_eb937f230e45ce",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The current reservations must not be represented as changed or cancelled unless the user explicitly authorizes that exact irreversible cancellation and authoritative booking status supports it.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending",
+          "priority": 1,
+          "activation": "before confirmation/authorization of cancellation or booking replacement",
+          "required_evidence": [
+            "user authorization specific to the irreversible change",
+            "authoritative status for the current booking"
+          ],
+          "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks for help canceling both upcoming international flights, discussing cancellation of existing reservations."
+            }
+          ],
+          "missing_evidence": [
+            "Explicit authorization for the exact irreversible cancellation action beyond asking for help",
+            "Authoritative current status for the reservations"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ed1dfd37058fb9",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_2992e739c4afee",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "If the cancellation task is completed or wrapped up, the final response must clearly report whether the original reservations are cancelled or unchanged so nothing was silently altered.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending",
+          "priority": 2,
+          "activation": "any completed or pending booking-change conversation involving an existing reservation",
+          "required_evidence": [
+            "authoritative booking status for the original reservation",
+            "authoritative status for any replacement booking"
+          ],
+          "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User is in a booking-change conversation involving existing reservations."
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative booking status for the original reservations",
+            "Any completed cancellation outcome to report"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_74eff612c1fa5d",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_95ad2c8e3f1af3",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete cancellation outcome, current authoritative evidence must establish which side of any relevant cancellation time boundary the reservations are on.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+          "required_evidence": [
+            "current reservation timing relevant to the policy boundary",
+            "authoritative policy result or reason showing the active side of the boundary"
+          ],
+          "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks for cancellation help."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Retrieved workflow says to preview cancellation terms before canceling."
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative cancellation policy result with a deadline, grace period, cutoff, or other time boundary",
+            "Current reservation timing relative to any such policy boundary"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_175d511e65310c",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed cancel_booking operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:cancel_booking:8",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 8,
+              "assistant_index": 7,
+              "tool": "cancel_booking",
+              "status": "preview",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1007",
+              "confirm": false
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+            "preview_sequence": 8,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_1e3725db933f17",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed cancel_booking operation.",
+          "source": "tool:cancel_booking:8",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 8,
+              "assistant_index": 7,
+              "tool": "cancel_booking",
+              "status": "preview",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1007",
+              "confirm": false
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+            "preview_sequence": 8,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_08e5e91d4c201f",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed cancel_booking operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:cancel_booking:9",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 9,
+              "assistant_index": 7,
+              "tool": "cancel_booking",
+              "status": "preview",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1008",
+              "confirm": false
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+            "preview_sequence": 9,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 7,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_b6c0a8635b710c",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed cancel_booking operation.",
+          "source": "tool:cancel_booking:9",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 9,
+              "assistant_index": 7,
+              "tool": "cancel_booking",
+              "status": "preview",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1008",
+              "confirm": false
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+            "preview_sequence": 9,
+            "assistant_index": 7
+          }
+        }
+      },
+      {
+        "index": 8,
+        "event": "preview_refreshed",
+        "item_id": "runtime_175d511e65310c",
+        "tool": "cancel_booking",
+        "sequence": 10
+      },
+      {
+        "index": 9,
+        "event": "preview_refreshed",
+        "item_id": "runtime_08e5e91d4c201f",
+        "tool": "cancel_booking",
+        "sequence": 11
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c87d462da9e46c",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_3a72faf4725065",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete cancellation fee, refund, eligibility, or policy outcome for these hotel-like cancellation consequences, the assistant would need current authoritative preview or equivalent policy evidence for the reservation outcome.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+          "required_evidence": [
+            "current reservation details relevant to the boundary",
+            "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+          ],
+          "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to cancel reservations."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "Authoritative preview exists for BK-1007 with fee 0 and refund 1400."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "Authoritative preview exists for BK-1008 with fee 96 and refund 384."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant communication of any concrete cancellation consequence, if assessing satisfaction or violation"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8bfd955d83a72f",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_f66f8758a7bae2",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If cancellation consequences depend on a timing threshold, the final communication should report the exact current fee, refund, and policy basis from authoritative evidence.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+          "required_evidence": [
+            "authoritative current fee amount if any",
+            "authoritative current refund amount if any",
+            "authoritative reason or policy basis for the current outcome"
+          ],
+          "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "BK-1007 preview shows fee 0, refund 1400, reason 'Within 48-hour free cancellation window'."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "BK-1008 preview shows fee 96, refund 384, and fee reason text."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant final communication reporting the exact current cancellation consequence and policy basis"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 12,
+        "event": "item_created",
+        "item": {
+          "id": "learned_826a09233372e7",
+          "template_id": "ct_660479c8bfbd9c",
+          "obligation_id": "obl_7c238665d99b3d",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Before giving a concrete cancellation outcome or recommendation where a time-based rule may matter, explain which side of the relevant cancellation boundary the reservations are currently on and why.",
+          "source": "completion_template:ct_660479c8bfbd9c",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "Authoritative results indicate a time-based rule currently determines whether cancellation is free, refundable, or penalized.",
+          "required_evidence": [
+            "the authoritative boundary reason or rule text",
+            "current reservation timing facts needed to place the reservation on the correct side of the boundary"
+          ],
+          "discharge": "The response explicitly states the current status relative to the boundary and ties it to the governing timing rule.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks whether cancellation can be helped with for upcoming flights."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "BK-1007 preview references a free-cancellation window."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "BK-1008 preview gives a fee rule but no explicit time boundary text."
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative boundary reason or rule text establishing the current side for each reservation",
+            "Current reservation timing facts needed to place BK-1008 relative to any boundary"
+          ],
+          "scope": {
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "title": "Explain current cancellation side of a deadline and the next consequence of waiting"
+          }
+        }
+      },
+      {
+        "index": 13,
+        "event": "item_created",
+        "item": {
+          "id": "learned_24ab33f4efd21b",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_c0d199f06c7790",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "If a fee or refund is reported based on a threshold or deadline, the response should explain why that outcome applies by linking it to the reservation's current position relative to the policy boundary.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+          "required_evidence": [
+            "current-side boundary determination",
+            "policy consequence associated with that side"
+          ],
+          "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "BK-1007 preview gives a boundary-linked reason."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "BK-1008 preview gives a fee reason but not a current boundary-position explanation."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant communication linking any reported fee/refund to the reservation's current side of the policy boundary"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 14,
+        "event": "item_created",
+        "item": {
+          "id": "learned_7a12d854b11c9c",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_3cfee76e4caf16",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "When delaying could cross a cancellation boundary and materially change the outcome, disclose the exact next consequence after the boundary from current authoritative evidence, or explicitly note that it is not established.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending_evidence",
+          "priority": 3,
+          "activation": "The observable policy reason shows a live time boundary whose crossing could change cancellation cost or refund.",
+          "required_evidence": [
+            "current authoritative evidence of the current outcome",
+            "current authoritative evidence of the next post-boundary consequence, or confirmation that it is not presently available"
+          ],
+          "discharge": "The response includes both the current outcome and the exact next consequence after the boundary when supported by evidence, or explicitly notes that the next consequence has not been established.",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T8",
+              "detail": "BK-1007 preview indicates a live free-cancellation window."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T9",
+              "detail": "BK-1008 preview shows a current fee/refund outcome."
+            }
+          ],
+          "missing_evidence": [
+            "Current authoritative evidence of the next post-boundary consequence for any reservation with a live boundary",
+            "Or authoritative confirmation that the exact next consequence is not presently available",
+            "Assistant communication disclosing that next consequence or explicitly stating it is unverified"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 15,
+        "event": "preview_refreshed",
+        "item_id": "runtime_175d511e65310c",
+        "tool": "cancel_booking",
+        "sequence": 4
+      },
+      {
+        "index": 16,
+        "event": "preview_refreshed",
+        "item_id": "runtime_08e5e91d4c201f",
+        "tool": "cancel_booking",
+        "sequence": 5
+      },
+      {
+        "index": 17,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6d10cf8249ae62",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_95ad2c8e3f1af3",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete cancellation policy outcome, establish from current authoritative evidence which side of the relevant time boundary the reservation is currently on.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+          "required_evidence": [
+            "current reservation timing relevant to the policy boundary",
+            "authoritative policy result or reason showing the active side of the boundary"
+          ],
+          "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User asks how BK-1007 is still within the 48-hour free-cancellation window."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "BK-1007 preview reason says 'Within 48-hour free cancellation window'."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "BK-1007 booked_at and departure_time are available."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 18,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b2f93849f505b9",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_c0d199f06c7790",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Explain why the reported fee or refund applies by linking it to the reservation's current position relative to the policy boundary, not merely quoting an amount.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+          "required_evidence": [
+            "current-side boundary determination",
+            "policy consequence associated with that side"
+          ],
+          "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User asks for the explanation of BK-1007's boundary position."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Preview reason ties the outcome to the 48-hour free-cancellation window."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 19,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b39e11fe0c22b1",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_95ad2c8e3f1af3",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete cancellation policy outcome, establish from current authoritative evidence which side of the relevant time boundary the reservation is currently on.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A cancellation or change outcome depends on a stated deadline or threshold.",
+          "required_evidence": [
+            "current reservation timing relevant to the policy boundary",
+            "authoritative policy result or reason showing the active side of the boundary"
+          ],
+          "discharge": "The response is grounded in current evidence that the reservation is presently before, after, or otherwise within the relevant policy boundary.",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User asks how BK-1008 is outside the 48-hour free-cancellation window."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "BK-1008 preview gives a fee formula and refund amount."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "BK-1008 booked_at and departure_time are available."
+            }
+          ],
+          "missing_evidence": [
+            "Authoritative boundary reason or rule text showing BK-1008's current side of the cancellation boundary"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 20,
+        "event": "item_created",
+        "item": {
+          "id": "learned_9093bc1b367431",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_c0d199f06c7790",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Explain why the reported fee or refund applies by linking it to the reservation's current position relative to the policy boundary, not merely quoting an amount.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A fee, refund, or eligibility outcome is justified by a threshold or deadline.",
+          "required_evidence": [
+            "current-side boundary determination",
+            "policy consequence associated with that side"
+          ],
+          "discharge": "The response states the current-side rationale for the outcome, such as that the reservation is still within a no-fee window or has passed into a penalty window.",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User asks for the explanation of BK-1008's boundary position."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Preview reason gives an international economy cancellation fee formula."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant communication linking BK-1008's fee/refund to the reservation's current side of the policy boundary"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 21,
+        "event": "item_created",
+        "item": {
+          "id": "learned_9516787592d04e",
+          "template_id": "ct_e1bc2bf5ae200a",
+          "obligation_id": "obl_3cfee76e4caf16",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "When delaying could cross the boundary and materially change the outcome, disclose the exact next consequence from current authoritative evidence, including the fee or refund that would apply after the boundary if known.",
+          "source": "completion_template:ct_e1bc2bf5ae200a",
+          "status": "pending_evidence",
+          "priority": 3,
+          "activation": "The observable policy reason shows a live time boundary whose crossing could change cancellation cost or refund.",
+          "required_evidence": [
+            "current authoritative evidence of the current outcome",
+            "current authoritative evidence of the next post-boundary consequence, or confirmation that it is not presently available"
+          ],
+          "discharge": "The response includes both the current outcome and the exact next consequence after the boundary when supported by evidence, or explicitly notes that the next consequence has not been established.",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "Current preview shows a fee and refund for BK-1008."
+            }
+          ],
+          "missing_evidence": [
+            "Current authoritative evidence of the next post-boundary consequence for BK-1008 or confirmation it is not presently available",
+            "Assistant communication disclosing that next consequence or explicitly stating it is unverified"
+          ],
+          "scope": {
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "title": "Policy-boundary disclosure for time-sensitive cancellation outcomes"
+          }
+        }
+      },
+      {
+        "index": 22,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a9da621fe5e853",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_3a72faf4725065",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete fee, refund, eligibility, or policy outcome, the agent must have current authoritative evidence that the reservation is eligible for that outcome under the applicable cancellation boundary.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+          "required_evidence": [
+            "current reservation details relevant to the boundary",
+            "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+          ],
+          "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "BK-1007 preview shows fee 0 and refund 1400."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant communication stating or implying the concrete cancellation consequence for BK-1007"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 23,
+        "event": "item_created",
+        "item": {
+          "id": "learned_e33f64f5702868",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_f66f8758a7bae2",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If cancellation consequences depend on a timing threshold, report the exact current cancellation consequence from authoritative evidence, including any fee and refund that apply on the current side of the boundary.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+          "required_evidence": [
+            "authoritative current fee amount if any",
+            "authoritative current refund amount if any",
+            "authoritative reason or policy basis for the current outcome"
+          ],
+          "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "BK-1007 preview shows fee 0, refund 1400, reason within free cancellation window."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant final communication reporting BK-1007's exact current cancellation consequence and policy basis"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 24,
+        "event": "item_created",
+        "item": {
+          "id": "learned_253919d9295e1e",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_3a72faf4725065",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete fee, refund, eligibility, or policy outcome, the agent must have current authoritative evidence that the reservation is eligible for that outcome under the applicable cancellation boundary.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A response would state or imply a specific cancellation consequence such as free cancellation, a refund amount, or a fee.",
+          "required_evidence": [
+            "current reservation details relevant to the boundary",
+            "current authoritative cancellation preview or equivalent policy evidence showing the applicable outcome"
+          ],
+          "discharge": "Satisfied when the claimed cancellation consequence matches authoritative current evidence; violated if a concrete outcome is stated without such grounding.",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "BK-1008 preview shows fee 96 and refund 384."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant communication stating or implying the concrete cancellation consequence for BK-1008"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 25,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6d1a4758f5f679",
+          "template_id": "ct_0b72f00a385642",
+          "obligation_id": "obl_f66f8758a7bae2",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If cancellation consequences depend on a timing threshold, report the exact current cancellation consequence from authoritative evidence, including any fee and refund that apply on the current side of the boundary.",
+          "source": "completion_template:ct_0b72f00a385642",
+          "status": "pending",
+          "priority": 2,
+          "activation": "A timing or policy threshold determines whether cancellation is free, penalized, or refundable.",
+          "required_evidence": [
+            "authoritative current fee amount if any",
+            "authoritative current refund amount if any",
+            "authoritative reason or policy basis for the current outcome"
+          ],
+          "discharge": "Satisfied when the final response communicates the exact current fee/refund consequence and policy basis without guessing.",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "BK-1008 preview shows fee 96, refund 384, reason gives the fee formula."
+            }
+          ],
+          "missing_evidence": [
+            "Assistant final communication reporting BK-1008's exact current cancellation consequence and policy basis"
+          ],
+          "scope": {
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "title": "Ground cancellation outcome in current policy boundary evidence"
+          }
+        }
+      },
+      {
+        "index": 26,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1c097401687109",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_eb937f230e45ce",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The current reservation state must not be represented as changed, cancelled, or replaced unless explicit authorization for that exact irreversible change exists.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending",
+          "priority": 1,
+          "activation": "before confirmation/authorization of cancellation or booking replacement",
+          "required_evidence": [
+            "user authorization specific to the irreversible change",
+            "authoritative status for the current booking"
+          ],
+          "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks for help canceling both flights."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "BK-1007 status is preview, not cancelled."
+            }
+          ],
+          "missing_evidence": [
+            "Explicit user authorization to execute BK-1007 cancellation",
+            "Authoritative confirmed cancellation status for BK-1007 if executed"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 27,
+        "event": "item_created",
+        "item": {
+          "id": "learned_86ffc4411ec1e1",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_eb937f230e45ce",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The current reservation state must not be represented as changed, cancelled, or replaced unless explicit authorization for that exact irreversible change exists.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending",
+          "priority": 1,
+          "activation": "before confirmation/authorization of cancellation or booking replacement",
+          "required_evidence": [
+            "user authorization specific to the irreversible change",
+            "authoritative status for the current booking"
+          ],
+          "discharge": "either the booking remains confirmed/unchanged, or the final report is grounded in confirmed cancellation/replacement evidence; prior false change claims remain invalid",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks for help canceling both flights."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "BK-1008 status is preview, not cancelled."
+            }
+          ],
+          "missing_evidence": [
+            "Explicit user authorization to execute BK-1008 cancellation",
+            "Authoritative confirmed cancellation status for BK-1008 if executed"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 28,
+        "event": "item_created",
+        "item": {
+          "id": "learned_d8ba8b17cfa329",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_2992e739c4afee",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "The final response must clearly report the current protected state or the completed replacement state, so the user can verify nothing was silently altered.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "any completed or pending booking-change conversation involving an existing reservation",
+          "required_evidence": [
+            "authoritative booking status for the original reservation",
+            "authoritative status for any replacement booking"
+          ],
+          "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+          "scope_key": "bk-1007",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "BK-1007 currently shows status preview/confirmed state not changed."
+            }
+          ],
+          "missing_evidence": [
+            "A wrap-up assistant message",
+            "Authoritative final status for BK-1007 after any authorized action"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": "item_created",
+        "item": {
+          "id": "learned_13d219f83e2ea9",
+          "template_id": "ct_359207918e01a8",
+          "obligation_id": "obl_2992e739c4afee",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "The final response must clearly report the current protected state or the completed replacement state, so the user can verify nothing was silently altered.",
+          "source": "completion_template:ct_359207918e01a8",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "any completed or pending booking-change conversation involving an existing reservation",
+          "required_evidence": [
+            "authoritative booking status for the original reservation",
+            "authoritative status for any replacement booking"
+          ],
+          "discharge": "final utterance explicitly states whether the original booking is cancelled/unchanged and what the replacement status is, with no ambiguity",
+          "scope_key": "bk-1008",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T5",
+              "detail": "BK-1008 currently shows status preview/confirmed state not changed."
+            }
+          ],
+          "missing_evidence": [
+            "A wrap-up assistant message",
+            "Authoritative final status for BK-1008 after any authorized action"
+          ],
+          "scope": {
+            "family": "protected_booking_state_preservation",
+            "title": "preserve protected booking state until a change is explicitly authorized"
+          }
+        }
+      },
+      {
+        "index": 30,
+        "event": "transition",
+        "item_id": "learned_24ab33f4efd21b",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 31,
+        "event": "transition",
+        "item_id": "learned_253919d9295e1e",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 32,
+        "event": "transition",
+        "item_id": "learned_74eff612c1fa5d",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 33,
+        "event": "transition",
+        "item_id": "learned_826a09233372e7",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 34,
+        "event": "transition",
+        "item_id": "learned_9093bc1b367431",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 35,
+        "event": "transition",
+        "item_id": "learned_a9da621fe5e853",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 36,
+        "event": "transition",
+        "item_id": "runtime_175d511e65310c",
+        "previous": "awaiting_confirmation",
+        "status": "satisfied",
+        "reason": "confirmed_mutation_succeeded"
+      },
+      {
+        "index": 37,
+        "event": "transition",
+        "item_id": "runtime_1e3725db933f17",
+        "previous": "pending",
+        "status": "violated",
+        "reason": "operation_completed_without_a_bound_confirmation"
+      },
+      {
+        "index": 38,
+        "event": "transition",
+        "item_id": "runtime_08e5e91d4c201f",
+        "previous": "awaiting_confirmation",
+        "status": "satisfied",
+        "reason": "confirmed_mutation_succeeded"
+      },
+      {
+        "index": 39,
+        "event": "transition",
+        "item_id": "runtime_b6c0a8635b710c",
+        "previous": "pending",
+        "status": "violated",
+        "reason": "operation_completed_without_a_bound_confirmation"
+      },
+      {
+        "index": 40,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_175d511e65310c",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The cancel_booking operation completed successfully.",
+          "source": "tool:cancel_booking:8",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 8,
+              "assistant_index": 6,
+              "tool": "cancel_booking",
+              "status": "cancelled",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1007\", \"cancellation_fee\": 0, \"reason\": \"Within 48-hour free cancellation window\", \"refund_amount\": 1400, \"status\": \"cancelled\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1007",
+              "confirm": true
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1007\"}]",
+            "preview_sequence": 8,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 41,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_08e5e91d4c201f",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The cancel_booking operation completed successfully.",
+          "source": "tool:cancel_booking:9",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 9,
+              "assistant_index": 6,
+              "tool": "cancel_booking",
+              "status": "cancelled",
+              "success": true,
+              "result": "{\"booking_id\": \"BK-1008\", \"cancellation_fee\": 96, \"reason\": \"International economy cancellation fee: max($75, 20% of $480) = $96\", \"refund_amount\": 384, \"status\": \"cancelled\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1008",
+              "confirm": true
+            },
+            "action_key": "[\"cancel_booking\", {\"booking_id\": \"BK-1008\"}]",
+            "preview_sequence": 9,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 42,
+        "event": "transition",
+        "item_id": "learned_d8ba8b17cfa329",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 43,
+        "event": "transition",
+        "item_id": "learned_13d219f83e2ea9",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 44,
+        "event": "transition",
+        "item_id": "learned_b39e11fe0c22b1",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 45,
+        "event": "transition",
+        "item_id": "learned_d8ba8b17cfa329",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 46,
+        "event": "transition",
+        "item_id": "learned_13d219f83e2ea9",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 47,
+        "event": "transition",
+        "item_id": "learned_e33f64f5702868",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 48,
+        "event": "transition",
+        "item_id": "learned_6d1a4758f5f679",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 49,
+        "event": "item_created",
+        "item": {
+          "id": "learned_f7fab3d6c086fe",
+          "template_id": "ct_17d6efba9f3b33",
+          "obligation_id": "obl_7733715a4e54b8",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "Explicitly account for each targeted reservation in the final summary.",
+          "source": "completion_template:ct_17d6efba9f3b33",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "the user asks for confirmation after a multi-reservation change",
+          "required_evidence": [
+            "status for each targeted reservation",
+            "status for any related reservation the user asked to protect"
+          ],
+          "discharge": "each targeted item is stated as canceled/modified and the protected item is stated as unchanged/active",
+          "scope_key": "multi_booking_scope",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M5",
+              "detail": "Assistant states both flights are now cancelled."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "BK-1007 cancelled."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T7",
+              "detail": "BK-1008 cancelled."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "multi_entity_change_confirmation",
+            "title": "confirm multiple reservations changed while a protected reservation stays unchanged"
+          }
+        }
+      },
+      {
+        "index": 50,
+        "event": "transition",
+        "item_id": "learned_1c097401687109",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 51,
+        "event": "transition",
+        "item_id": "learned_86ffc4411ec1e1",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 52,
+        "event": "transition",
+        "item_id": "learned_9516787592d04e",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 53,
+        "event": "transition",
+        "item_id": "learned_ed1dfd37058fb9",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "085846a1bcc036d1672ff588732fc3bc1c098b7d6d472ccbc06bcd8cfcb669c4",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help?",
+        "candidates": [
+          {
+            "id": "ct_17d6efba9f3b33",
+            "family": "multi_entity_change_confirmation",
+            "score": 14.054372
+          },
+          {
+            "id": "ct_91687952d4728d",
+            "family": "profile_benefit_resolution_with_proactive_disclosure",
+            "score": 12.441979
+          },
+          {
+            "id": "ct_39f11753537b6b",
+            "family": "time_boundary_consequence_disclosure_for_cancellation_terms",
+            "score": 12.812993
+          },
+          {
+            "id": "ct_2abad59544e360",
+            "family": "travel_change_completion_confirmation",
+            "score": 12.567624
+          },
+          {
+            "id": "ct_d808e9487db395",
+            "family": "threshold_boundary_transition",
+            "score": 12.440023
+          },
+          {
+            "id": "ct_be03e596df46c0",
+            "family": "travel_price_comparison_decision",
+            "score": 11.892237
+          },
+          {
+            "id": "ct_ded8e43884a66a",
+            "family": "cancel_one_reservation_with_remaining_itinerary_check",
+            "score": 11.762825
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 12.010642
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "f38dbb2f41990cbe9def18d1c7358db0dd0a5f0e8f065a067eae45514e1d811a",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? retrieve_learnings retrieve_learnings",
+        "candidates": [
+          {
+            "id": "ct_17d6efba9f3b33",
+            "family": "multi_entity_change_confirmation",
+            "score": 13.471039
+          },
+          {
+            "id": "ct_91687952d4728d",
+            "family": "profile_benefit_resolution_with_proactive_disclosure",
+            "score": 11.593494
+          },
+          {
+            "id": "ct_39f11753537b6b",
+            "family": "time_boundary_consequence_disclosure_for_cancellation_terms",
+            "score": 12.150114
+          },
+          {
+            "id": "ct_2abad59544e360",
+            "family": "travel_change_completion_confirmation",
+            "score": 11.719139
+          },
+          {
+            "id": "ct_d808e9487db395",
+            "family": "threshold_boundary_transition",
+            "score": 11.591538
+          },
+          {
+            "id": "ct_ff8f9774b32b75",
+            "family": "protected_related_entity_state",
+            "score": 10.787044
+          },
+          {
+            "id": "ct_be03e596df46c0",
+            "family": "travel_price_comparison_decision",
+            "score": 11.043752
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 11.162157
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "e27759566d0302a1591c5b49aa6aede37ccbdb5b8484bb37dc0255b4b8fd621c",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? retrieve_learnings retrieve_learnings get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids",
+        "candidates": [
+          {
+            "id": "ct_17d6efba9f3b33",
+            "family": "multi_entity_change_confirmation",
+            "score": 19.156799
+          },
+          {
+            "id": "ct_91687952d4728d",
+            "family": "profile_benefit_resolution_with_proactive_disclosure",
+            "score": 16.704662
+          },
+          {
+            "id": "ct_39f11753537b6b",
+            "family": "time_boundary_consequence_disclosure_for_cancellation_terms",
+            "score": 17.067072
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 17.866839
+          },
+          {
+            "id": "ct_2abad59544e360",
+            "family": "travel_change_completion_confirmation",
+            "score": 16.883649
+          },
+          {
+            "id": "ct_ff8f9774b32b75",
+            "family": "protected_related_entity_state",
+            "score": 16.472231
+          },
+          {
+            "id": "ct_d808e9487db395",
+            "family": "threshold_boundary_transition",
+            "score": 16.842978
+          },
+          {
+            "id": "ct_86ef40665f47ba",
+            "family": "account_linked_benefit_resolution_before_cancellation_totals",
+            "score": 15.817786
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "e37e963287e15e748a17087bd99eab87c11ea93b8f97a16dac65aad708eb82f2",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? retrieve_learnings retrieve_learnings get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids get_booking booking_id BK-1007 user_id user_001 flight_id DL100 status confirmed cabin_class business seat_type aisle meal_preference kosher add_wifi true add_extra_legroom true add_insurance false price_paid payment_method credit_card points_used cash_amount booked_at 2026-06-13T12:00:00 cancellation_f...",
+        "candidates": [
+          {
+            "id": "ct_2392ca8a24d013",
+            "family": "return_change_confirmation_with_final_cost_report",
+            "score": 30.545315
+          },
+          {
+            "id": "ct_2eb31932c0c8ae",
+            "family": "loyalty_benefit_and_related_itinerary_disclosure",
+            "score": 30.140424
+          },
+          {
+            "id": "ct_897d46bd76c2e6",
+            "family": "authorized_multi_booking_change_with_preserved_preferences",
+            "score": 25.129806
+          },
+          {
+            "id": "ct_e1bc2bf5ae200a",
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "score": 19.57133
+          },
+          {
+            "id": "ct_05ab5c1c4c7b14",
+            "family": "travel_booking_unchanged_status",
+            "score": 29.260225
+          },
+          {
+            "id": "ct_30c0e232fa5dd1",
+            "family": "account_linked_benefit_resolution_before_cost_commitment",
+            "score": 28.426612
+          },
+          {
+            "id": "ct_ac7409095f7041",
+            "family": "selected_replacement_option_details_for_each_booking",
+            "score": 29.328513
+          },
+          {
+            "id": "ct_cdb5642257f3b0",
+            "family": "flight_search_basis_and_preference_match_reporting",
+            "score": 29.305611
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "118f74a64a06505cfd89ad56aeffa1246d8a46efd63887d5a716f285e9ee958c",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? retrieve_learnings retrieve_learnings get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids get_user_reservations user_id user_001 booking_ids BK-1007 BK-1008 hotel_ids car_rental_ids get_booking booking_id BK-1007 user_id user_001 flight_id DL100 status confirmed cabin_class business seat_type aisle meal_preference kosher add_wifi true add_extra_legroom true add_insurance false price_paid payment_method credit_card points_used cash_amount booked_at 2026-06-13T12:00:00 cancellation_f...",
+        "candidates": [
+          {
+            "id": "ct_0b72f00a385642",
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "score": 62.454786
+          },
+          {
+            "id": "ct_660479c8bfbd9c",
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "score": 48.994571
+          },
+          {
+            "id": "ct_2eb31932c0c8ae",
+            "family": "loyalty_benefit_and_related_itinerary_disclosure",
+            "score": 34.335672
+          },
+          {
+            "id": "ct_b171597e1960f1",
+            "family": "same_day_alternate_flight_search_scope_and_no_option_report",
+            "score": 45.220664
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 28.08582
+          },
+          {
+            "id": "ct_bf9be42bddca95",
+            "family": "time_window_boundary_policy_disclosure",
+            "score": 44.997322
+          },
+          {
+            "id": "ct_e1bc2bf5ae200a",
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "score": 52.421387
+          },
+          {
+            "id": "ct_ab16301fce1901",
+            "family": "boundary_transition_cost_change",
+            "score": 40.894223
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "9b40db5a4d4ad3c215a5d1a8b6bfe99b7a3d5f0b23ad186fae81b9a97e23605f",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? That surprises me a little since I thought both were booked around two days ago. Can you show me the exact booking timestamps or explain how you determined BK-1007 is still within the 48-hour free-cancellation window but BK-1008 is outside it? Yes — I found two upcoming international flight bookings on your account: - BK-1007: SFO → NRT, 2026-06-28 11:00, business - BK-1008: JFK → LHR, 2026-06-30 19:45, economy I also pulled the cancellation previews: - BK-1007: fee $0, refund $1,400 - Reason: within 48-hour free cancell...",
+        "candidates": [
+          {
+            "id": "ct_0b72f00a385642",
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "score": 73.143622
+          },
+          {
+            "id": "ct_bf9be42bddca95",
+            "family": "time_window_boundary_policy_disclosure",
+            "score": 65.294197
+          },
+          {
+            "id": "ct_660479c8bfbd9c",
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "score": 58.769454
+          },
+          {
+            "id": "ct_2eb31932c0c8ae",
+            "family": "loyalty_benefit_and_related_itinerary_disclosure",
+            "score": 46.997275
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 42.599509
+          },
+          {
+            "id": "ct_05ab5c1c4c7b14",
+            "family": "travel_booking_unchanged_status",
+            "score": 58.541128
+          },
+          {
+            "id": "ct_2392ca8a24d013",
+            "family": "return_change_confirmation_with_final_cost_report",
+            "score": 57.125326
+          },
+          {
+            "id": "ct_ab16301fce1901",
+            "family": "boundary_transition_cost_change",
+            "score": 57.942851
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "ba5db6e3f0f10283b1c43af42b3d0a5e2fb94d1dd02675fae5de59b07b4a65c8",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? That surprises me a little since I thought both were booked around two days ago. Can you show me the exact booking timestamps or explain how you determined BK-1007 is still within the 48-hour free-cancellation window but BK-1008 is outside it? Got it — that makes sense. Please cancel BK-1007 with the $0 fee and $1,400 refund, and BK-1008 with the $96 fee and $384 refund. Yes — I found two upcoming international flight bookings on your account: - BK-1007: SFO → NRT, 2026-06-28 11:00, business - BK-1008: JFK → LHR, 2026-06...",
+        "candidates": [
+          {
+            "id": "ct_0b72f00a385642",
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "score": 90.039884
+          },
+          {
+            "id": "ct_bf9be42bddca95",
+            "family": "time_window_boundary_policy_disclosure",
+            "score": 76.794691
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 60.731085
+          },
+          {
+            "id": "ct_660479c8bfbd9c",
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "score": 69.084323
+          },
+          {
+            "id": "ct_d4cd21d4436c86",
+            "family": "lowest_cost_multi_booking_change_with_constraint_match",
+            "score": 60.595942
+          },
+          {
+            "id": "ct_2392ca8a24d013",
+            "family": "return_change_confirmation_with_final_cost_report",
+            "score": 68.716195
+          },
+          {
+            "id": "ct_e1bc2bf5ae200a",
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "score": 85.824755
+          },
+          {
+            "id": "ct_05ab5c1c4c7b14",
+            "family": "travel_booking_unchanged_status",
+            "score": 61.326708
+          }
+        ]
+      },
+      {
+        "index": 7,
+        "query_sha256": "33ba48f98b0439f2d14d0bfaed0cfb90df5441dab02580eb342f1d379bb8564d",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? That surprises me a little since I thought both were booked around two days ago. Can you show me the exact booking timestamps or explain how you determined BK-1007 is still within the 48-hour free-cancellation window but BK-1008 is outside it? Got it — that makes sense. Please cancel BK-1007 with the $0 fee and $1,400 refund, and BK-1008 with the $96 fee and $384 refund. Yes — I found two upcoming international flight bookings on your account: - BK-1007: SFO → NRT, 2026-06-28 11:00, business - BK-1008: JFK → LHR, 2026-06...",
+        "candidates": [
+          {
+            "id": "ct_0b72f00a385642",
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "score": 99.905346
+          },
+          {
+            "id": "ct_bf9be42bddca95",
+            "family": "time_window_boundary_policy_disclosure",
+            "score": 78.047445
+          },
+          {
+            "id": "ct_ca3deb3a2bc859",
+            "family": "travel_rebook_tradeoff_with_final_verification",
+            "score": 62.177041
+          },
+          {
+            "id": "ct_660479c8bfbd9c",
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "score": 70.440397
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 61.772515
+          },
+          {
+            "id": "ct_e1bc2bf5ae200a",
+            "family": "cancellation_policy_boundary_transition_disclosure",
+            "score": 85.823913
+          },
+          {
+            "id": "ct_cdb5642257f3b0",
+            "family": "flight_search_basis_and_preference_match_reporting",
+            "score": 67.033388
+          },
+          {
+            "id": "ct_d4cd21d4436c86",
+            "family": "lowest_cost_multi_booking_change_with_constraint_match",
+            "score": 61.348754
+          }
+        ]
+      },
+      {
+        "index": 8,
+        "query_sha256": "b0ec3388db0e4e34015ec6927dec2acfc1a4719ccc4aa9e047cab1e6dd80496e",
+        "query_preview": "I need to cancel both my upcoming international flights. Can you help? That surprises me a little since I thought both were booked around two days ago. Can you show me the exact booking timestamps or explain how you determined BK-1007 is still within the 48-hour free-cancellation window but BK-1008 is outside it? Got it — that makes sense. Please cancel BK-1007 with the $0 fee and $1,400 refund, and BK-1008 with the $96 fee and $384 refund. Yes — I found two upcoming international flight bookings on your account: - BK-1007: SFO → NRT, 2026-06-28 11:00, business - BK-1008: JFK → LHR, 2026-06...",
+        "candidates": [
+          {
+            "id": "ct_0b72f00a385642",
+            "family": "travel_hotel_cancellation_boundary_grounding",
+            "score": 103.864807
+          },
+          {
+            "id": "ct_ab16301fce1901",
+            "family": "boundary_transition_cost_change",
+            "score": 72.879356
+          },
+          {
+            "id": "ct_359207918e01a8",
+            "family": "protected_booking_state_preservation",
+            "score": 66.677035
+          },
+          {
+            "id": "ct_660479c8bfbd9c",
+            "family": "deadline_sensitive_cancellation_boundary_reporting",
+            "score": 74.290009
+          },
+          {
+            "id": "ct_5c665a16b75af7",
+            "family": "multi_entity_change_status_summary",
+            "score": 64.421767
+          },
+          {
+            "id": "ct_bf9be42bddca95",
+            "family": "time_window_boundary_policy_disclosure",
+            "score": 82.395532
+          },
+          {
+            "id": "ct_2392ca8a24d013",
+            "family": "return_change_confirmation_with_final_cost_report",
+            "score": 72.606955
+          },
+          {
+            "id": "ct_05ab5c1c4c7b14",
+            "family": "travel_booking_unchanged_status",
+            "score": 67.251248
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "ccce3e8d87c905c1f28d2d67b082a76ae78c98c2d458600439b7a6a04815940e",
+        "candidate_ids": [
+          "ct_17d6efba9f3b33",
+          "ct_91687952d4728d",
+          "ct_39f11753537b6b",
+          "ct_2abad59544e360",
+          "ct_d808e9487db395",
+          "ct_be03e596df46c0",
+          "ct_ded8e43884a66a",
+          "ct_359207918e01a8"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 4213,
+          "output_tokens": 415
+        },
+        "response_sha256": "436005f83b6d9de8e3eda47600983cb6486abd736a82cc120ef041cd68da31c4",
+        "returned_items": 3
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "46b0db2d7c17118cc5fc2334f072525af58363bd48f3c956be7270e1e89a6ffc",
+        "candidate_ids": [
+          "ct_17d6efba9f3b33",
+          "ct_91687952d4728d",
+          "ct_39f11753537b6b",
+          "ct_2abad59544e360",
+          "ct_d808e9487db395",
+          "ct_ff8f9774b32b75",
+          "ct_be03e596df46c0",
+          "ct_359207918e01a8"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 5793,
+          "output_tokens": 483
+        },
+        "response_sha256": "dc60d3b9bc445638dc37d48250388635865340e8d3d4e86acf16bc2583a620e7",
+        "returned_items": 3
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "a5f90504eef56e8efacb25d13be58a3b666be4a2863e02719c6b0e69380f6241",
+        "candidate_ids": [
+          "ct_17d6efba9f3b33",
+          "ct_91687952d4728d",
+          "ct_39f11753537b6b",
+          "ct_359207918e01a8",
+          "ct_2abad59544e360",
+          "ct_ff8f9774b32b75",
+          "ct_d808e9487db395",
+          "ct_86ef40665f47ba"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 6159,
+          "output_tokens": 561
+        },
+        "response_sha256": "feb8a85118b57ed32a72e8b59ec0d14f33dc830e9cbbabe4e28a138c75a70f59",
+        "returned_items": 3
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "6ddf295dbdd1da3a2a53f94fa58b3e9ddd99209cf7cb7fec56aa015e4463ac14",
+        "candidate_ids": [
+          "ct_2392ca8a24d013",
+          "ct_2eb31932c0c8ae",
+          "ct_897d46bd76c2e6",
+          "ct_e1bc2bf5ae200a",
+          "ct_05ab5c1c4c7b14",
+          "ct_30c0e232fa5dd1",
+          "ct_ac7409095f7041",
+          "ct_cdb5642257f3b0",
+          "ct_17d6efba9f3b33",
+          "ct_359207918e01a8"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9098,
+          "output_tokens": 671
+        },
+        "response_sha256": "82bf5cce5c4c81ab792b0b9a7e2aea12297f539d54196eff15b1cb22fbe32969",
+        "returned_items": 4
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "31ba87577a56eb8324a4cae861b6c3f1933a038b75755e8203ffd8d31227c78b",
+        "candidate_ids": [
+          "ct_0b72f00a385642",
+          "ct_660479c8bfbd9c",
+          "ct_2eb31932c0c8ae",
+          "ct_b171597e1960f1",
+          "ct_359207918e01a8",
+          "ct_bf9be42bddca95",
+          "ct_e1bc2bf5ae200a",
+          "ct_ab16301fce1901",
+          "ct_17d6efba9f3b33"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9429,
+          "output_tokens": 1552
+        },
+        "response_sha256": "b073b9aba15ff0e63987a74eac3860402d23f227ab21ff50bc2c537fd47ec097",
+        "returned_items": 8
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "376c202d49ba06b562abb256f79529c91dc41883d0c4953d00b3c7e6f739b193",
+        "candidate_ids": [
+          "ct_0b72f00a385642",
+          "ct_bf9be42bddca95",
+          "ct_660479c8bfbd9c",
+          "ct_2eb31932c0c8ae",
+          "ct_359207918e01a8",
+          "ct_05ab5c1c4c7b14",
+          "ct_2392ca8a24d013",
+          "ct_ab16301fce1901",
+          "ct_e1bc2bf5ae200a",
+          "ct_17d6efba9f3b33"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10331,
+          "output_tokens": 1859
+        },
+        "response_sha256": "4ac4ea7304033029f4806481b5a9ad2faaabd7aba60f5441cc16207cdeee9ba2",
+        "returned_items": 13
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "1a54070d332f768a0354459092e9294c8b57145698abaf397b7d361a44810ebb",
+        "candidate_ids": [
+          "ct_0b72f00a385642",
+          "ct_bf9be42bddca95",
+          "ct_359207918e01a8",
+          "ct_660479c8bfbd9c",
+          "ct_d4cd21d4436c86",
+          "ct_2392ca8a24d013",
+          "ct_e1bc2bf5ae200a",
+          "ct_05ab5c1c4c7b14",
+          "ct_17d6efba9f3b33"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 13899,
+          "output_tokens": 2782
+        },
+        "response_sha256": "52463cd78dae1395d3db734e8132a37bcbb571c29b0dd43e8abadc8f3887aa35",
+        "returned_items": 16
+      },
+      {
+        "index": 7,
+        "input_fingerprint": "15140e067d70028d750a6699dd1b50eecda531b6d8963b4710d3397f86baa1e4",
+        "candidate_ids": [
+          "ct_0b72f00a385642",
+          "ct_bf9be42bddca95",
+          "ct_ca3deb3a2bc859",
+          "ct_660479c8bfbd9c",
+          "ct_359207918e01a8",
+          "ct_e1bc2bf5ae200a",
+          "ct_cdb5642257f3b0",
+          "ct_d4cd21d4436c86",
+          "ct_17d6efba9f3b33"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 13283,
+          "output_tokens": 2272
+        },
+        "response_sha256": "4e7fe0b88d42723a606bfa51558a4eca89ce676b8b10db0576e2621c94b0fc5e",
+        "returned_items": 13
+      },
+      {
+        "index": 8,
+        "input_fingerprint": "a0d2ba111290d254e7d54e031f0f712e621cac2176ebf16ba21f834f2cee0cc3",
+        "candidate_ids": [
+          "ct_0b72f00a385642",
+          "ct_ab16301fce1901",
+          "ct_359207918e01a8",
+          "ct_660479c8bfbd9c",
+          "ct_5c665a16b75af7",
+          "ct_bf9be42bddca95",
+          "ct_2392ca8a24d013",
+          "ct_05ab5c1c4c7b14",
+          "ct_17d6efba9f3b33",
+          "ct_e1bc2bf5ae200a"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12623,
+          "output_tokens": 1101
+        },
+        "response_sha256": "41753c881d8a1d13e5d1fca757322fdc96a605915dc34b6b1d16f14cb855a662",
+        "returned_items": 9
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "6b54754a86e2671624e905ecb5ddbc167b4078e17192f213a93153d8c558d16f",
+        "exposure_signature": "ba2df8a0c5bebb5f8d365b5a103f3453a5428f207b286d7c03f5a81db5d23cc9",
+        "exposed_items": [
+          "learned_e4ba5d7fdf2ec8"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "retrieve_learnings",
+            "arguments": {
+              "query": "Cancel flight bookings after identifying all upcoming international flights from the current user's reservations; verify bookings from reservation list, inspect booking details to find international upcoming flights, preview cancellation terms before canceling, and only execute after explicit user approval."
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "6b54754a86e2671624e905ecb5ddbc167b4078e17192f213a93153d8c558d16f",
+        "exposure_signature": "ba2df8a0c5bebb5f8d365b5a103f3453a5428f207b286d7c03f5a81db5d23cc9",
+        "exposed_items": [
+          "learned_e4ba5d7fdf2ec8"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_user_reservations",
+            "arguments": {
+              "user_id": "user_001"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "6b54754a86e2671624e905ecb5ddbc167b4078e17192f213a93153d8c558d16f",
+        "exposure_signature": "ba2df8a0c5bebb5f8d365b5a103f3453a5428f207b286d7c03f5a81db5d23cc9",
+        "exposed_items": [
+          "learned_e4ba5d7fdf2ec8"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 1,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_booking",
+            "arguments": {
+              "booking_id": "BK-1007"
+            }
+          },
+          {
+            "name": "get_booking",
+            "arguments": {
+              "booking_id": "BK-1008"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "6b54754a86e2671624e905ecb5ddbc167b4078e17192f213a93153d8c558d16f",
+        "exposure_signature": "ba2df8a0c5bebb5f8d365b5a103f3453a5428f207b286d7c03f5a81db5d23cc9",
+        "exposed_items": [
+          "learned_e4ba5d7fdf2ec8"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9",
+          "learned_74eff612c1fa5d"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 2,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1007",
+              "confirm": false
+            }
+          },
+          {
+            "name": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1008",
+              "confirm": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "5237d1d9e84a04978f3cd58cd44b83dca50157995cdd2c8c29a4d7e5d470646f",
+        "exposure_signature": "64c192a6e5466603057d8b109b43f2fa8be1ab5aced5ff442aa82ef242f04a89",
+        "exposed_items": [
+          "runtime_08e5e91d4c201f",
+          "learned_e4ba5d7fdf2ec8",
+          "runtime_1e3725db933f17"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9",
+          "learned_74eff612c1fa5d",
+          "runtime_175d511e65310c",
+          "runtime_1e3725db933f17",
+          "runtime_08e5e91d4c201f",
+          "runtime_b6c0a8635b710c",
+          "learned_c87d462da9e46c",
+          "learned_8bfd955d83a72f",
+          "learned_826a09233372e7",
+          "learned_24ab33f4efd21b",
+          "learned_7a12d854b11c9c"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 2,
+          "invalidated": 0,
+          "pending": 7,
+          "pending_evidence": 4,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "b23dcb0e2b8ed5ff4c1ba7459302d00eea8c6d6ce3587c637bb21f60640c2691",
+        "exposure_signature": "539902ad152462fc3c3d5a235357dfa78f218019c0494bf88294efa20a43f199",
+        "exposed_items": [
+          "runtime_08e5e91d4c201f",
+          "learned_1c097401687109",
+          "learned_e4ba5d7fdf2ec8",
+          "runtime_1e3725db933f17"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9",
+          "learned_74eff612c1fa5d",
+          "runtime_175d511e65310c",
+          "runtime_1e3725db933f17",
+          "runtime_08e5e91d4c201f",
+          "runtime_b6c0a8635b710c",
+          "learned_c87d462da9e46c",
+          "learned_8bfd955d83a72f",
+          "learned_826a09233372e7",
+          "learned_24ab33f4efd21b",
+          "learned_7a12d854b11c9c",
+          "learned_b39e11fe0c22b1",
+          "learned_9093bc1b367431",
+          "learned_9516787592d04e",
+          "learned_a9da621fe5e853",
+          "learned_e33f64f5702868",
+          "learned_253919d9295e1e",
+          "learned_6d1a4758f5f679",
+          "learned_1c097401687109",
+          "learned_86ffc4411ec1e1",
+          "learned_d8ba8b17cfa329",
+          "learned_13d219f83e2ea9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 2,
+          "invalidated": 0,
+          "pending": 13,
+          "pending_evidence": 9,
+          "satisfied": 2,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 6,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "b23dcb0e2b8ed5ff4c1ba7459302d00eea8c6d6ce3587c637bb21f60640c2691",
+        "exposure_signature": "539902ad152462fc3c3d5a235357dfa78f218019c0494bf88294efa20a43f199",
+        "exposed_items": [
+          "runtime_08e5e91d4c201f",
+          "learned_1c097401687109",
+          "learned_e4ba5d7fdf2ec8",
+          "runtime_1e3725db933f17"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9",
+          "runtime_175d511e65310c",
+          "runtime_1e3725db933f17",
+          "runtime_08e5e91d4c201f",
+          "runtime_b6c0a8635b710c",
+          "learned_c87d462da9e46c",
+          "learned_8bfd955d83a72f",
+          "learned_7a12d854b11c9c",
+          "learned_b39e11fe0c22b1",
+          "learned_9516787592d04e",
+          "learned_e33f64f5702868",
+          "learned_6d1a4758f5f679",
+          "learned_1c097401687109",
+          "learned_86ffc4411ec1e1",
+          "learned_d8ba8b17cfa329",
+          "learned_13d219f83e2ea9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 2,
+          "invalidated": 0,
+          "pending": 10,
+          "pending_evidence": 6,
+          "satisfied": 8,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1007",
+              "confirm": true
+            }
+          },
+          {
+            "name": "cancel_booking",
+            "arguments": {
+              "booking_id": "BK-1008",
+              "confirm": true
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 7,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "e2967b05253bb02f1a44470424f6184fad2ecf837878478a09d28a03825805c1",
+        "exposure_signature": "b7ddc9a8e9f239d3a5d243f8198079b30ca52ed4ff08e2f024296fe0cae0e978",
+        "exposed_items": [
+          "learned_1c097401687109",
+          "learned_e4ba5d7fdf2ec8"
+        ],
+        "pending_items": [
+          "learned_900d75285f5075",
+          "learned_e4ba5d7fdf2ec8",
+          "learned_ed1dfd37058fb9",
+          "learned_c87d462da9e46c",
+          "learned_8bfd955d83a72f",
+          "learned_7a12d854b11c9c",
+          "learned_9516787592d04e",
+          "learned_e33f64f5702868",
+          "learned_6d1a4758f5f679",
+          "learned_1c097401687109",
+          "learned_86ffc4411ec1e1",
+          "learned_d8ba8b17cfa329",
+          "learned_13d219f83e2ea9"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 10,
+          "pending_evidence": 3,
+          "satisfied": 11,
+          "violated": 2
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 8,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 9,
+      "regenerations": 0,
+      "exposures": 8,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 5,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 3,
+      "tool_calls": 8,
+      "bookkeeper_input_tokens": 84828,
+      "bookkeeper_output_tokens": 11696,
+      "bookkeeper_total_tokens": 96524,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 129836,
+    "cached_input_tokens": 0,
+    "output_tokens": 12280,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 142116,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 129836,
+  "cached_input_tokens": 0,
+  "output_tokens": 12280,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 142116,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "bookings": {
+        "BK-1007": {
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 1400
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 0
+          }
+        },
+        "BK-1008": {
+          "status": {
+            "old": "confirmed",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 384
+          },
+          "cancellation_fee": {
+            "old": null,
+            "new": 96
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1007",
+      "field": "cancellation_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1007",
+      "field": "refund_amount",
+      "expected_value": 1400
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1007",
+      "field": "status",
+      "expected_value": "cancelled"
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1008",
+      "field": "cancellation_fee",
+      "expected_value": 96
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1008",
+      "field": "refund_amount",
+      "expected_value": 384
+    },
+    {
+      "entity_type": "bookings",
+      "record_key": "BK-1008",
+      "field": "status",
+      "expected_value": "cancelled"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "dd4abe82eedb4873cfa015708df99f59cfbfeaa85ac090b01bd1d75eb0500487",
+    "judge_ux_quality.md": "b04009d159fb477c3a215f30f10793c4e0a5587e578d07fcd2bfc7d719f90598",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

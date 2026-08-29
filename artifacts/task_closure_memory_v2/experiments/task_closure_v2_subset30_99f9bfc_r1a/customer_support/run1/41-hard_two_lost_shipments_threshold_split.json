@@ -1,0 +1,3395 @@
+{
+  "task_id": "41-hard_two_lost_shipments_threshold_split",
+  "user_id": "cust_003",
+  "task_summary": "**Task:** A customer has two lost-in-transit shipments: a low-value coffee maker and a high-value tablet. Correct handling is to offer refund versus reship for the coffee maker, process the chosen $149 original-payment refund, and leave the tablet order unchanged while explaining that high-value lost shipments require carrier investigation before refund or replacement.\n\n**Challenge:** This reuses the proven high-value lost-shipment failure pattern from tasks 20 and 54 in a threshold-contrast setup. Weak agents overgeneralize the immediate low-value refund path to the expensive item, or cancel/refund both lost orders to be helpful.",
+  "state_requirements_met": 0,
+  "state_requirements_reasoning": "State requirements failed: missing_assertions=2; unexpected_assertions=3",
+  "state_requirements_details": {
+    "missing_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "original_payment"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10452",
+        "field": "refund_amount",
+        "value": 0
+      }
+    ],
+    "unexpected_assertions": [
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "item_status",
+        "value": "cancelled"
+      },
+      {
+        "entity_type": "order_items",
+        "record_key": "ITEM-10451",
+        "field": "refund_method",
+        "value": "credit_card"
+      },
+      {
+        "entity_type": "orders",
+        "record_key": "ORD-7451",
+        "field": "status",
+        "value": "cancelled"
+      }
+    ]
+  },
+  "task_requirements_met": 0,
+  "task_requirements_details": [
+    {
+      "id": "156_coffee_maker_refund_choice",
+      "kind": "must",
+      "requirement": "Agent must ask whether the customer wants a refund or a reship for the lost coffee maker before processing one.",
+      "evidence": "conversation",
+      "passed": false,
+      "reasoning": "The agent did not ask the customer to choose between refund or reship for the lost coffee maker before proceeding. It only offered cancellation/refund right away ('If you want, I can cancel and refund ORD-7451...') rather than presenting both options and asking for a choice."
+    },
+    {
+      "id": "156_coffee_maker_direct_refund",
+      "kind": "must",
+      "requirement": "Agent must process only a $149 original-payment refund for the lost coffee maker from ORD-7451, without cancelling or returning the order/item.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "Although the amount and original payment method matched $149, the agent handled ORD-7451 by previewing and then executing cancel_order, and told the customer the order was canceled. The requirement explicitly says to process only a refund without cancelling or returning the order/item."
+    },
+    {
+      "id": "156_tablet_investigation_required",
+      "kind": "must",
+      "requirement": "Agent must explain that ORD-7452 is a high-value lost shipment requiring carrier investigation before any refund, reship, or replacement.",
+      "evidence": "conversation",
+      "passed": true,
+      "reasoning": "The agent clearly explained that the tablet order ORD-7452 is high value and requires a carrier investigation/claim review before any refund or replacement can be completed."
+    },
+    {
+      "id": "156_no_tablet_immediate_action",
+      "kind": "must_not",
+      "requirement": "Agent must not offer as available, confirm, refund, reship, replace, cancel, return, credit, escalate for credit, or otherwise mutate ORD-7452 or ITEM-10452 before investigation. A non-mutating internal preview alone is not a failure unless the agent presents the tablet resolution as available or done.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": false,
+      "reasoning": "The agent told the customer, 'For ORD-7452, I can help you start/escalate the required claim review today,' which is an offered immediate action/escalation on ORD-7452 before investigation. The requirement forbids offering or escalating credit/other mutation-related handling before investigation, and requires leaving ORD-7452 unchanged."
+    }
+  ],
+  "task_completion_pass": 0,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled the threshold contrast correctly: it separated the low-value coffee maker from the high-value tablet, avoided any improper action on the tablet, and explicitly explained the policy difference. It preserved user control by previewing the ORD-7451 cancellation/refund amount and method before execution, then waiting for a later explicit confirmation before calling the write tool. The flow was smooth with no need for the user to correct scope or recover from hidden actions, and the final state was clearly summarized for both orders. Responses were concise but complete, giving the key amounts, constraints, and next-step implications without padding.",
+  "turns": 3,
+  "tool_calls": 8,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked both orders. The coffee maker order (ORD-7451, $149) qualifies for immediate resolution, but the tablet order (ORD-7452, $599) falls under the higher-value lost-package rule, which requires a carrier claim review first before I can issue a refund or cancellation.\n\nIf you want, I can cancel and refund ORD-7451 back to your original payment method right now. For ORD-7452, I can help you start/escalate the required claim review today, but I can’t finalize the refund yet under policy.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7451"
+          },
+          "result": {
+            "order_id": "ORD-7451",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK18318188",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 149
+            },
+            "subtotal": 149,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 149,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10451",
+                "order_id": "ORD-7451",
+                "product_id": "PROD-4451",
+                "quantity": 1,
+                "unit_price": 149,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4451",
+                  "name": "BrewPerfect Coffee Maker",
+                  "category": "kitchen",
+                  "price": 149,
+                  "current_price": null,
+                  "return_window_days": 30,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-7452"
+          },
+          "result": {
+            "order_id": "ORD-7452",
+            "customer_id": "cust_003",
+            "order_date": "2026-07-01T10:00:00",
+            "status": "shipped",
+            "shipping_status": "lost",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK30864714",
+            "delivery_date": null,
+            "delivery_promised_date": "2026-07-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 599
+            },
+            "subtotal": 599,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 599,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-10452",
+                "order_id": "ORD-7452",
+                "product_id": "PROD-4452",
+                "quantity": 1,
+                "unit_price": 599,
+                "item_status": "shipped",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-4452",
+                  "name": "SlateTab Pro 11-inch",
+                  "category": "electronics",
+                  "price": 599,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "shipping"
+          },
+          "result": {
+            "topic": "shipping",
+            "rules": {
+              "not_received": {
+                "under_500": "Delivered but not received (<$500): reship or refund.",
+                "over_500": "Delivered but not received (>=$500): mandatory investigation (3-5 business days).",
+                "signature_on_file": "Delivery with signature on file: claim denied."
+              },
+              "lost_in_transit": {
+                "under_500": "Lost in transit (<$500): immediate reship or refund.",
+                "over_500": "Lost in transit (>=$500): carrier claim required first.",
+                "stuck_7_days": "No tracking update for 7+ days: treat as lost."
+              },
+              "damaged": {
+                "rule": "Damaged in transit: full refund or replacement.",
+                "fragile_bonus": "Fragile items damaged in transit qualify for a separate $10 goodwill credit, issued as a refund in addition to the return refund."
+              },
+              "late_delivery_compensation": {
+                "tiers": {
+                  "1_to_2_days_late": "$5 credit",
+                  "3_to_5_days_late": "$15 credit",
+                  "6_plus_days_late": "Full shipping refund + $15 credit"
+                },
+                "shipping_refund_basis": "When refunding shipping, refund the actual shipping cost the customer was charged on the order — read order.shipping_cost. Standard policy charges $0 on free-shipping orders (subtotal >= $100) and $8 otherwise.",
+                "tier_multipliers": {
+                  "gold": "1.5x multiplier on the base late-delivery credit only (NOT on shipping refund or goodwill). Rounded down (e.g., int(15*1.5) = 22).",
+                  "platinum": "2x multiplier on the base late-delivery credit only. Rounded down."
+                },
+                "repeated_issues": "3+ PRIOR issues in 6 months (not counting current incident): additional $25 goodwill credit.",
+                "loyalty_bonus": "Platinum members with 50+ total orders: one-time $50 loyalty bonus on next compensation claim. Confirm with customer if already redeemed.",
+                "max_cap": "Maximum compensation: 50% of order total (rounded down).",
+                "calculation_order": "1) Compute base credit by days-late tier. 2) Apply tier multiplier to base credit only. 3) Add shipping refund (if 6+ days late) using order.shipping_cost. 4) Add goodwill (if 3+ prior issues or fragile damage). 5) Apply loyalty bonus if eligible. 6) Apply 50%-of-order cap on the sum."
+              }
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "cancellation"
+          },
+          "result": {
+            "topic": "cancellation",
+            "rules": {
+              "pre_shipment": "Free cancellation before shipment (pending/processing status).",
+              "in_transit": "$10 intercept fee per item for in-transit orders.",
+              "delivered": "Cannot cancel delivered orders — must use the return process instead.",
+              "partial": "Partial cancellation allowed if items not yet delivered.",
+              "split_payment": "Refund distributed proportionally to original payment methods.",
+              "already_cancelled": "Already cancelled orders cannot be cancelled again."
+            }
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_003"
+          },
+          "result": {
+            "customer_id": "cust_003",
+            "name": "Sarah Williams",
+            "email": "sarah.w@example.com",
+            "membership_tier": "gold",
+            "account_created": "2021-11-20",
+            "total_orders": 53,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 45,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "1.5x",
+              "restocking_fee_waiver": false,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "retrieve_learnings",
+          "arguments": {
+            "query": "lost in transit resolution refund now for two orders, verify shipped not delivered, cancellation policy, possible refund method preview/choice"
+          },
+          "result": [
+            "Workflow: Lost in transit resolution via cancellation/refund, with optional accessory cancellation\nUse when: Customer says an order is lost in transit or shipped but not delivered and wants resolution now, usually refund rather than replacement; may also want a separate pending accessory canceled only if the main issue is resolved.\nVerify first:\n- Use get_order on the affected order to verify item status is shipped/in transit and not delivered.\n- If another order may be canceled, use get_order on that order and identify which pending item should be canceled and which should remain pending.\n- Use get_policies for shipment-loss/cancellation rules before mutating.\n- If benefits or compensation could matter, verify with get_customer.\nProcedure:\n1. get_order(<lost_order_id>)\n2. If conditional accessory handling is requested, get_order(<related_order_id>)\n3. If needed, get_customer(<customer_id>)\n4. get_policies(<shipping_loss_or_damage_topic>)\n5. get_policies(<cancellation_topic>)\n6. If needed, process_refund(confirm=false, item_id=<lost_item_id>, refund_method=<requested_or_preferred_method>) to inspect any available direct refund path\n7. cancel_order(confirm=false, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n8. If preview authorizes and customer wants refund now, cancel_order(confirm=true, order_id=<lost_order_id>, item_ids=[<lost_item_id>])\n9. If the customer wanted the related pending item canceled only after the main issue was resolved, cancel_order(confirm=false, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n10. If acceptable, cancel_order(confirm=true, order_id=<related_order_id>, item_ids=[<pending_item_id>])\n11. Optionally get_order(<related_order_id>) to confirm unaffected items remain pending\nBranches:\n- If policy says claim review/investigation is required first, do not mutate; give a no-write explanation of the required review path.\n- If the item is actually delivered, do not use lost-in-transit cancellation; switch to return/damage workflow.\n- If the customer wants replacement instead of refund, do not force cancellation; explain the available policy path.\n- If accessory cancellation is conditional and the main order cannot yet be ",
+            "Workflow: Cancel eligible order items with refund preview then confirm\nUse when: The user wants to cancel an order or specific items, possibly as a partial cancellation, and the request can be evaluated from order state plus cancellation policy.\nVerify first:\n- Use get_order to identify the requested order items and their current statuses.\n- Verify whether the request is for the whole order or only specific items.\n- Check with get_policies whether cancellation is allowed for the observed statuses (for example pre-shipment, in-transit, delivered, already cancelled).\n- If the user names a product but the order has multiple possible matches, verify there is a uniquely identifiable target item before mutating.\nProcedure:\n1. get_order(order_id=<ORDER_ID>)\n2. get_policies(topic=<CANCELLATION_POLICY_TOPIC>)\n3. cancel_order(confirm=false, order_id=<ORDER_ID>, item_ids=<TARGET_ITEM_IDS>)\n4. cancel_order(confirm=true, order_id=<ORDER_ID>, item_ids=<TARGET_ITEM_IDS>)\nBranches:\n- If some requested items are delivered, do not cancel those items; report that delivered items must use the return process and only proceed on eligible undelivered items.\n- If the request is partial and some items should remain unchanged, include only the confirmed target item_ids in cancel_order.\n- If the order or target items are already cancelled, do not attempt reconfirmation; report no further cancellation is possible.\n- If the preview shows a fee or reduced refund, communicate that the final refund amount already reflects that policy once confirmed.\n- If the target item cannot be determined from the user request, do not mutate; ask for clarification instead of cancelling multiple candidates.\nAvoid:\n- Do not cancel delivered items.\n- Do not include unconfirmed extra items in a partial cancellation.\n- Do not skip the preview call before confirmation.\n- Do not treat one order's refund amount, fee, or item identifiers as reusable across cases.\nProcess support: mean conformance=1.000\nObserved frequent paths:\n- 2x: get_order -> get_policies -> cancel_order -> cancel_order\n- 1x: get_order -> get_policies -> cancel_order -> cancel_order -> get_order\n- 1x: get_order -> get_order -> get_policies -> get_",
+            "Workflow: Combined wrong-item return plus separate shipping-claim refund\nUse when: Customer reports a wrong-item shipment and also requests an additional non-return shipping-related compensation or claim refund on the same delivered order.\nVerify first:\n- Use get_order to verify delivery timing and identify the affected delivered item.\n- Use get_customer if customer tier/benefits may affect compensation calculation or explanation.\n- Use get_policies to verify both the wrong-item return rules and the separate shipping-claim compensation rules.\n- Use get_product_details or search_products only if needed to confirm the disputed item/product.\nProcedure:\n1. get_order(order_id)\n2. get_customer(customer_id) if compensation rules depend on customer benefits\n3. get_policies(topic='shipping claim compensation')\n4. get_policies(topic='wrong-item return/refund')\n5. get_policies(topic='return amount computation')\n6. get_product_details(product_id) or search_products(query) if needed\n7. process_return(amount=<preview return refund amount>, confirm=false, item_id=<item_id>, reason='wrong_item')\n8. process_refund(amount=<preview compensation amount>, confirm=false, item_id=<item_id>, refund_method=<allowed method>)\n9. If customer approves both, process_return(amount=<preview return refund amount>, confirm=true, item_id=<item_id>, reason='wrong_item')\n10. process_refund(amount=<preview compensation amount>, confirm=true, item_id=<item_id>, refund_method=<allowed method>)\nBranches:\n- If only the return is authorized, confirm only process_return and leave the compensation as preview/no-write.\n- If only the compensation is authorized and policy allows it, confirm only process_refund.\n- If compensation is not supported by policy or order facts, do not write it; explain the authoritative policy result and, if still valid, continue with the return only.\n- If either preview differs from the customer expectation, pause before confirmation and restate the tool-provided amounts/methods separately.\n- If the wrong-item line is unclear, resolve the item first and delay all writes.\nAvoid:\n- Do not merge the return refund and compensation into a single invented tool action.\n- Do not compute sh"
+          ]
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible."
+    },
+    {
+      "role": "assistant",
+      "content": "The difference is the order value: for lost-in-transit packages under $500, I’m allowed to resolve immediately; for $500 and up, policy requires a carrier investigation first, even if the shipping issue looks the same.\n\nI’ve previewed the coffee maker refund and it’s a full $149 back to your original payment method. If you want me to finalize that now, reply “confirm ORD-7451.” For the tablet, I can’t complete a same-day refund or replacement unless the investigation requirement is cleared first.",
+      "tool_calls": [
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": false
+          },
+          "result": {
+            "status": "preview",
+            "order_id": "ORD-7451",
+            "items_to_cancel": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "reason": "Package lost — free cancellation with full refund"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "confirm ORD-7451. And understood on ORD-7452 — please leave that order unchanged for now if the investigation has to happen before any refund or replacement."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — ORD-7451 has been canceled and $149 will be refunded to your original payment method.\n\nORD-7452 remains unchanged for now, pending the required investigation.",
+      "tool_calls": [
+        {
+          "name": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": true
+          },
+          "result": {
+            "status": "cancelled",
+            "order_id": "ORD-7451",
+            "items_cancelled": [
+              "ITEM-10451"
+            ],
+            "cancellation_fee": 0,
+            "refund_amount": 149,
+            "refund_method": "credit_card"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "[TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [
+      {
+        "id": "learned_1f3ab0f48cba64",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_317262e6d67083",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+        "required_evidence": [
+          "authoritative loss status",
+          "policy or case rationale distinguishing loss from delay"
+        ],
+        "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to have ORD-7451 handled today and describes it as lost in transit."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative loss status for ORD-7451",
+          "policy or case rationale distinguishing lost from delayed shipments"
+        ],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_1f67760301fbec",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_5a0c589ba3ef75",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+        "required_evidence": [
+          "order/shipping status showing loss classification",
+          "policy evidence for the relevant threshold or exception"
+        ],
+        "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7452 shows lost in transit and asks to get it handled today."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative shipping/order status showing ORD-7452 is classified as lost",
+          "policy evidence for any threshold or exception governing immediate resolution"
+        ],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_46108bcc9dccfe",
+        "template_id": "ct_f2543d3ac82170",
+        "obligation_id": "obl_fcf69c63ad13e1",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "Before any final refund or compensation outcome is stated for the two orders, each order must be evaluated against its own delivery and policy facts because the user requested both be handled in one claim.",
+        "source": "completion_template:ct_f2543d3ac82170",
+        "status": "pending_evidence",
+        "priority": 50,
+        "activation": "multiple related orders/items are present and at least one has different delivery evidence or policy status",
+        "required_evidence": [
+          "order-level delivery evidence for each entity",
+          "policy evidence showing which facts make one entity eligible or ineligible"
+        ],
+        "discharge": "a grounded statement that distinguishes which entities qualify and which do not",
+        "scope_key": "orders_ord-7451_ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions two orders, ORD-7451 and ORD-7452, in one refund/resolution request."
+          }
+        ],
+        "missing_evidence": [
+          "order-level delivery evidence for ORD-7451",
+          "order-level delivery evidence for ORD-7452",
+          "policy evidence showing whether either order has different eligibility or disqualifying facts"
+        ],
+        "scope": {
+          "family": "multi_entity_refund_eligibility_and_partial_resolution",
+          "title": "separate items by eligibility before closing a multi-item refund request"
+        }
+      },
+      {
+        "id": "learned_517db414a0b469",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_5a0c589ba3ef75",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+        "required_evidence": [
+          "order/shipping status showing loss classification",
+          "policy evidence for the relevant threshold or exception"
+        ],
+        "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7451 shows lost in transit and asks to get it handled today."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative shipping/order status showing ORD-7451 is classified as lost",
+          "policy evidence for any threshold or exception governing immediate resolution"
+        ],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_5535d2ad570ca0",
+        "template_id": "ct_a8ccd82962142c",
+        "obligation_id": "obl_6cc2f7113cc8d5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+        "source": "completion_template:ct_a8ccd82962142c",
+        "status": "pending",
+        "priority": 1,
+        "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+        "required_evidence": [
+          "user assent to proceed",
+          "the specific remedy to be executed and the destination method to be used"
+        ],
+        "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to get ORD-7451 handled today, implying possible refund or replacement resolution."
+          }
+        ],
+        "missing_evidence": [
+          "specific monetary remedy proposed for ORD-7451",
+          "destination payment method or account for ORD-7451 refund/credit",
+          "explicit user authorization to proceed with that remedy"
+        ],
+        "scope": {
+          "family": "irreversible_refund_requires_explicit_consent",
+          "title": "Explicit user confirmation before completing a monetary refund"
+        }
+      },
+      {
+        "id": "learned_ccbd56d966e199",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_317262e6d67083",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+        "required_evidence": [
+          "authoritative loss status",
+          "policy or case rationale distinguishing loss from delay"
+        ],
+        "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to have ORD-7452 handled today and describes it as lost in transit."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative loss status for ORD-7452",
+          "policy or case rationale distinguishing lost from delayed shipments"
+        ],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_f2d4ac8d84a175",
+        "template_id": "ct_a8ccd82962142c",
+        "obligation_id": "obl_6cc2f7113cc8d5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+        "source": "completion_template:ct_a8ccd82962142c",
+        "status": "pending",
+        "priority": 1,
+        "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+        "required_evidence": [
+          "user assent to proceed",
+          "the specific remedy to be executed and the destination method to be used"
+        ],
+        "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to get ORD-7452 handled today, implying possible refund or replacement resolution."
+          }
+        ],
+        "missing_evidence": [
+          "specific monetary remedy proposed for ORD-7452",
+          "destination payment method or account for ORD-7452 refund/credit",
+          "explicit user authorization to proceed with that remedy"
+        ],
+        "scope": {
+          "family": "irreversible_refund_requires_explicit_consent",
+          "title": "Explicit user confirmation before completing a monetary refund"
+        }
+      }
+    ],
+    "final_items": [
+      {
+        "id": "learned_10b33dd70eb91e",
+        "template_id": "ct_4a4df1297027fb",
+        "obligation_id": "obl_ac325c8dc06d66",
+        "phase": "final",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "do not imply that untouched related items were changed, and do not claim more scope than was actually resolved",
+        "source": "completion_template:ct_4a4df1297027fb",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "the user’s confirmation request spans multiple items or orders",
+        "required_evidence": [
+          "current status for each mentioned item"
+        ],
+        "discharge": "absence of any claim beyond the grounded items",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant distinguished ORD-7451 as canceled/refunded and ORD-7452 as unchanged pending investigation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "final_status_confirmation_with_related_items",
+          "title": "confirm completion across primary and related orders"
+        }
+      },
+      {
+        "id": "learned_1f3ab0f48cba64",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_317262e6d67083",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+        "required_evidence": [
+          "authoritative loss status",
+          "policy or case rationale distinguishing loss from delay"
+        ],
+        "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to have ORD-7451 handled today and describes it as lost in transit."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7451 is lost in transit and asks to get it handled today."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "ORD-7451 status is shipped; shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7451 qualifies for immediate resolution."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asked why ORD-7451 can be refunded right away."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "ORD-7451 shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7451 is lost in transit and wants it handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated lost-in-transit packages under $500 may be resolved immediately."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "ORD-7451 shipping_status is lost; item_status is shipped."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_1f67760301fbec",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_5a0c589ba3ef75",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+        "required_evidence": [
+          "order/shipping status showing loss classification",
+          "policy evidence for the relevant threshold or exception"
+        ],
+        "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7452 shows lost in transit and asks to get it handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7452 is lost in transit and wants it handled today."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7452 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Shipping policy retrieved, but no explicit lost-shipment threshold/exception shown in transcript."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7452 falls under a higher-value lost-package rule requiring carrier claim review first."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "ORD-7452 shipping_status is lost and item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "ORD-7452 shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7452 requires carrier claim review before refund or cancellation."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated $500-and-up lost-in-transit packages require carrier investigation first."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_32cf68bbc6958b",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_0ffca9c9019e35",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "any relevant action result is non-final or failed",
+        "required_evidence": [
+          "a successful final state for the requested action, not merely a preview or attempted confirmation"
+        ],
+        "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asked to leave ORD-7452 unchanged for now if investigation is required."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant stated ORD-7452 remains unchanged for now, pending the required investigation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_345c76c87740e6",
+        "template_id": "ct_ebd72e94986255",
+        "obligation_id": "obl_8ad2628bef431f",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "If the customer is asking whether support can act now, explicitly explain that the inability to act is because the signature-confirmed delivery state counts as completed delivery for immediate replacement/refund purposes.",
+        "source": "completion_template:ct_ebd72e94986255",
+        "status": "pending_evidence",
+        "priority": 3,
+        "activation": "the customer asks for clarification of why support cannot replace or refund now",
+        "required_evidence": [
+          "the governing delivery-confirmation state",
+          "the policy consequence attached to that state"
+        ],
+        "discharge": "the final response clearly links the confirmed-delivery evidence to the no-immediate-action outcome",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asked why the tablet cannot be refunded right away and asked for refund or replacement today if possible."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explained a value-based investigation rule, not a delivery-confirmation state."
+          }
+        ],
+        "missing_evidence": [
+          "evidence that signature-confirmed delivery state is actually the governing basis for ORD-7452",
+          "an assistant explanation linking that state to the inability to refund or replace immediately, if applicable"
+        ],
+        "scope": {
+          "family": "signature_confirmed_delivery_boundary",
+          "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+        }
+      },
+      {
+        "id": "learned_46108bcc9dccfe",
+        "template_id": "ct_f2543d3ac82170",
+        "obligation_id": "obl_fcf69c63ad13e1",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "each claimed item/order must be compared against its own delivery and policy facts before any final outcome is stated",
+        "source": "completion_template:ct_f2543d3ac82170",
+        "status": "satisfied",
+        "priority": 50,
+        "activation": "multiple related orders/items are present and at least one has different delivery evidence or policy status",
+        "required_evidence": [
+          "order-level delivery evidence for each entity",
+          "policy evidence showing which facts make one entity eligible or ineligible"
+        ],
+        "discharge": "a grounded statement that distinguishes which entities qualify and which do not",
+        "scope_key": "orders_ord-7451_ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions two orders, ORD-7451 and ORD-7452, in one refund/resolution request."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions both ORD-7451 and ORD-7452 in one request."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "ORD-7451 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7452 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User requested handling for both ORD-7451 and ORD-7452."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant gave different claimed outcomes for ORD-7451 and ORD-7452."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "ORD-7451 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "ORD-7452 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User mentions ORD-7451 and ORD-7452 in one request."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User presented two orders in one request."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant distinguished the under-$500 and $500-and-up rules."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "multi_entity_refund_eligibility_and_partial_resolution",
+          "title": "separate items by eligibility before closing a multi-item refund request"
+        }
+      },
+      {
+        "id": "learned_517db414a0b469",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_5a0c589ba3ef75",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+        "required_evidence": [
+          "order/shipping status showing loss classification",
+          "policy evidence for the relevant threshold or exception"
+        ],
+        "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7451 shows lost in transit and asks to get it handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7451 is lost in transit and wants it handled today."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "ORD-7451 shipping_status is lost; item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T8",
+            "detail": "Shipping policy retrieved, but no explicit lost-shipment threshold/exception shown in transcript."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7451 qualifies for immediate resolution."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "ORD-7451 shipping_status is lost and item_status is shipped."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "ORD-7451 shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated the under-$500 lost-in-transit rule allows immediate resolution."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_5535d2ad570ca0",
+        "template_id": "ct_a8ccd82962142c",
+        "obligation_id": "obl_6cc2f7113cc8d5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+        "source": "completion_template:ct_a8ccd82962142c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+        "required_evidence": [
+          "user assent to proceed",
+          "the specific remedy to be executed and the destination method to be used"
+        ],
+        "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to get ORD-7451 handled today, implying possible refund or replacement resolution."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to get ORD-7451 handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant offered to cancel and refund ORD-7451 back to the original payment method."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User said yes, please refund ORD-7451 to my original payment method."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User said confirm ORD-7451."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant presented a full $149 refund preview to the original payment method and asked for confirmation to finalize."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly replied 'confirm ORD-7451.'"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Refund executed to credit_card after confirmation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "irreversible_refund_requires_explicit_consent",
+          "title": "Explicit user confirmation before completing a monetary refund"
+        }
+      },
+      {
+        "id": "learned_8d2ae832a5d9cc",
+        "template_id": "ct_4a4df1297027fb",
+        "obligation_id": "obl_6d3db458461346",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "When confirming the already-handled case, explicitly report the primary resolved item's completion status using grounded evidence.",
+        "source": "completion_template:ct_4a4df1297027fb",
+        "status": "pending",
+        "priority": 1,
+        "activation": "the user asks for confirmation of an already-handled case",
+        "required_evidence": [
+          "authoritative status for the primary item",
+          "matching refund/cancellation evidence"
+        ],
+        "discharge": "a direct statement that the primary item is refunded/canceled/resolved",
+        "scope_key": "default",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reported ORD-7451 done and ORD-7452 unchanged."
+          }
+        ],
+        "missing_evidence": [
+          "an assistant confirmation response to the user's completion/confirmation request, if any further confirmation is expected after M6"
+        ],
+        "scope": {
+          "family": "final_status_confirmation_with_related_items",
+          "title": "confirm completion across primary and related orders"
+        }
+      },
+      {
+        "id": "learned_91fb5f7691fb59",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_0ffca9c9019e35",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "any relevant action result is non-final or failed",
+        "required_evidence": [
+          "a successful final state for the requested action, not merely a preview or attempted confirmation"
+        ],
+        "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User authorized refund of ORD-7451 to original payment method."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Cancellation preview exists for ORD-7451."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User confirmed ORD-7451."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7451 status is cancelled with refund_method credit_card and refund_amount 149."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "ORD-7451 cancellation/refund first appeared as preview status."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7451 later shows final status cancelled with refund_method credit_card and refund_amount 149."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant stated ORD-7451 was done after final executed result existed."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_a67c506c6f5e48",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_40d3c12e070194",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+        "required_evidence": [
+          "final executed status for each claimed change"
+        ],
+        "discharge": "authoritative results show the claimed state change completed for each affected entity",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User requested ORD-7452 remain unchanged for now."
+          }
+        ],
+        "missing_evidence": [
+          "final executed state for ORD-7452 if any change is claimed"
+        ],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_c6d487845b30de",
+        "template_id": "ct_15a009f16ad57c",
+        "obligation_id": "obl_40d3c12e070194",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+        "source": "completion_template:ct_15a009f16ad57c",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+        "required_evidence": [
+          "final executed status for each claimed change"
+        ],
+        "discharge": "authoritative results show the claimed state change completed for each affected entity",
+        "scope_key": "ord-7451",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User requested the ORD-7451 refund be carried out."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Cancellation result is still preview."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "Final executed cancellation status: cancelled."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7451 cancel_order with confirm true returned status cancelled, refund_amount 149, refund_method credit_card."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant declared ORD-7451 done after the executed cancellation result."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "protected_action_requires_confirmed_execution",
+          "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+        }
+      },
+      {
+        "id": "learned_ccbd56d966e199",
+        "template_id": "ct_e562d9ed872abe",
+        "obligation_id": "obl_317262e6d67083",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+        "source": "completion_template:ct_e562d9ed872abe",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+        "required_evidence": [
+          "authoritative loss status",
+          "policy or case rationale distinguishing loss from delay"
+        ],
+        "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to have ORD-7452 handled today and describes it as lost in transit."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7452 is lost in transit and asks to get it handled today."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T7",
+            "detail": "ORD-7452 status is shipped; shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7452 requires carrier claim review before refund or cancellation."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asked why ORD-7452 cannot be refunded right away if both were lost the same way."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "ORD-7452 shipping_status is lost; delivery_date is null."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says ORD-7452 is lost in transit and wants it handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated $500-and-up lost-in-transit packages require carrier investigation first."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "lost_in_transit_resolution_and_refund_closure",
+          "title": "lost shipment must be grounded and final outcome reported"
+        }
+      },
+      {
+        "id": "learned_dbd2e2482f9d60",
+        "template_id": "ct_ebd72e94986255",
+        "obligation_id": "obl_a5d8f78969775e",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating that immediate replacement, refund, or similar order relief is unavailable, ground the claim in current authoritative delivery evidence showing the delivery-confirmation state that controls eligibility.",
+        "source": "completion_template:ct_ebd72e94986255",
+        "status": "pending_evidence",
+        "priority": 1,
+        "activation": "the response asserts or implies that a concrete outcome or ineligibility follows from delivery status",
+        "required_evidence": [
+          "current order status",
+          "presence of signature or equivalent delivery confirmation",
+          "any applicable protected-value or signature-required condition"
+        ],
+        "discharge": "the agent cites the controlling delivery-confirmation evidence and ties it to the claimed restriction",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant said ORD-7452 requires a higher-value lost-package claim review before refund or cancellation."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant said same-day refund or replacement for ORD-7452 cannot be completed unless investigation requirement is cleared first."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Visible order evidence shows shipped item with shipping_status lost; transcript snippet does not show signature-confirmed delivery."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative evidence that ORD-7452 is in a signature-confirmed or equivalent protected delivery state if that template is the actual basis",
+          "applicable protected-value or signature-required condition tied to the claimed restriction"
+        ],
+        "scope": {
+          "family": "signature_confirmed_delivery_boundary",
+          "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+        }
+      },
+      {
+        "id": "learned_e23a3be76b1147",
+        "template_id": "ct_ebd72e94986255",
+        "obligation_id": "obl_33c6501c9ac6b6",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "A replacement, refund, or new order case must not be opened when the order is in a protected confirmed-delivery state unless an applicable exception has been established.",
+        "source": "completion_template:ct_ebd72e94986255",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "the customer requests immediate corrective action despite confirmed-delivery evidence",
+        "required_evidence": [
+          "authoritative proof of an applicable exception, if any",
+          "otherwise the unchanged confirmed-delivery state"
+        ],
+        "discharge": "either no irreversible order action is taken, or a valid exception is established first",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asked to leave ORD-7452 unchanged for now."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant said ORD-7452 remains unchanged for now, pending investigation."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "signature_confirmed_delivery_boundary",
+          "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+        }
+      },
+      {
+        "id": "learned_f2d4ac8d84a175",
+        "template_id": "ct_a8ccd82962142c",
+        "obligation_id": "obl_6cc2f7113cc8d5",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+        "source": "completion_template:ct_a8ccd82962142c",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+        "required_evidence": [
+          "user assent to proceed",
+          "the specific remedy to be executed and the destination method to be used"
+        ],
+        "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+        "scope_key": "ord-7452",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asks to get ORD-7452 handled today, implying possible refund or replacement resolution."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to get ORD-7452 handled today."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asked for a refund or replacement today if possible."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User expressed interest in a refund or replacement today if possible, not a specific approved monetary remedy."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User asked to leave ORD-7452 unchanged for now if investigation is required."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant stated ORD-7452 remains unchanged for now."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "irreversible_refund_requires_explicit_consent",
+          "title": "Explicit user confirmation before completing a monetary refund"
+        }
+      },
+      {
+        "id": "runtime_d510c7d361a500",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The previewed cancel_order operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+        "source": "tool:cancel_order:6",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 3,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_to_cancel\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"reason\": \"Package lost — free cancellation with full refund\", \"refund_amount\": 149, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 4,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_to_cancel\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"reason\": \"Package lost — free cancellation with full refund\", \"refund_amount\": 149, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 8,
+            "assistant_index": 6,
+            "tool": "cancel_order",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_cancelled\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"refund_amount\": 149, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": false
+          },
+          "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "preview_sequence": 7,
+          "assistant_index": 4
+        }
+      },
+      {
+        "id": "runtime_d9b07de550f4af",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed cancel_order operation.",
+        "source": "tool:cancel_order:6",
+        "status": "violated",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 3,
+            "tool": "cancel_order",
+            "status": "preview",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_to_cancel\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"reason\": \"Package lost — free cancellation with full refund\", \"refund_amount\": 149, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 5,
+            "tool": "cancel_order",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_cancelled\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"refund_amount\": 149, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": false
+          },
+          "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "preview_sequence": 6,
+          "assistant_index": 3
+        }
+      },
+      {
+        "id": "runtime_faff9d7f482434",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The cancel_order operation completed successfully.",
+        "source": "tool:cancel_order:7",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 5,
+            "tool": "cancel_order",
+            "status": "cancelled",
+            "success": true,
+            "result": "{\"cancellation_fee\": 0, \"items_cancelled\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"refund_amount\": 149, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "cancel_order",
+          "arguments": {
+            "order_id": "ORD-7451",
+            "item_ids": [
+              "ITEM-10451"
+            ],
+            "confirm": true
+          },
+          "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "preview_sequence": 7,
+          "assistant_index": 5
+        }
+      }
+    ],
+    "final_open_items": [
+      "learned_345c76c87740e6",
+      "learned_8d2ae832a5d9cc",
+      "learned_a67c506c6f5e48",
+      "learned_dbd2e2482f9d60"
+    ],
+    "final_satisfied_items": [
+      "learned_10b33dd70eb91e",
+      "learned_1f3ab0f48cba64",
+      "learned_1f67760301fbec",
+      "learned_32cf68bbc6958b",
+      "learned_46108bcc9dccfe",
+      "learned_517db414a0b469",
+      "learned_5535d2ad570ca0",
+      "learned_91fb5f7691fb59",
+      "learned_c6d487845b30de",
+      "learned_ccbd56d966e199",
+      "learned_e23a3be76b1147",
+      "learned_f2d4ac8d84a175",
+      "runtime_d510c7d361a500",
+      "runtime_faff9d7f482434"
+    ],
+    "final_invalidated_items": [],
+    "final_violated_items": [
+      "runtime_d9b07de550f4af"
+    ],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 0,
+      "invalidated": 0,
+      "pending": 1,
+      "pending_evidence": 3,
+      "satisfied": 14,
+      "violated": 1
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_46108bcc9dccfe",
+          "template_id": "ct_f2543d3ac82170",
+          "obligation_id": "obl_fcf69c63ad13e1",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "Before any final refund or compensation outcome is stated for the two orders, each order must be evaluated against its own delivery and policy facts because the user requested both be handled in one claim.",
+          "source": "completion_template:ct_f2543d3ac82170",
+          "status": "pending_evidence",
+          "priority": 50,
+          "activation": "multiple related orders/items are present and at least one has different delivery evidence or policy status",
+          "required_evidence": [
+            "order-level delivery evidence for each entity",
+            "policy evidence showing which facts make one entity eligible or ineligible"
+          ],
+          "discharge": "a grounded statement that distinguishes which entities qualify and which do not",
+          "scope_key": "orders_ord-7451_ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User mentions two orders, ORD-7451 and ORD-7452, in one refund/resolution request."
+            }
+          ],
+          "missing_evidence": [
+            "order-level delivery evidence for ORD-7451",
+            "order-level delivery evidence for ORD-7452",
+            "policy evidence showing whether either order has different eligibility or disqualifying facts"
+          ],
+          "scope": {
+            "family": "multi_entity_refund_eligibility_and_partial_resolution",
+            "title": "separate items by eligibility before closing a multi-item refund request"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_517db414a0b469",
+          "template_id": "ct_e562d9ed872abe",
+          "obligation_id": "obl_5a0c589ba3ef75",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+          "source": "completion_template:ct_e562d9ed872abe",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+          "required_evidence": [
+            "order/shipping status showing loss classification",
+            "policy evidence for the relevant threshold or exception"
+          ],
+          "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+          "scope_key": "ord-7451",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User says ORD-7451 shows lost in transit and asks to get it handled today."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative shipping/order status showing ORD-7451 is classified as lost",
+            "policy evidence for any threshold or exception governing immediate resolution"
+          ],
+          "scope": {
+            "family": "lost_in_transit_resolution_and_refund_closure",
+            "title": "lost shipment must be grounded and final outcome reported"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1f3ab0f48cba64",
+          "template_id": "ct_e562d9ed872abe",
+          "obligation_id": "obl_317262e6d67083",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+          "source": "completion_template:ct_e562d9ed872abe",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+          "required_evidence": [
+            "authoritative loss status",
+            "policy or case rationale distinguishing loss from delay"
+          ],
+          "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+          "scope_key": "ord-7451",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to have ORD-7451 handled today and describes it as lost in transit."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative loss status for ORD-7451",
+            "policy or case rationale distinguishing lost from delayed shipments"
+          ],
+          "scope": {
+            "family": "lost_in_transit_resolution_and_refund_closure",
+            "title": "lost shipment must be grounded and final outcome reported"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1f67760301fbec",
+          "template_id": "ct_e562d9ed872abe",
+          "obligation_id": "obl_5a0c589ba3ef75",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Any claim that no waiting period or investigation is needed must be grounded in authoritative order/policy evidence showing the shipment is already classified as lost and that the applicable value/threshold condition is satisfied.",
+          "source": "completion_template:ct_e562d9ed872abe",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "The assistant is about to state a policy conclusion about investigation or eligibility for immediate resolution.",
+          "required_evidence": [
+            "order/shipping status showing loss classification",
+            "policy evidence for the relevant threshold or exception"
+          ],
+          "discharge": "A grounded statement tying the conclusion to the observed loss status and the applicable policy threshold; if missing, the claim is not dischargeable.",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User says ORD-7452 shows lost in transit and asks to get it handled today."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative shipping/order status showing ORD-7452 is classified as lost",
+            "policy evidence for any threshold or exception governing immediate resolution"
+          ],
+          "scope": {
+            "family": "lost_in_transit_resolution_and_refund_closure",
+            "title": "lost shipment must be grounded and final outcome reported"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ccbd56d966e199",
+          "template_id": "ct_e562d9ed872abe",
+          "obligation_id": "obl_317262e6d67083",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "The completion statement must explain why the state qualifies for immediate resolution rather than a normal delay case, including the decisive loss-status rationale.",
+          "source": "completion_template:ct_e562d9ed872abe",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A support response is ready to tell the customer they can proceed without waiting.",
+          "required_evidence": [
+            "authoritative loss status",
+            "policy or case rationale distinguishing loss from delay"
+          ],
+          "discharge": "An explicit rationale that the item is already lost and therefore follows the loss-resolution path instead of a wait-and-see path.",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to have ORD-7452 handled today and describes it as lost in transit."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative loss status for ORD-7452",
+            "policy or case rationale distinguishing lost from delayed shipments"
+          ],
+          "scope": {
+            "family": "lost_in_transit_resolution_and_refund_closure",
+            "title": "lost shipment must be grounded and final outcome reported"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5535d2ad570ca0",
+          "template_id": "ct_a8ccd82962142c",
+          "obligation_id": "obl_6cc2f7113cc8d5",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+          "source": "completion_template:ct_a8ccd82962142c",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+          "required_evidence": [
+            "user assent to proceed",
+            "the specific remedy to be executed and the destination method to be used"
+          ],
+          "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+          "scope_key": "ord-7451",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to get ORD-7451 handled today, implying possible refund or replacement resolution."
+            }
+          ],
+          "missing_evidence": [
+            "specific monetary remedy proposed for ORD-7451",
+            "destination payment method or account for ORD-7451 refund/credit",
+            "explicit user authorization to proceed with that remedy"
+          ],
+          "scope": {
+            "family": "irreversible_refund_requires_explicit_consent",
+            "title": "Explicit user confirmation before completing a monetary refund"
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "item_created",
+        "item": {
+          "id": "learned_f2d4ac8d84a175",
+          "template_id": "ct_a8ccd82962142c",
+          "obligation_id": "obl_6cc2f7113cc8d5",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before an irreversible refund or credit is executed, obtain the user's explicit confirmation of the monetary remedy and destination method.",
+          "source": "completion_template:ct_a8ccd82962142c",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant is otherwise ready to finalize a refund, credit, or price adjustment.",
+          "required_evidence": [
+            "user assent to proceed",
+            "the specific remedy to be executed and the destination method to be used"
+          ],
+          "discharge": "The user explicitly authorizes proceeding with the stated monetary remedy, or the action is not executed.",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User asks to get ORD-7452 handled today, implying possible refund or replacement resolution."
+            }
+          ],
+          "missing_evidence": [
+            "specific monetary remedy proposed for ORD-7452",
+            "destination payment method or account for ORD-7452 refund/credit",
+            "explicit user authorization to proceed with that remedy"
+          ],
+          "scope": {
+            "family": "irreversible_refund_requires_explicit_consent",
+            "title": "Explicit user confirmation before completing a monetary refund"
+          }
+        }
+      },
+      {
+        "index": 7,
+        "event": "transition",
+        "item_id": "learned_5535d2ad570ca0",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "learned_91fb5f7691fb59",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_0ffca9c9019e35",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "pending",
+          "priority": 1,
+          "activation": "any relevant action result is non-final or failed",
+          "required_evidence": [
+            "a successful final state for the requested action, not merely a preview or attempted confirmation"
+          ],
+          "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+          "scope_key": "ord-7451",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User authorized refund of ORD-7451 to original payment method."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative final executed refund or cancellation state for ORD-7451"
+          ],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c6d487845b30de",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_40d3c12e070194",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "pending",
+          "priority": 2,
+          "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+          "required_evidence": [
+            "final executed status for each claimed change"
+          ],
+          "discharge": "authoritative results show the claimed state change completed for each affected entity",
+          "scope_key": "ord-7451",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User requested the ORD-7451 refund be carried out."
+            }
+          ],
+          "missing_evidence": [
+            "final executed refund or cancellation status for ORD-7451"
+          ],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_d510c7d361a500",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed cancel_order operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:cancel_order:6",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 3,
+              "tool": "cancel_order",
+              "status": "preview",
+              "success": true,
+              "result": "{\"cancellation_fee\": 0, \"items_to_cancel\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"reason\": \"Package lost — free cancellation with full refund\", \"refund_amount\": 149, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": false
+            },
+            "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+            "preview_sequence": 6,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 11,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_d9b07de550f4af",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed cancel_order operation.",
+          "source": "tool:cancel_order:6",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 3,
+              "tool": "cancel_order",
+              "status": "preview",
+              "success": true,
+              "result": "{\"cancellation_fee\": 0, \"items_to_cancel\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"reason\": \"Package lost — free cancellation with full refund\", \"refund_amount\": 149, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": false
+            },
+            "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+            "preview_sequence": 6,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 12,
+        "event": "preview_refreshed",
+        "item_id": "runtime_d510c7d361a500",
+        "tool": "cancel_order",
+        "sequence": 7
+      },
+      {
+        "index": 13,
+        "event": "transition",
+        "item_id": "learned_1f3ab0f48cba64",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 14,
+        "event": "transition",
+        "item_id": "learned_517db414a0b469",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 15,
+        "event": "transition",
+        "item_id": "learned_ccbd56d966e199",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 16,
+        "event": "transition",
+        "item_id": "learned_1f67760301fbec",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 17,
+        "event": "transition",
+        "item_id": "learned_46108bcc9dccfe",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 18,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_faff9d7f482434",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The cancel_order operation completed successfully.",
+          "source": "tool:cancel_order:7",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 7,
+              "assistant_index": 5,
+              "tool": "cancel_order",
+              "status": "cancelled",
+              "success": true,
+              "result": "{\"cancellation_fee\": 0, \"items_cancelled\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\", \"refund_amount\": 149, \"refund_method\": \"credit_card\", \"status\": \"cancelled\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": true
+            },
+            "action_key": "[\"cancel_order\", {\"item_ids\": [\"ITEM-10451\"], \"order_id\": \"ORD-7451\"}]",
+            "preview_sequence": 7,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 19,
+        "event": "transition",
+        "item_id": "runtime_d9b07de550f4af",
+        "previous": "pending",
+        "status": "violated",
+        "reason": "operation_completed_without_a_bound_confirmation"
+      },
+      {
+        "index": 20,
+        "event": "transition",
+        "item_id": "runtime_d510c7d361a500",
+        "previous": "awaiting_confirmation",
+        "status": "satisfied",
+        "reason": "confirmed_mutation_succeeded"
+      },
+      {
+        "index": 21,
+        "event": "transition",
+        "item_id": "learned_c6d487845b30de",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 22,
+        "event": "item_created",
+        "item": {
+          "id": "learned_32cf68bbc6958b",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_0ffca9c9019e35",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "The agent must not state that a refund, cancellation, or return is completed if the latest authoritative state is only a preview, draft, or error.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "any relevant action result is non-final or failed",
+          "required_evidence": [
+            "a successful final state for the requested action, not merely a preview or attempted confirmation"
+          ],
+          "discharge": "a successful executed state exists for the action, or the response clearly says it is not yet completed",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M4",
+              "detail": "User asked to leave ORD-7452 unchanged for now if investigation is required."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative final executed refund/cancellation/return state for ORD-7452 or explicit unchanged status"
+          ],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      },
+      {
+        "index": 23,
+        "event": "item_created",
+        "item": {
+          "id": "learned_a67c506c6f5e48",
+          "template_id": "ct_15a009f16ad57c",
+          "obligation_id": "obl_40d3c12e070194",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "Before declaring the task finished, every requested irreversible change that the agent says it completed must actually have taken effect in authoritative state.",
+          "source": "completion_template:ct_15a009f16ad57c",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "the response claims a concrete completion outcome such as refunded, cancelled, or returned",
+          "required_evidence": [
+            "final executed status for each claimed change"
+          ],
+          "discharge": "authoritative results show the claimed state change completed for each affected entity",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M4",
+              "detail": "User requested ORD-7452 remain unchanged for now."
+            }
+          ],
+          "missing_evidence": [
+            "final executed state for ORD-7452 if any change is claimed"
+          ],
+          "scope": {
+            "family": "protected_action_requires_confirmed_execution",
+            "title": "Do not claim an irreversible refund, cancellation, or return until execution succeeded"
+          }
+        }
+      },
+      {
+        "index": 24,
+        "event": "transition",
+        "item_id": "learned_91fb5f7691fb59",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 25,
+        "event": "transition",
+        "item_id": "learned_32cf68bbc6958b",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 26,
+        "event": "transition",
+        "item_id": "learned_f2d4ac8d84a175",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 27,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8d2ae832a5d9cc",
+          "template_id": "ct_4a4df1297027fb",
+          "obligation_id": "obl_6d3db458461346",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "When confirming the already-handled case, explicitly report the primary resolved item's completion status using grounded evidence.",
+          "source": "completion_template:ct_4a4df1297027fb",
+          "status": "pending",
+          "priority": 1,
+          "activation": "the user asks for confirmation of an already-handled case",
+          "required_evidence": [
+            "authoritative status for the primary item",
+            "matching refund/cancellation evidence"
+          ],
+          "discharge": "a direct statement that the primary item is refunded/canceled/resolved",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M5",
+              "detail": "Assistant reported ORD-7451 done and ORD-7452 unchanged."
+            }
+          ],
+          "missing_evidence": [
+            "an assistant confirmation response to the user's completion/confirmation request, if any further confirmation is expected after M6"
+          ],
+          "scope": {
+            "family": "final_status_confirmation_with_related_items",
+            "title": "confirm completion across primary and related orders"
+          }
+        }
+      },
+      {
+        "index": 28,
+        "event": "item_created",
+        "item": {
+          "id": "learned_10b33dd70eb91e",
+          "template_id": "ct_4a4df1297027fb",
+          "obligation_id": "obl_ac325c8dc06d66",
+          "phase": "final",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "do not imply that untouched related items were changed, and do not claim more scope than was actually resolved",
+          "source": "completion_template:ct_4a4df1297027fb",
+          "status": "satisfied",
+          "priority": 3,
+          "activation": "the user’s confirmation request spans multiple items or orders",
+          "required_evidence": [
+            "current status for each mentioned item"
+          ],
+          "discharge": "absence of any claim beyond the grounded items",
+          "scope_key": "default",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M5",
+              "detail": "Assistant distinguished ORD-7451 as canceled/refunded and ORD-7452 as unchanged pending investigation."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "final_status_confirmation_with_related_items",
+            "title": "confirm completion across primary and related orders"
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": "item_created",
+        "item": {
+          "id": "learned_dbd2e2482f9d60",
+          "template_id": "ct_ebd72e94986255",
+          "obligation_id": "obl_a5d8f78969775e",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating that immediate replacement, refund, or similar order relief is unavailable, ground the claim in current authoritative delivery evidence showing the delivery-confirmation state that controls eligibility.",
+          "source": "completion_template:ct_ebd72e94986255",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "the response asserts or implies that a concrete outcome or ineligibility follows from delivery status",
+          "required_evidence": [
+            "current order status",
+            "presence of signature or equivalent delivery confirmation",
+            "any applicable protected-value or signature-required condition"
+          ],
+          "discharge": "the agent cites the controlling delivery-confirmation evidence and ties it to the claimed restriction",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant said ORD-7452 requires a higher-value lost-package claim review before refund or cancellation."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant said same-day refund or replacement for ORD-7452 cannot be completed unless investigation requirement is cleared first."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Visible order evidence shows shipped item with shipping_status lost; transcript snippet does not show signature-confirmed delivery."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative evidence that ORD-7452 is in a signature-confirmed or equivalent protected delivery state if that template is the actual basis",
+            "applicable protected-value or signature-required condition tied to the claimed restriction"
+          ],
+          "scope": {
+            "family": "signature_confirmed_delivery_boundary",
+            "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+          }
+        }
+      },
+      {
+        "index": 30,
+        "event": "item_created",
+        "item": {
+          "id": "learned_e23a3be76b1147",
+          "template_id": "ct_ebd72e94986255",
+          "obligation_id": "obl_33c6501c9ac6b6",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "A replacement, refund, or new order case must not be opened when the order is in a protected confirmed-delivery state unless an applicable exception has been established.",
+          "source": "completion_template:ct_ebd72e94986255",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "the customer requests immediate corrective action despite confirmed-delivery evidence",
+          "required_evidence": [
+            "authoritative proof of an applicable exception, if any",
+            "otherwise the unchanged confirmed-delivery state"
+          ],
+          "discharge": "either no irreversible order action is taken, or a valid exception is established first",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M4",
+              "detail": "User asked to leave ORD-7452 unchanged for now."
+            },
+            {
+              "kind": "message",
+              "ref": "M5",
+              "detail": "Assistant said ORD-7452 remains unchanged for now, pending investigation."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "signature_confirmed_delivery_boundary",
+            "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+          }
+        }
+      },
+      {
+        "index": 31,
+        "event": "item_created",
+        "item": {
+          "id": "learned_345c76c87740e6",
+          "template_id": "ct_ebd72e94986255",
+          "obligation_id": "obl_8ad2628bef431f",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "If the customer is asking whether support can act now, explicitly explain that the inability to act is because the signature-confirmed delivery state counts as completed delivery for immediate replacement/refund purposes.",
+          "source": "completion_template:ct_ebd72e94986255",
+          "status": "pending_evidence",
+          "priority": 3,
+          "activation": "the customer asks for clarification of why support cannot replace or refund now",
+          "required_evidence": [
+            "the governing delivery-confirmation state",
+            "the policy consequence attached to that state"
+          ],
+          "discharge": "the final response clearly links the confirmed-delivery evidence to the no-immediate-action outcome",
+          "scope_key": "ord-7452",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M2",
+              "detail": "User asked why the tablet cannot be refunded right away and asked for refund or replacement today if possible."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant explained a value-based investigation rule, not a delivery-confirmation state."
+            }
+          ],
+          "missing_evidence": [
+            "evidence that signature-confirmed delivery state is actually the governing basis for ORD-7452",
+            "an assistant explanation linking that state to the inability to refund or replace immediately, if applicable"
+          ],
+          "scope": {
+            "family": "signature_confirmed_delivery_boundary",
+            "title": "Signature-confirmed delivery blocks immediate replacement/refund claims"
+          }
+        }
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "f19860837af91abcfb1130c0d6bde34132dbc9555dd7650dd42795d75868ea82",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today.",
+        "candidates": [
+          {
+            "id": "ct_f2543d3ac82170",
+            "family": "multi_entity_refund_eligibility_and_partial_resolution",
+            "score": 30.178334
+          },
+          {
+            "id": "ct_3741ae3c332370",
+            "family": "profile_benefit_completion_family",
+            "score": 21.814136
+          },
+          {
+            "id": "ct_e562d9ed872abe",
+            "family": "lost_in_transit_resolution_and_refund_closure",
+            "score": 16.630663
+          },
+          {
+            "id": "ct_236f5269efddb9",
+            "family": "partial_item_cancellation_with_unchanged_sibling_state",
+            "score": 12.383092
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 18.224856
+          },
+          {
+            "id": "ct_f9d1476ec6f628",
+            "family": "boundary_transition_completion_family",
+            "score": 21.473184
+          },
+          {
+            "id": "ct_1aba9518555ad6",
+            "family": "protected_state_confirmation_on_request",
+            "score": 17.974008
+          },
+          {
+            "id": "ct_a8ccd82962142c",
+            "family": "irreversible_refund_requires_explicit_consent",
+            "score": 12.923286
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "7dcb5f07911290eb729595acacb0a919e06da75eac68ff2df143e3215bd3f6cc",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. get_order order_id ORD-7451 customer_id cust_003 order_date 2026-07-01T10:00:00 status shipped shipping_status lost shipping_method standard shipping_cost tracking_number TRK18318188 delivery_date delivery_promised_date 2026-07-05T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-10451 order_id ORD-7451 p...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 151.612192
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 112.356055
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 104.541923
+          },
+          {
+            "id": "ct_66af885ae29b9d",
+            "family": "lost_shipment_refund_requires_exact_refund_basis",
+            "score": 106.754508
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 111.761265
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 96.381227
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 82.701225
+          },
+          {
+            "id": "ct_fa43cf85e864ea",
+            "family": "threshold_boundary_explanation_with_next_consequence",
+            "score": 85.126927
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "3595f92ef934ac44d527c171380ed0b46c3132798f8398113eeb5458aa603d7a",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible. I checked both orders. The coffee maker order (ORD-7451, $149) qualifies for immediate resolution, but the tablet order (ORD-7452, $599) falls under the higher-value lost-package rule, ...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 132.938985
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 104.595421
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 96.876613
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 94.434578
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 91.599015
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 100.285007
+          },
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 81.290372
+          },
+          {
+            "id": "ct_66af885ae29b9d",
+            "family": "lost_shipment_refund_requires_exact_refund_basis",
+            "score": 86.045737
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "8956d24f3d2b72c045ae5ae0b336441c1b60b31e3599c975ed2dee8c130caa18",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible. I checked both orders. The coffee maker order (ORD-7451, $149) qualifies for immediate resolution, but the tablet order (ORD-7452, $599) falls under the higher-value lost-package rule, ...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 135.531935
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 110.891542
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 96.860478
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 98.554769
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 97.853727
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 110.5042
+          },
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 88.956665
+          },
+          {
+            "id": "ct_7a4b6afc158086",
+            "family": "boundary_transition_completion",
+            "score": 90.7242
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "11b09b396a0c4d41de0b8223e04ebb4a85b3d6e091afcf40c392221cef9fea7c",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible. confirm ORD-7451. And understood on ORD-7452 — please leave that order unchanged for now if the investigation has to happen before any refund or replacement. I checked both orders. The ...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 140.319493
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 111.572721
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 105.841649
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 110.015052
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 103.793782
+          },
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 101.481088
+          },
+          {
+            "id": "ct_3c27d025731488",
+            "family": "irreversible_refund_requires_confirmation_unless_already_given",
+            "score": 93.146393
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 113.019477
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "6ec4e4c6a15c023cb56d80a411043cad5a2904b92cf14d76bcca54a8a6cef646",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible. confirm ORD-7451. And understood on ORD-7452 — please leave that order unchanged for now if the investigation has to happen before any refund or replacement. I checked both orders. The ...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 140.320538
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 111.574383
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 105.839218
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 111.845149
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 105.610056
+          },
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 103.078959
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 114.931744
+          },
+          {
+            "id": "ct_3c27d025731488",
+            "family": "irreversible_refund_requires_confirmation_unless_already_given",
+            "score": 93.144443
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "05d98049d28a6f0cd33e08132378798efe119d0a216351698919ba64b725f657",
+        "query_preview": "I have two orders that both show lost in transit: ORD-7451 has my coffee maker, and ORD-7452 has my tablet. Please get both handled today. Why can the coffee maker be refunded right away, but the tablet can’t if they were both lost the same way? If ORD-7451 can be refunded now, then yes, please refund that one to my original payment method, and for ORD-7452 I’d like a refund or replacement today if possible. confirm ORD-7451. And understood on ORD-7452 — please leave that order unchanged for now if the investigation has to happen before any refund or replacement. I checked both orders. The ...",
+        "candidates": [
+          {
+            "id": "ct_a6e72329369c66",
+            "family": "boundary_transition_completion_condition",
+            "score": 144.783343
+          },
+          {
+            "id": "ct_258534a0f36853",
+            "family": "partial_cancellation_with_split_refund",
+            "score": 119.149107
+          },
+          {
+            "id": "ct_8c52c63445fa7c",
+            "family": "late_shipment_threshold_consequence_disclosure",
+            "score": 105.836641
+          },
+          {
+            "id": "ct_4a4df1297027fb",
+            "family": "final_status_confirmation_with_related_items",
+            "score": 117.067652
+          },
+          {
+            "id": "ct_ebd72e94986255",
+            "family": "signature_confirmed_delivery_boundary",
+            "score": 111.566705
+          },
+          {
+            "id": "ct_15a009f16ad57c",
+            "family": "protected_action_requires_confirmed_execution",
+            "score": 105.459927
+          },
+          {
+            "id": "ct_947d9cc0d6a2b1",
+            "family": "pre_shipment_cancellation_boundary",
+            "score": 119.459619
+          },
+          {
+            "id": "ct_3c27d025731488",
+            "family": "irreversible_refund_requires_confirmation_unless_already_given",
+            "score": 93.1351
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "2e947920c57029cafe1caba99ead59307790081e5ea1e8ce9922a73c3cc98b64",
+        "candidate_ids": [
+          "ct_f2543d3ac82170",
+          "ct_3741ae3c332370",
+          "ct_e562d9ed872abe",
+          "ct_236f5269efddb9",
+          "ct_4a4df1297027fb",
+          "ct_f9d1476ec6f628",
+          "ct_1aba9518555ad6",
+          "ct_a8ccd82962142c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 4233,
+          "output_tokens": 1047
+        },
+        "response_sha256": "2a32fff3d402950e9b83c75096664d2a1c4c4a693597e77007882d53e96be77d",
+        "returned_items": 7
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "48cbfbf3ed48b25ea72fda43b4d87b3710a2b24282be838c8f76ea73a22a36d2",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_8c52c63445fa7c",
+          "ct_66af885ae29b9d",
+          "ct_947d9cc0d6a2b1",
+          "ct_7a4b6afc158086",
+          "ct_ebd72e94986255",
+          "ct_fa43cf85e864ea",
+          "ct_a8ccd82962142c",
+          "ct_e562d9ed872abe",
+          "ct_f2543d3ac82170"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12290,
+          "output_tokens": 1145
+        },
+        "response_sha256": "880dce5f45c937f64bfeb0b7587ab37b42c2521df23ee58e07aa602696447fa8",
+        "returned_items": 7
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "63ba97301434968d3188e25c04c60631cdc649621ab388ff9ee5afa74ae2188f",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_8c52c63445fa7c",
+          "ct_ebd72e94986255",
+          "ct_4a4df1297027fb",
+          "ct_947d9cc0d6a2b1",
+          "ct_15a009f16ad57c",
+          "ct_66af885ae29b9d",
+          "ct_a8ccd82962142c",
+          "ct_e562d9ed872abe",
+          "ct_f2543d3ac82170"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 9980,
+          "output_tokens": 1338
+        },
+        "response_sha256": "75b7b74ec667e625b85ef3a5ecf4a3c38ca376d901ea5e6058c477bf4442a374",
+        "returned_items": 8
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "dc9f43190238f12fd30f0224bd2608c839afedf7ef8487592a8683a1d50411d4",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_8c52c63445fa7c",
+          "ct_ebd72e94986255",
+          "ct_4a4df1297027fb",
+          "ct_947d9cc0d6a2b1",
+          "ct_15a009f16ad57c",
+          "ct_7a4b6afc158086",
+          "ct_a8ccd82962142c",
+          "ct_e562d9ed872abe",
+          "ct_f2543d3ac82170"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 11843,
+          "output_tokens": 1327
+        },
+        "response_sha256": "b1b67c69bcd9d541ab08c6ad3416ecfc30c278ba54d0a67ddaf0832fd39c1352",
+        "returned_items": 8
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "4f34317f0da5d9fef71d28b0820a3eb6f03254d02190b59e12b83df51610f972",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_ebd72e94986255",
+          "ct_8c52c63445fa7c",
+          "ct_258534a0f36853",
+          "ct_4a4df1297027fb",
+          "ct_15a009f16ad57c",
+          "ct_3c27d025731488",
+          "ct_947d9cc0d6a2b1",
+          "ct_a8ccd82962142c",
+          "ct_e562d9ed872abe",
+          "ct_f2543d3ac82170"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10947,
+          "output_tokens": 1183
+        },
+        "response_sha256": "c29271129d3af93604533b7746c1123cf05bd1105232fc38b0df7c0fbb98def3",
+        "returned_items": 8
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "bb1a0df3a5860704d091a5072def4b955c608c9d148a3b4863723ba0d97d48c5",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_ebd72e94986255",
+          "ct_8c52c63445fa7c",
+          "ct_258534a0f36853",
+          "ct_4a4df1297027fb",
+          "ct_15a009f16ad57c",
+          "ct_947d9cc0d6a2b1",
+          "ct_3c27d025731488",
+          "ct_a8ccd82962142c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7677,
+          "output_tokens": 598
+        },
+        "response_sha256": "879e06f32c7cce8e657ac65ecde0d9f4f198b948bb885bf8b5d61f95648be3f5",
+        "returned_items": 5
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "7b3706bb2bbb8a73229f37b65e192b74bdcb03f54d90de02fc559f3f9e66d45b",
+        "candidate_ids": [
+          "ct_a6e72329369c66",
+          "ct_258534a0f36853",
+          "ct_8c52c63445fa7c",
+          "ct_4a4df1297027fb",
+          "ct_ebd72e94986255",
+          "ct_15a009f16ad57c",
+          "ct_947d9cc0d6a2b1",
+          "ct_3c27d025731488",
+          "ct_a8ccd82962142c"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7865,
+          "output_tokens": 1623
+        },
+        "response_sha256": "ebe42e798e1b593344fbf346bce2b0c6424c453275bedaecf14a5c166f45ab9a",
+        "returned_items": 10
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "4f04afe26a40a95cb1d79f7fc8ab7af7fffc1880fd9aaeec6d3b4054b24fff67",
+        "exposure_signature": "d36501b87bebc0a2a100177336bbb6442b5b50df70306e7197112f47bc8e4c02",
+        "exposed_items": [
+          "learned_5535d2ad570ca0"
+        ],
+        "pending_items": [
+          "learned_46108bcc9dccfe",
+          "learned_517db414a0b469",
+          "learned_1f3ab0f48cba64",
+          "learned_1f67760301fbec",
+          "learned_ccbd56d966e199",
+          "learned_5535d2ad570ca0",
+          "learned_f2d4ac8d84a175"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 5,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "get_order",
+            "arguments": {
+              "order_id": "ORD-7451"
+            }
+          },
+          {
+            "name": "get_order",
+            "arguments": {
+              "order_id": "ORD-7452"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "shipping"
+            }
+          },
+          {
+            "name": "get_policies",
+            "arguments": {
+              "topic": "cancellation"
+            }
+          },
+          {
+            "name": "get_customer",
+            "arguments": {
+              "customer_id": "cust_003"
+            }
+          },
+          {
+            "name": "retrieve_learnings",
+            "arguments": {
+              "query": "lost in transit resolution refund now for two orders, verify shipped not delivered, cancellation policy, possible refund method preview/choice"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "4f04afe26a40a95cb1d79f7fc8ab7af7fffc1880fd9aaeec6d3b4054b24fff67",
+        "exposure_signature": "d36501b87bebc0a2a100177336bbb6442b5b50df70306e7197112f47bc8e4c02",
+        "exposed_items": [
+          "learned_5535d2ad570ca0"
+        ],
+        "pending_items": [
+          "learned_46108bcc9dccfe",
+          "learned_517db414a0b469",
+          "learned_1f3ab0f48cba64",
+          "learned_1f67760301fbec",
+          "learned_ccbd56d966e199",
+          "learned_5535d2ad570ca0",
+          "learned_f2d4ac8d84a175"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 5,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "dac2830553540bf04bd8c8cb4a3cf6bad2e8f8ec61281bac73fddd87c48c21a2",
+        "exposure_signature": "b6ea7de47efe6e5d4204ad877c0ca9f0b8805b431fbdeac0c01b8de95de97900",
+        "exposed_items": [
+          "learned_f2d4ac8d84a175",
+          "learned_c6d487845b30de"
+        ],
+        "pending_items": [
+          "learned_46108bcc9dccfe",
+          "learned_517db414a0b469",
+          "learned_1f3ab0f48cba64",
+          "learned_1f67760301fbec",
+          "learned_ccbd56d966e199",
+          "learned_f2d4ac8d84a175",
+          "learned_91fb5f7691fb59",
+          "learned_c6d487845b30de"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 3,
+          "pending_evidence": 5,
+          "satisfied": 1,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": false
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "d5f7d25243a5e2deee53c46ab3e976d8fa9e48043686a1edee2ff07dcb97b27e",
+        "exposure_signature": "15fe4fbe7e690473380dc560cdb1f88372f4af486a88347ab92c8d55ab44055f",
+        "exposed_items": [
+          "runtime_d510c7d361a500",
+          "learned_f2d4ac8d84a175",
+          "learned_c6d487845b30de"
+        ],
+        "pending_items": [
+          "learned_46108bcc9dccfe",
+          "learned_517db414a0b469",
+          "learned_1f3ab0f48cba64",
+          "learned_1f67760301fbec",
+          "learned_ccbd56d966e199",
+          "learned_f2d4ac8d84a175",
+          "learned_91fb5f7691fb59",
+          "learned_c6d487845b30de",
+          "runtime_d510c7d361a500",
+          "runtime_d9b07de550f4af"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 5,
+          "satisfied": 1,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "d5f7d25243a5e2deee53c46ab3e976d8fa9e48043686a1edee2ff07dcb97b27e",
+        "exposure_signature": "15fe4fbe7e690473380dc560cdb1f88372f4af486a88347ab92c8d55ab44055f",
+        "exposed_items": [
+          "runtime_d510c7d361a500",
+          "learned_f2d4ac8d84a175",
+          "learned_c6d487845b30de"
+        ],
+        "pending_items": [
+          "learned_f2d4ac8d84a175",
+          "learned_91fb5f7691fb59",
+          "learned_c6d487845b30de",
+          "runtime_d510c7d361a500",
+          "runtime_d9b07de550f4af"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 0,
+          "pending": 4,
+          "pending_evidence": 0,
+          "satisfied": 6,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "cancel_order",
+            "arguments": {
+              "order_id": "ORD-7451",
+              "item_ids": [
+                "ITEM-10451"
+              ],
+              "confirm": true
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "58041084d6d9e8feb9ff597785ec84a7f34a6fb957629b02d846a0098861a2ac",
+        "exposure_signature": "428e318c9b90524df68ec3c17700a4f82fe056bbe073bce034bab227cb8900d2",
+        "exposed_items": [
+          "learned_f2d4ac8d84a175",
+          "learned_a67c506c6f5e48"
+        ],
+        "pending_items": [
+          "learned_f2d4ac8d84a175",
+          "learned_91fb5f7691fb59",
+          "learned_32cf68bbc6958b",
+          "learned_a67c506c6f5e48"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 2,
+          "pending_evidence": 2,
+          "satisfied": 9,
+          "violated": 1
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 6,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 7,
+      "regenerations": 0,
+      "exposures": 6,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 3,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 3,
+      "tool_calls": 8,
+      "bookkeeper_input_tokens": 64835,
+      "bookkeeper_output_tokens": 8261,
+      "bookkeeper_total_tokens": 73096,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 99083,
+    "cached_input_tokens": 0,
+    "output_tokens": 8741,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 107824,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 99083,
+  "cached_input_tokens": 0,
+  "output_tokens": 8741,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 107824,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-10451": {
+          "item_status": {
+            "old": "shipped",
+            "new": "cancelled"
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 149
+          },
+          "refund_method": {
+            "old": null,
+            "new": "credit_card"
+          }
+        }
+      },
+      "orders": {
+        "ORD-7451": {
+          "status": {
+            "old": "shipped",
+            "new": "cancelled"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_amount",
+      "expected_value": 149
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10451",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "item_status",
+      "expected_value": "shipped"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-10452",
+      "field": "refund_amount",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-7452",
+      "field": "status",
+      "expected_value": "shipped"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 8,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}

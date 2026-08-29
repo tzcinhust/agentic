@@ -1,0 +1,3506 @@
+{
+  "task_id": "7-return_restocking_waived",
+  "user_id": "cust_001",
+  "task_summary": "**Task:** A Platinum customer wants to return opened headphones for changed mind. The correct handling is to process the return on the normal refund path while waiving the electronics restocking fee because Platinum status overrides that deduction.\n\n**Challenge:** The agent has to notice that membership changes the economics without changing the rest of the workflow. Weak agents charge the ordinary restocking fee anyway or fail to tie the waiver back to the customer's tier.",
+  "state_requirements_met": 1,
+  "state_requirements_reasoning": "All required state assertions matched the saved state_diff.",
+  "state_requirements_details": null,
+  "task_requirements_met": 1,
+  "task_requirements_details": [
+    {
+      "id": "7_return_restocking_waived_agent_must_check_customer_tier",
+      "kind": "must",
+      "requirement": "Agent must verify the customer is Platinum, either by calling get_customer for cust_001 or by explicitly stating the Platinum tier before confirming the return.",
+      "evidence": "conversation_or_tool_calls",
+      "passed": true,
+      "reasoning": "Passed. The agent verified the customer's tier by calling get_customer for customer_id cust_001, which returned membership_tier 'platinum', and the agent also explicitly referenced 'your Platinum benefits' before confirming the return."
+    }
+  ],
+  "task_completion_pass": 1,
+  "ux_user_control": 5,
+  "ux_score": 5.0,
+  "ux_reasoning": "The agent handled this cleanly: it did a non-mutating preview first, explained eligibility and refund details, and waited for explicit confirmation before executing the return. It correctly connected the waived restocking fee to the customer's Platinum tier while also surfacing the separate $8 free-shipping clawback, which was the key decision point in this scenario. The user only needed one clarification, and the explanation directly addressed it without detours or scope creep. Responses were concise but complete, with the final state clearly summarized after processing.",
+  "turns": 3,
+  "tool_calls": 5,
+  "tool_errors": 0,
+  "redundant_calls": 0,
+  "conversation": [
+    {
+      "role": "user",
+      "content": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well."
+    },
+    {
+      "role": "assistant",
+      "content": "I checked it, and your headphones are eligible for return. Because they were opened and this is a fit/preference issue, it falls under a standard return; your Platinum benefits waive the usual restocking fee, so your refund would be $241 back to your original payment method, with the $8 difference coming from the free-shipping clawback.\n\nIf you want, I can submit the return now.",
+      "tool_calls": [
+        {
+          "name": "get_order",
+          "arguments": {
+            "order_id": "ORD-6011"
+          },
+          "result": {
+            "order_id": "ORD-6011",
+            "customer_id": "cust_001",
+            "order_date": "2026-06-01T10:00:00",
+            "status": "delivered",
+            "shipping_status": "delivered",
+            "shipping_method": "standard",
+            "shipping_cost": 0,
+            "tracking_number": "TRK89213373",
+            "delivery_date": "2026-06-05T14:00:00",
+            "delivery_promised_date": "2026-06-05T18:00:00",
+            "signature_required": false,
+            "signature_on_file": null,
+            "payment_method": "credit_card",
+            "payment_details": {
+              "credit_card": 249
+            },
+            "subtotal": 249,
+            "discount_code": null,
+            "discount_amount": 0,
+            "total_paid": 249,
+            "is_gift": false,
+            "gift_sender": null,
+            "items": [
+              {
+                "item_id": "ITEM-9075",
+                "order_id": "ORD-6011",
+                "product_id": "PROD-2075",
+                "quantity": 1,
+                "unit_price": 249,
+                "item_status": "delivered",
+                "return_reason": null,
+                "refund_amount": null,
+                "refund_method": null,
+                "restocking_fee": null,
+                "return_label_issued": false,
+                "replacement_item_id": null,
+                "goodwill_credit": 0,
+                "goodwill_credit_method": null,
+                "store_credit_only": false,
+                "product": {
+                  "product_id": "PROD-2075",
+                  "name": "SoundMax Wireless Headphones",
+                  "category": "electronics",
+                  "price": 249,
+                  "current_price": null,
+                  "return_window_days": 15,
+                  "warranty_months": 12,
+                  "in_stock": true
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "get_customer",
+          "arguments": {
+            "customer_id": "cust_001"
+          },
+          "result": {
+            "customer_id": "cust_001",
+            "name": "Emma Chen",
+            "email": "emma.chen@example.com",
+            "membership_tier": "platinum",
+            "account_created": "2020-03-15",
+            "total_orders": 87,
+            "preferred_refund_method": "original_payment",
+            "store_credit_balance": 150,
+            "has_prime_shipping": true,
+            "benefits": {
+              "return_window_extension": "+15 days",
+              "compensation_multiplier": "2.0x",
+              "restocking_fee_waiver": true,
+              "prime_shipping": true
+            }
+          }
+        },
+        {
+          "name": "get_policies",
+          "arguments": {
+            "topic": "return"
+          },
+          "result": {
+            "topic": "return",
+            "rules": {
+              "agent_computes_amount": "process_return requires the agent to submit the net refund as `amount` on confirm. Compute it from the preview's component breakdown: base_item_price (after promo redistribution) minus restocking_fee plus restocking_discount minus shipping_clawback minus bulk_clawback minus repeat_surcharge minus paid_return_shipping_fee. The env writes the submitted amount verbatim — skipping a component (e.g. forgetting the Gold restocking discount) produces a wrong refund_amount and fails state scoring.",
+              "windows_by_category": {
+                "electronics": "15-day return window",
+                "clothing": "30-day return window",
+                "kitchen": "30-day return window",
+                "books": "14-day return window",
+                "accessories": "30-day return window"
+              },
+              "window_extensions": {
+                "membership": "Gold/Platinum members get +15 days",
+                "prime": "Prime shipping members get +15 additional days",
+                "seasonal": "Orders placed in November or December extend through January 31 of the following year. Seasonal extension applies if it gives more time than tier/prime extensions.",
+                "store_credit_grace": "Up to 15 days past the return window: store credit only."
+              },
+              "eligibility": {
+                "defective_items": "No window restriction for defective, wrong item, or damaged in transit.",
+                "already_returned": "Items already returned/exchanged/cancelled are ineligible.",
+                "not_as_described": "Use not_as_described only for an unused/unworn item that materially differs from the listing. If the customer wore, washed, altered, or used the item and only dislikes fit, feel, texture, or preference-based qualities, classify the return as changed_mind instead."
+              },
+              "restocking_fee": {
+                "base": "15% restocking fee for opened electronics returned for changed_mind.",
+                "tier_discount": {
+                  "platinum": "Restocking fee fully waived.",
+                  "gold": "50% off the restocking fee.",
+                  "silver": "25% off the restocking fee.",
+                  "standard": "No discount."
+                },
+                "auto_applied": "Restocking fee and any tier discount are folded into the process_return refund amount automatically; the result reports the discount under 'restocking_discount' for transparency.",
+                "completed_returns": "Once a changed-mind return is completed with the applicable restocking fee, do not reverse that fee later as a courtesy or supplemental refund."
+              },
+              "return_shipping_fee": {
+                "low_value": "Orders with subtotal < $50: customer pays $8 return shipping fee.",
+                "free_threshold": "Orders >= $50: free return label provided.",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: always free return shipping.",
+                "deduction": "Return shipping fee, when charged, is deducted from the return refund."
+              },
+              "bulk_purchase_clawback": {
+                "applies_when": "Order originally qualified for a bulk discount (3+ items with a discount code) AND the return drops remaining count below 3.",
+                "amount": "$5 per remaining item, deducted from the return refund.",
+                "no_discount_code": "If order had no discount code, no clawback applies."
+              },
+              "free_shipping_clawback": {
+                "applies_when": "Order originally qualified for free shipping (subtotal >= $100) AND the return drops remaining subtotal below $100.",
+                "amount": "$8 standard shipping fee is deducted from the return refund. This is a flat policy charge, not the original shipping cost (which was $0 on free-shipping orders).",
+                "fault_exempt": "Defective, wrong item, or damaged in transit: no clawback (customer-fault returns only).",
+                "paid_shipping": "If the order did not qualify for free shipping originally (subtotal < $100), no clawback applies."
+              },
+              "repeat_category_surcharge": {
+                "rule": "Returning 2+ items from the same product category in one order: $5 surcharge per additional return (first return in each category is free).",
+                "different_categories": "Returns from different categories do not trigger the surcharge.",
+                "deduction": "Surcharge is deducted from the return refund."
+              }
+            }
+          }
+        },
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind"
+          },
+          "result": {
+            "status": "preview",
+            "item_id": "ITEM-9075",
+            "return_eligible": true,
+            "reason": "changed_mind",
+            "refund_amount": 241,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "discount_adjustment": 0,
+            "free_return_shipping": false,
+            "shipping_refund": false,
+            "shipping_clawback": 8,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks for checking. Before I confirm, can you clarify the $8 difference? You mentioned Platinum waives the restocking fee, so I want to make sure this return is for the headphones due to fit, refunded to my original payment method, with no restocking fee charged."
+    },
+    {
+      "role": "assistant",
+      "content": "Yes — for this headphones return due to fit, it would go back to your original payment method, and there is no restocking fee.\n\nThe $8 is separate: because the order originally qualified for free shipping and returning this item brings the remaining order value below that threshold, the shipping benefit is clawed back under the return policy. So the return would be processed as:\n- Item price: $249\n- Restocking fee: $0\n- Shipping clawback: $8\n- Net refund: $241\n\nIf you'd like, I can go ahead and process it.",
+      "tool_calls": null
+    },
+    {
+      "role": "user",
+      "content": "Got it, thanks for explaining. Please go ahead and process the return for the headphones from ORD-6011 due to the fit issue, with the refund to my original payment method and no restocking fee."
+    },
+    {
+      "role": "assistant",
+      "content": "Done — the return for the headphones has been processed. Your refund is $241 to your original payment method, and no restocking fee was charged.",
+      "tool_calls": [
+        {
+          "name": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 241
+          },
+          "result": {
+            "status": "returned",
+            "item_id": "ITEM-9075",
+            "refund_amount": 241,
+            "policy_computed_amount": 241,
+            "refund_method": "original_payment",
+            "restocking_fee": 0,
+            "return_label_issued": false,
+            "shipping_clawback": 8,
+            "bulk_clawback": 0,
+            "repeat_surcharge": 0,
+            "paid_return_shipping_fee": 0,
+            "restocking_discount": 0
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Thanks, that works for me. [TASK_DONE]"
+    }
+  ],
+  "evaluation_protocol_id": "state_bench_v0.8.1_gpt54",
+  "simulator_model": "gpt-5.4",
+  "simulator_prompt_hash": "0b58e108ac16469926ee210774e6e3275049d898d35ea23ef40c13ddfbe829d8",
+  "agent_name": "TaskClosureMemoryAgent",
+  "agent_model": {
+    "model_name": "gpt-5.4",
+    "reasoning_level": null
+  },
+  "completion_memory": {
+    "version": "task_closure_memory_v2",
+    "mode": "full",
+    "completion_artifact": "/root/autodl-tmp/task-closure-v2-stage-20260829/artifacts/task_closure_memory_v2/memory/completion_templates.json",
+    "completion_artifact_sha256": "ac6792e1258bc49d8e273c9a294141e5e80c923b7b7e135eef7e014df3b0359c",
+    "initial_items": [],
+    "final_items": [
+      {
+        "id": "learned_08a3da22fd94d2",
+        "template_id": "ct_cf4ac61f93c383",
+        "obligation_id": "obl_4eb81ecdab51bd",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete refund outcome, ground the claim in current authoritative return evidence that resolves eligibility, refund method, and whether a label can be issued.",
+        "source": "completion_template:ct_cf4ac61f93c383",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A response would mention a specific return eligibility decision or concrete refund terms.",
+        "required_evidence": [
+          "current return-eligibility evidence for the item",
+          "authoritative preview or equivalent state showing refund method and label/shipping outcome"
+        ],
+        "discharge": "The assistant's claim is supported by current return evidence matching the stated eligibility, method, and label outcome.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows return_eligible true and refund_method original_payment for ITEM-9075."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the headphones are eligible for return and the refund would go back to the original payment method."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_refund_preview_grounded_before_quote",
+          "title": "Ground the exact return outcome before quoting refund eligibility or amount"
+        }
+      },
+      {
+        "id": "learned_0e69a01d704306",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_ff7a016701cd6b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Resolve whether any account-linked return benefit applies before stating concrete refund, fee, or eligibility terms.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A profile or customer record exposes a return-related benefit field or tier-linked entitlement.",
+        "required_evidence": [
+          "current customer benefit or tier data",
+          "policy terms connecting that benefit to return fees, refund components, or eligibility",
+          "the return scenario details needed to test applicability"
+        ],
+        "discharge": "The response is grounded in evidence showing either that a specific account benefit applies or that no listed benefit changes this return outcome.",
+        "scope_key": "cust_001/ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer benefits include restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Return scenario is a delivered headphones item in order ORD-6011."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Return scenario is delivered item ITEM-9075 in order ORD-6011."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview exists for changed_mind return with refund_amount 241 and shipping_clawback 8, but it does not by itself prove whether account-linked benefits were resolved."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has Platinum membership with restocking_fee_waiver and return_window_extension benefits."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated eligibility, no restocking fee, and a $241 refund while referencing Platinum benefits."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows changed_mind refund_amount 241 and restocking_fee 0, but does not by itself prove how account-linked benefits were resolved."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer benefits include restocking_fee_waiver and return_window_extension with platinum membership."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows refund_amount 241 and restocking_fee 0 for changed_mind, but does not itself show whether account-linked benefits were resolved."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated Platinum benefits waive the usual restocking fee and quoted a $241 refund."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has platinum membership with restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview showed restocking_fee 0 and refund_amount 241."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant referenced Platinum benefits when giving the return terms."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_108b574f67f23c",
+        "template_id": "ct_4334dc5be09a1e",
+        "obligation_id": "obl_00295ff6e97614",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "comparison",
+        "description": "When delaying or changing state could cross the boundary and materially change the outcome, provide the exact next consequence from current authoritative evidence, not just the current-side result.",
+        "source": "completion_template:ct_4334dc5be09a1e",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "Observed state indicates a nearby or meaningful boundary transition where waiting could alter eligibility, fees, or refund amount.",
+        "required_evidence": [
+          "current authoritative evidence of the present outcome",
+          "current authoritative evidence of the consequence after crossing the next boundary, including any changed fee, loss of eligibility, or other material effect"
+        ],
+        "discharge": "The user is told both the current result and the evidence-grounded next consequence if the boundary is crossed.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant gave both the no-restocking-fee result and the exact $8 shipping clawback consequence tied to the threshold change."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview grounds the changed-side consequence with shipping_clawback 8 and net refund 241."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_boundary_transition_consequence_disclosure",
+          "title": "Explain threshold side and next consequence before stating return deductions or totals"
+        }
+      },
+      {
+        "id": "learned_118c2ade7fa88d",
+        "template_id": "ct_36643a7ab9144d",
+        "obligation_id": "obl_016a64fd60323b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating the amount the customer will receive, ground the exact net amount in current authoritative return/refund state.",
+        "source": "completion_template:ct_36643a7ab9144d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A concrete refund or store-credit amount is about to be stated.",
+        "required_evidence": [
+          "current preview or completed return/refund amount from authoritative state",
+          "any applicable adjustment components that explain the net total"
+        ],
+        "discharge": "The response states the exact grounded amount and it matches current authoritative state.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview shows refund_amount 241 for ITEM-9075."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview component includes shipping_clawback 8 and zero restocking_fee, bulk_clawback, and repeat_surcharge."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy says process_return preview component breakdown is used to compute net refund."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows refund_amount 241 for ITEM-9075 with shipping_clawback 8 and zero restocking_fee."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated the refund would be $241."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows refund_amount 241 with shipping_clawback 8 and restocking_fee 0."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant stated the exact net refund and the material adjustment components."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed return shows refund_amount 241."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview showed refund_amount 241 and shipping_clawback 8."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_credit_amount_and_method_grounded",
+          "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+        }
+      },
+      {
+        "id": "learned_1d4ceea2f939c6",
+        "template_id": "ct_36643a7ab9144d",
+        "obligation_id": "obl_4115629ab0548c",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "When the net amount differs from the apparent purchase price, explain the policy-grounded reason at a high level.",
+        "source": "completion_template:ct_36643a7ab9144d",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "The final amount includes a visible deduction, clawback, fee, discount, or other nonobvious adjustment.",
+        "required_evidence": [
+          "authoritative indication that an adjustment affected the net amount",
+          "the policy-grounded reason category for that adjustment"
+        ],
+        "discharge": "The response includes a concise explanation of the reason for the difference without inventing unsupported details.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Item price is 249."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview refund_amount is 241 with shipping_clawback 8."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Policy includes shipping_clawback as a refund component."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview refund_amount is 241 with shipping_clawback 8."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant explained the $8 difference was from the free-shipping clawback."
+          },
+          {
+            "kind": "message",
+            "ref": "M2",
+            "detail": "User asked to clarify the $8 difference."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explained the $8 is a free-shipping clawback because returning the item drops the remaining order value below the threshold."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explained the $8 shipping clawback and no restocking fee."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed return shows shipping_clawback 8 and restocking_fee 0."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_credit_amount_and_method_grounded",
+          "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+        }
+      },
+      {
+        "id": "learned_205954b5c6b81f",
+        "template_id": "ct_152097d013cffb",
+        "obligation_id": "obl_1044b8503ad9f4",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "proactive_disclosure",
+        "description": "If a visible benefit signal could affect return terms, do not present a definitive total without resolving eligibility or noting that the benefit must be checked.",
+        "source": "completion_template:ct_152097d013cffb",
+        "status": "violated",
+        "priority": 2,
+        "activation": "A profile benefit signal is present and could affect refund amount, fees, or shipping treatment.",
+        "required_evidence": [
+          "benefit eligibility result or unresolved status",
+          "benefit effect on the customer-facing return terms"
+        ],
+        "discharge": "The response either explains the benefit-driven term change or explicitly withholds a definitive total until eligibility is resolved.",
+        "scope_key": "cust_001/ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Visible benefit signal: platinum tier with restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview returned a concrete refund amount, but no assistant message communicated withholding or benefit-based clarification."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Visible profile benefit signal: Platinum membership with restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant presented a definitive eligibility decision and $241 refund while asserting Platinum waived the restocking fee."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Visible platinum benefit signal with restocking_fee_waiver."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant presented a definitive $241 refund and said Platinum waived the restocking fee."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative benefit-eligibility resolution supporting the definitive benefit-based claim at M1"
+        ],
+        "scope": {
+          "family": "account_linked_return_benefit_resolution",
+          "title": "Resolve account-linked return benefits before quoting refund or fees"
+        }
+      },
+      {
+        "id": "learned_258e12b2e1e8a6",
+        "template_id": "ct_4334dc5be09a1e",
+        "obligation_id": "obl_790c9f1c8c4d13",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "When a changed state could cross a material boundary, provide the exact next consequence from current authoritative evidence rather than only naming the rule.",
+        "source": "completion_template:ct_4334dc5be09a1e",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "A threshold/deadline boundary is observable and delay or state change could alter the refund, fees, or eligibility.",
+        "required_evidence": [
+          "authoritative evidence of the current boundary-triggered consequence",
+          "authoritative evidence of the next consequence that would apply after crossing, including the exact amount or effect if knowable"
+        ],
+        "discharge": "The response reports the exact consequence on the other side of the boundary, grounded in current evidence, or clearly states that the exact consequence is not yet established by available evidence.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows shipping_clawback 8 and refund_amount 241."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant reported the exact $8 shipping clawback as the consequence of dropping below the free-shipping threshold."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_boundary_transition_consequence_disclosure",
+          "title": "Explain threshold side and next consequence before stating return deductions or totals"
+        }
+      },
+      {
+        "id": "learned_5cd3fb5e3b5ac1",
+        "template_id": "ct_98f40f96da07dd",
+        "obligation_id": "obl_56c4a71920a13b",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "If explaining fee or refund treatment for the fit issue, provide the policy-based rationale rather than only the result.",
+        "source": "completion_template:ct_98f40f96da07dd",
+        "status": "invalidated",
+        "priority": 3,
+        "activation": "the customer asks to confirm or explain fee treatment, return-label status, or refund handling",
+        "required_evidence": [
+          "the applicable policy term for the reported damage scenario",
+          "current item/order state showing the term applies"
+        ],
+        "discharge": "the final response includes a concise rationale linking the confirmed term to the applicable damage policy",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Return policy retrieved."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User says the headphones do not fit well."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Return policy was retrieved."
+          }
+        ],
+        "missing_evidence": [
+          "policy term explaining treatment for opened headphones that do not fit well"
+        ],
+        "scope": {
+          "family": "damaged_item_refund_grounded_resolution",
+          "title": "Grounded damaged-item refund terms before stating outcome"
+        }
+      },
+      {
+        "id": "learned_69c48c0225641e",
+        "template_id": "ct_4334dc5be09a1e",
+        "obligation_id": "obl_5a07f6e514c300",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "When changing state could cross a consequential threshold, report the exact next consequence that would apply on the other side based on current authoritative evidence.",
+        "source": "completion_template:ct_4334dc5be09a1e",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "Observable state indicates the case is at or near a consequential threshold, or the applied explanation references a threshold/cutoff whose opposite-side effect would materially change the refund or fee outcome.",
+        "required_evidence": [
+          "current authoritative computation or policy for the next consequence",
+          "the exact component or amount that changes if the boundary is crossed",
+          "evidence that the change is contingent on crossing that boundary"
+        ],
+        "discharge": "The response grounds the boundary-dependent consequence with the exact current-evidence effect that would apply if the case were on the other side, or states that no different consequence would apply if supported by evidence.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Current authoritative preview includes shipping_clawback 8."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explicitly stated the exact component that changes is an $8 shipping clawback because the remaining order value falls below the threshold."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_boundary_transition_consequence_disclosure",
+          "title": "Explain threshold side and next consequence before stating return deductions or totals"
+        }
+      },
+      {
+        "id": "learned_6f371ea471b43a",
+        "template_id": "ct_f320bb0404bf2d",
+        "obligation_id": "obl_4dc53a1c1f18db",
+        "phase": "pre_action",
+        "kind": "invariant",
+        "type": "boundary_must_not",
+        "description": "Do not state or imply that the refund or credit has been issued until the irreversible action has actually completed successfully.",
+        "source": "completion_template:ct_f320bb0404bf2d",
+        "status": "violated",
+        "priority": 2,
+        "activation": "The agent is discussing completion of a refund or credit.",
+        "required_evidence": [
+          "authoritative completed status for the executed adjustment"
+        ],
+        "discharge": "Any completion claim is made only after completed-state evidence exists; any earlier claim remains a violation.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "process_return result status is preview, not completed."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant offered to process the return rather than claiming completion."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant said the return had been processed."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Confirmed process_return returned status \"returned\"."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+          "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+        }
+      },
+      {
+        "id": "learned_83b449636af23b",
+        "template_id": "ct_98f40f96da07dd",
+        "obligation_id": "obl_cce51d215ae177",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "evidence_grounding",
+        "description": "Before stating a concrete refund outcome or eligibility for the reported fit issue, ground the claim in current order and policy evidence, including whether the resolution is refund or replacement and whether any fee waiver applies.",
+        "source": "completion_template:ct_98f40f96da07dd",
+        "status": "invalidated",
+        "priority": 1,
+        "activation": "the assistant is about to state a specific eligibility decision, refund method, or fee outcome for a damaged-item case",
+        "required_evidence": [
+          "authoritative order state for the item",
+          "authoritative policy covering damaged/defective transit cases",
+          "any policy constraints on refund destination or fees"
+        ],
+        "discharge": "a response that ties the stated outcome to current order/policy evidence, or a refusal to make the claim until that evidence is resolved",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User reports the headphones do not fit well."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Delivered electronics item in ORD-6011 with no return state yet."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Return policy retrieved."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User reports the headphones do not fit well, not that they are damaged or defective."
+          }
+        ],
+        "missing_evidence": [
+          "policy terms for non-defective fit/compatibility returns",
+          "refund or replacement handling for this scenario",
+          "any allowed refund destination or fee constraints"
+        ],
+        "scope": {
+          "family": "damaged_item_refund_grounded_resolution",
+          "title": "Grounded damaged-item refund terms before stating outcome"
+        }
+      },
+      {
+        "id": "learned_84b89999dc8056",
+        "template_id": "ct_cf4ac61f93c383",
+        "obligation_id": "obl_c4d2d1af3b4caa",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "cost_amount_reporting",
+        "description": "Any quoted refund amount must match the exact current net refund from authoritative evidence, including applicable policy components that change the total.",
+        "source": "completion_template:ct_cf4ac61f93c383",
+        "status": "pending",
+        "priority": 2,
+        "activation": "The assistant states a specific refund amount or 'full refund' outcome.",
+        "required_evidence": [
+          "current authoritative net refund amount",
+          "any applicable refund components or adjustments needed to justify that net amount"
+        ],
+        "discharge": "The communicated amount matches the authoritative net amount, or the assistant withholds a concrete figure until grounded.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Current preview net refund is 241 with shipping_clawback 8 and restocking_fee 0."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant quoted a $241 refund and attributed the $8 difference to shipping clawback."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_refund_preview_grounded_before_quote",
+          "title": "Ground the exact return outcome before quoting refund eligibility or amount"
+        }
+      },
+      {
+        "id": "learned_8d7b0e6113e3d0",
+        "template_id": "ct_4334dc5be09a1e",
+        "obligation_id": "obl_af07fc73f25e60",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "explanation_rationale",
+        "description": "Before asserting a concrete deduction or refund total that depends on a threshold or cutoff, state which side of the boundary the current order/return state is on and why that places this return under the applicable rule.",
+        "source": "completion_template:ct_4334dc5be09a1e",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "A fee, waiver, or refund component is triggered by crossing or not crossing an order-level or timing boundary.",
+        "required_evidence": [
+          "current authoritative policy defining the boundary",
+          "current order/item state needed to evaluate the boundary",
+          "grounded relation between the current state and the boundary condition"
+        ],
+        "discharge": "The response explicitly explains the present side of the boundary and links it to the applied or unapplied consequence.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant explained that returning this item brings the remaining order value below the free-shipping threshold."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant linked that boundary crossing to the $8 shipping clawback in the refund breakdown."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_boundary_transition_consequence_disclosure",
+          "title": "Explain threshold side and next consequence before stating return deductions or totals"
+        }
+      },
+      {
+        "id": "learned_8efaf5dcb7e9fe",
+        "template_id": "ct_f320bb0404bf2d",
+        "obligation_id": "obl_684cf09ee74f33",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Before issuing an irreversible refund or credit, obtain the customer's explicit confirmation of the exact amount and destination/method.",
+        "source": "completion_template:ct_f320bb0404bf2d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The agent is otherwise ready to finalize a refund or credit.",
+        "required_evidence": [
+          "the exact amount to be issued from current authoritative evidence",
+          "the selected refund destination or method",
+          "the customer's affirmative approval of those exact terms"
+        ],
+        "discharge": "A clear customer confirmation covers the amount and method/destination before execution occurs.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant restated the exact refund breakdown and original payment method, then asked whether to process it."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly approved processing the headphones return due to fit, with refund to original payment method and no restocking fee."
+          },
+          {
+            "kind": "message",
+            "ref": "M4",
+            "detail": "User explicitly approved processing the headphones return with refund to original payment method and no restocking fee."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Confirmed process_return used amount 241 and reason changed_mind."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+          "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+        }
+      },
+      {
+        "id": "learned_b06cc660fa7dc3",
+        "template_id": "ct_409c5deaed8155",
+        "obligation_id": "obl_42d743a092f025",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If a refund outcome is stated, report the exact refund amount supported by current authoritative evidence.",
+        "source": "completion_template:ct_409c5deaed8155",
+        "status": "satisfied",
+        "priority": 2,
+        "activation": "a refund amount or outcome is stated or confirmed",
+        "required_evidence": [
+          "current authoritative refund preview or equivalent amount evidence",
+          "any policy-relevant amount components that could change the net refund"
+        ],
+        "discharge": "the communicated amount matches current evidence or the assistant withholds a concrete amount until grounded",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Item price is 249 and refund_amount is null."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview for ITEM-9075 shows refund_amount 241 with status preview."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview for ITEM-9075 shows refund_amount 241 with status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated a $241 refund."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview gives exact refund_amount 241 with shipping_clawback 8 and restocking_fee 0."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant reported Item price $249, Restocking fee $0, Shipping clawback $8, Net refund $241."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview refund_amount 241."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed refund_amount 241."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_refund_terms_must_be_grounded",
+          "title": "Ground return/refund promises in current policy preview"
+        }
+      },
+      {
+        "id": "learned_b92d2c3d0f2eb5",
+        "template_id": "ct_f320bb0404bf2d",
+        "obligation_id": "obl_1f86782995ec69",
+        "phase": "final",
+        "kind": "achievement",
+        "type": "final_state_reporting",
+        "description": "After execution succeeds, report that the adjustment is completed and restate the final issued amount and destination/method so the customer knows the end state.",
+        "source": "completion_template:ct_f320bb0404bf2d",
+        "status": "satisfied",
+        "priority": 3,
+        "activation": "The irreversible refund or credit has completed successfully.",
+        "required_evidence": [
+          "authoritative success status",
+          "final issued amount",
+          "final refund destination or method"
+        ],
+        "discharge": "A completion message communicates the successful final state with the amount and destination/method.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant said 'If you'd like, I can go ahead and process it.'"
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Return completed with status returned, refund_amount 241, refund_method original_payment."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Execution succeeded with status returned, refund_amount 241, refund_method original_payment."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reported the return was processed and restated $241 to the original payment method."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+          "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+        }
+      },
+      {
+        "id": "learned_c991f2f30bef96",
+        "template_id": "ct_98f40f96da07dd",
+        "obligation_id": "obl_3a67675707305b",
+        "phase": "pre_claim",
+        "kind": "achievement",
+        "type": "cost_amount_reporting",
+        "description": "If giving a concrete refund amount for the headphones, use the exact supported amount from current authoritative calculation.",
+        "source": "completion_template:ct_98f40f96da07dd",
+        "status": "pending_evidence",
+        "priority": 2,
+        "activation": "a monetary refund total is stated for the item return",
+        "required_evidence": [
+          "current authoritative refund calculation or policy-grounded amount components",
+          "confirmation that any applicable deductions or waivers have been resolved"
+        ],
+        "discharge": "the exact supported refund amount is stated, or the assistant explicitly withholds the amount pending authoritative calculation",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "No refund amount is set for ITEM-9075."
+          }
+        ],
+        "missing_evidence": [
+          "authoritative refund calculation for ITEM-9075"
+        ],
+        "scope": {
+          "family": "damaged_item_refund_grounded_resolution",
+          "title": "Grounded damaged-item refund terms before stating outcome"
+        }
+      },
+      {
+        "id": "learned_ce8480fc3e179b",
+        "template_id": "ct_409c5deaed8155",
+        "obligation_id": "obl_79320e728e225a",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Return policy outcome claims must be grounded in current order/policy evidence, including any relevant account-linked benefits.",
+        "source": "completion_template:ct_409c5deaed8155",
+        "status": "violated",
+        "priority": 1,
+        "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+        "required_evidence": [
+          "authoritative evidence for the item/order and applicable return reason",
+          "current policy or preview evidence showing the resulting eligibility and terms"
+        ],
+        "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+        "scope_key": "cust_001/benefits",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer cust_001 has membership tier platinum and benefits including restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-6011 contains a delivered return-eligible item with a 15-day window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer cust_001 has platinum membership and benefits including restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-6011 contains a delivered item with 15-day return window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview shows return_eligible true and refund_amount 241 for changed_mind, but a preview alone does not prove benefit linkage was resolved."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has Platinum membership and benefits including restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows return_eligible true and refund_amount 241, but does not by itself prove benefit linkage was resolved."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant claimed Platinum benefits waive the usual restocking fee and quoted concrete return terms."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer has platinum membership with benefits including restocking_fee_waiver and return_window_extension."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows return_eligible true and refund_amount 241, but does not itself prove benefit linkage was resolved."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T1",
+            "detail": "Customer benefits include restocking_fee_waiver and return_window_extension."
+          }
+        ],
+        "missing_evidence": [
+          "policy linkage showing whether and how the Platinum benefits affect this return outcome"
+        ],
+        "scope": {
+          "family": "return_refund_terms_must_be_grounded",
+          "title": "Ground return/refund promises in current policy preview"
+        }
+      },
+      {
+        "id": "learned_d629020dab41a0",
+        "template_id": "ct_36643a7ab9144d",
+        "obligation_id": "obl_99f72253fa08b2",
+        "phase": "final",
+        "kind": "invariant",
+        "type": "final_state_reporting",
+        "description": "When reporting completion, state the final recorded refund method exactly as stored after all updates.",
+        "source": "completion_template:ct_36643a7ab9144d",
+        "status": "satisfied",
+        "priority": 1,
+        "activation": "The assistant says the return/refund is completed or answers a confirmation question about final method.",
+        "required_evidence": [
+          "completed return/refund state showing the recorded final refund method"
+        ],
+        "discharge": "The completion message explicitly confirms the final recorded method and completion status without contradiction.",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "ref": "T4",
+            "detail": "Completed return shows refund_method original_payment."
+          },
+          {
+            "kind": "message",
+            "ref": "M3",
+            "detail": "Assistant described original payment as the refund destination."
+          },
+          {
+            "kind": "message",
+            "ref": "M5",
+            "detail": "Assistant reported refund to the original payment method after saying the return was processed."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_credit_amount_and_method_grounded",
+          "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+        }
+      },
+      {
+        "id": "learned_dfdd351b4ca979",
+        "template_id": "ct_409c5deaed8155",
+        "obligation_id": "obl_79320e728e225a",
+        "phase": "pre_claim",
+        "kind": "invariant",
+        "type": "evidence_grounding",
+        "description": "Concrete return outcome and eligibility must be supported by current order/policy or preview evidence.",
+        "source": "completion_template:ct_409c5deaed8155",
+        "status": "pending",
+        "priority": 1,
+        "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+        "required_evidence": [
+          "authoritative evidence for the item/order and applicable return reason",
+          "current policy or preview evidence showing the resulting eligibility and terms"
+        ],
+        "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+        "scope_key": "ord-6011/item-9075",
+        "evidence": [
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User wants to return headphones from order ORD-6011 because they do not fit well."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-6011 has delivered item ITEM-9075, SoundMax Wireless Headphones, return_window_days 15."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T2",
+            "detail": "Return policy was retrieved."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-6011 has delivered item ITEM-9075, return_window_days 15."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T6",
+            "detail": "Preview shows changed_mind return_eligible true, refund_amount 241, refund_method original_payment, shipping_clawback 8, status preview."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order ORD-6011 has delivered item ITEM-9075, SoundMax Wireless Headphones."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview shows changed_mind return_eligible true, refund_amount 241, refund_method original_payment, shipping_clawback 8, status preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated eligibility, refund amount, and refund method consistent with the preview."
+          },
+          {
+            "kind": "message",
+            "ref": "M0",
+            "detail": "User asked to return headphones from ORD-6011 because they do not fit well."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Order shows delivered item ITEM-9075 with return window data."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T0",
+            "detail": "Delivered item ITEM-9075 in order ORD-6011 with 15-day return window."
+          },
+          {
+            "kind": "tool_result",
+            "ref": "T3",
+            "detail": "Preview showed return_eligible true, refund_amount 241, refund_method original_payment."
+          },
+          {
+            "kind": "message",
+            "ref": "M1",
+            "detail": "Assistant stated eligibility and refund terms consistent with preview."
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "family": "return_refund_terms_must_be_grounded",
+          "title": "Ground return/refund promises in current policy preview"
+        }
+      },
+      {
+        "id": "runtime_0db45d17849656",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The process_return operation completed successfully.",
+        "source": "tool:process_return:5",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 5,
+            "assistant_index": 6,
+            "tool": "process_return",
+            "status": "returned",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 241, \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 8, \"status\": \"returned\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 241
+          },
+          "action_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 5,
+          "assistant_index": 6
+        }
+      },
+      {
+        "id": "runtime_3f4e9afb52ebbc",
+        "template_id": "runtime_execution",
+        "obligation_id": "confirmation",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "user_confirmation_choice",
+        "description": "Obtain explicit user approval for the previewed process_return operation.",
+        "source": "tool:process_return:6",
+        "status": "pending",
+        "priority": 5,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 3,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind"
+          },
+          "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 6,
+          "assistant_index": 3
+        }
+      },
+      {
+        "id": "runtime_5032b62d1b67cb",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The previewed process_return operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+        "source": "tool:process_return:6",
+        "status": "awaiting_confirmation",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 6,
+            "assistant_index": 3,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 7,
+            "assistant_index": 4,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+          },
+          {
+            "kind": "tool_result",
+            "sequence": 3,
+            "assistant_index": 1,
+            "tool": "process_return",
+            "status": "preview",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind"
+          },
+          "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 3,
+          "assistant_index": 1
+        }
+      },
+      {
+        "id": "runtime_7eecc870bb26e6",
+        "template_id": "runtime_execution",
+        "obligation_id": "execution",
+        "phase": "pre_action",
+        "kind": "achievement",
+        "type": "execution",
+        "description": "The process_return operation completed successfully.",
+        "source": "tool:process_return:4",
+        "status": "satisfied",
+        "priority": 0,
+        "activation": "",
+        "required_evidence": [],
+        "discharge": "",
+        "scope_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+        "evidence": [
+          {
+            "kind": "tool_result",
+            "sequence": 4,
+            "assistant_index": 5,
+            "tool": "process_return",
+            "status": "returned",
+            "success": true,
+            "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 241, \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 8, \"status\": \"returned\"}"
+          }
+        ],
+        "missing_evidence": [],
+        "scope": {
+          "tool": "process_return",
+          "arguments": {
+            "item_id": "ITEM-9075",
+            "reason": "changed_mind",
+            "confirm": true,
+            "amount": 241
+          },
+          "action_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "preview_sequence": 4,
+          "assistant_index": 5
+        }
+      }
+    ],
+    "final_open_items": [
+      "learned_84b89999dc8056",
+      "learned_c991f2f30bef96",
+      "learned_dfdd351b4ca979",
+      "runtime_3f4e9afb52ebbc",
+      "runtime_5032b62d1b67cb"
+    ],
+    "final_satisfied_items": [
+      "learned_08a3da22fd94d2",
+      "learned_0e69a01d704306",
+      "learned_108b574f67f23c",
+      "learned_118c2ade7fa88d",
+      "learned_1d4ceea2f939c6",
+      "learned_258e12b2e1e8a6",
+      "learned_69c48c0225641e",
+      "learned_8d7b0e6113e3d0",
+      "learned_8efaf5dcb7e9fe",
+      "learned_b06cc660fa7dc3",
+      "learned_b92d2c3d0f2eb5",
+      "learned_d629020dab41a0",
+      "runtime_0db45d17849656",
+      "runtime_7eecc870bb26e6"
+    ],
+    "final_invalidated_items": [
+      "learned_5cd3fb5e3b5ac1",
+      "learned_83b449636af23b"
+    ],
+    "final_violated_items": [
+      "learned_205954b5c6b81f",
+      "learned_6f371ea471b43a",
+      "learned_ce8480fc3e179b"
+    ],
+    "status_counts": {
+      "approved_pending_execution": 0,
+      "awaiting_confirmation": 1,
+      "invalidated": 2,
+      "pending": 3,
+      "pending_evidence": 1,
+      "satisfied": 14,
+      "violated": 3
+    },
+    "lifecycle_events": [
+      {
+        "index": 0,
+        "event": "item_created",
+        "item": {
+          "id": "learned_dfdd351b4ca979",
+          "template_id": "ct_409c5deaed8155",
+          "obligation_id": "obl_79320e728e225a",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Ground any return outcome for the headphones in current order/policy evidence before stating eligibility, refund method, fee waiver, or refund amount.",
+          "source": "completion_template:ct_409c5deaed8155",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+          "required_evidence": [
+            "authoritative evidence for the item/order and applicable return reason",
+            "current policy or preview evidence showing the resulting eligibility and terms"
+          ],
+          "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User wants to return headphones from order ORD-6011 because they do not fit well."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order ORD-6011 has delivered item ITEM-9075, SoundMax Wireless Headphones, return_window_days 15."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Return policy was retrieved."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative policy text for fit/unsuitability returns and any fee/refund terms",
+            "current grounded refund calculation or preview for this specific item",
+            "confirmation the return window applies to this order date and delivery date"
+          ],
+          "scope": {
+            "family": "return_refund_terms_must_be_grounded",
+            "title": "Ground return/refund promises in current policy preview"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b06cc660fa7dc3",
+          "template_id": "ct_409c5deaed8155",
+          "obligation_id": "obl_42d743a092f025",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If stating a refund outcome, report the exact refund amount supported by authoritative evidence.",
+          "source": "completion_template:ct_409c5deaed8155",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "a refund amount or outcome is stated or confirmed",
+          "required_evidence": [
+            "current authoritative refund preview or equivalent amount evidence",
+            "any policy-relevant amount components that could change the net refund"
+          ],
+          "discharge": "the communicated amount matches current evidence or the assistant withholds a concrete amount until grounded",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Item price is 249 and refund_amount is null."
+            }
+          ],
+          "missing_evidence": [
+            "current authoritative refund preview or computed amount for ITEM-9075"
+          ],
+          "scope": {
+            "family": "return_refund_terms_must_be_grounded",
+            "title": "Ground return/refund promises in current policy preview"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "event": "item_created",
+        "item": {
+          "id": "learned_83b449636af23b",
+          "template_id": "ct_98f40f96da07dd",
+          "obligation_id": "obl_cce51d215ae177",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete refund outcome or eligibility for the reported fit issue, ground the claim in current order and policy evidence, including whether the resolution is refund or replacement and whether any fee waiver applies.",
+          "source": "completion_template:ct_98f40f96da07dd",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "the assistant is about to state a specific eligibility decision, refund method, or fee outcome for a damaged-item case",
+          "required_evidence": [
+            "authoritative order state for the item",
+            "authoritative policy covering damaged/defective transit cases",
+            "any policy constraints on refund destination or fees"
+          ],
+          "discharge": "a response that ties the stated outcome to current order/policy evidence, or a refusal to make the claim until that evidence is resolved",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M0",
+              "detail": "User reports the headphones do not fit well."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Delivered electronics item in ORD-6011 with no return state yet."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Return policy retrieved."
+            }
+          ],
+          "missing_evidence": [
+            "policy terms for non-defective fit/compatibility returns",
+            "refund or replacement handling for this scenario",
+            "any allowed refund destination or fee constraints"
+          ],
+          "scope": {
+            "family": "damaged_item_refund_grounded_resolution",
+            "title": "Grounded damaged-item refund terms before stating outcome"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "event": "item_created",
+        "item": {
+          "id": "learned_c991f2f30bef96",
+          "template_id": "ct_98f40f96da07dd",
+          "obligation_id": "obl_3a67675707305b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "If giving a concrete refund amount for the headphones, use the exact supported amount from current authoritative calculation.",
+          "source": "completion_template:ct_98f40f96da07dd",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "a monetary refund total is stated for the item return",
+          "required_evidence": [
+            "current authoritative refund calculation or policy-grounded amount components",
+            "confirmation that any applicable deductions or waivers have been resolved"
+          ],
+          "discharge": "the exact supported refund amount is stated, or the assistant explicitly withholds the amount pending authoritative calculation",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "No refund amount is set for ITEM-9075."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative refund calculation for ITEM-9075"
+          ],
+          "scope": {
+            "family": "damaged_item_refund_grounded_resolution",
+            "title": "Grounded damaged-item refund terms before stating outcome"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "event": "item_created",
+        "item": {
+          "id": "learned_5cd3fb5e3b5ac1",
+          "template_id": "ct_98f40f96da07dd",
+          "obligation_id": "obl_56c4a71920a13b",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "If explaining fee or refund treatment for the fit issue, provide the policy-based rationale rather than only the result.",
+          "source": "completion_template:ct_98f40f96da07dd",
+          "status": "pending_evidence",
+          "priority": 3,
+          "activation": "the customer asks to confirm or explain fee treatment, return-label status, or refund handling",
+          "required_evidence": [
+            "the applicable policy term for the reported damage scenario",
+            "current item/order state showing the term applies"
+          ],
+          "discharge": "the final response includes a concise rationale linking the confirmed term to the applicable damage policy",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Return policy retrieved."
+            }
+          ],
+          "missing_evidence": [
+            "policy term explaining treatment for opened headphones that do not fit well"
+          ],
+          "scope": {
+            "family": "damaged_item_refund_grounded_resolution",
+            "title": "Grounded damaged-item refund terms before stating outcome"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "event": "item_created",
+        "item": {
+          "id": "learned_ce8480fc3e179b",
+          "template_id": "ct_409c5deaed8155",
+          "obligation_id": "obl_79320e728e225a",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete return policy outcome, resolve any account-linked return benefit and incorporate only evidence-supported benefit effects.",
+          "source": "completion_template:ct_409c5deaed8155",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "the response includes a specific claim about qualification, refund type, fee waiver, or label cost",
+          "required_evidence": [
+            "authoritative evidence for the item/order and applicable return reason",
+            "current policy or preview evidence showing the resulting eligibility and terms"
+          ],
+          "discharge": "the assistant only makes concrete claims that match the available authoritative evidence; unsupported claims remain unresolved",
+          "scope_key": "cust_001/benefits",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer cust_001 has membership tier platinum and benefits including restocking_fee_waiver and return_window_extension."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Order ORD-6011 contains a delivered return-eligible item with a 15-day window."
+            }
+          ],
+          "missing_evidence": [
+            "policy linkage between the platinum benefits and this return outcome",
+            "authoritative preview showing whether the benefit applies here"
+          ],
+          "scope": {
+            "family": "return_refund_terms_must_be_grounded",
+            "title": "Ground return/refund promises in current policy preview"
+          }
+        }
+      },
+      {
+        "index": 6,
+        "event": "item_created",
+        "item": {
+          "id": "learned_0e69a01d704306",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_ff7a016701cd6b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Resolve whether any account-linked return benefit applies to this customer and this return before stating a concrete refund amount, fee, or eligibility.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending_evidence",
+          "priority": 1,
+          "activation": "A profile or customer record exposes a return-related benefit field or tier-linked entitlement.",
+          "required_evidence": [
+            "current customer benefit or tier data",
+            "policy terms connecting that benefit to return fees, refund components, or eligibility",
+            "the return scenario details needed to test applicability"
+          ],
+          "discharge": "The response is grounded in evidence showing either that a specific account benefit applies or that no listed benefit changes this return outcome.",
+          "scope_key": "cust_001/ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Customer benefits include restocking_fee_waiver and return_window_extension."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Return scenario is a delivered headphones item in order ORD-6011."
+            }
+          ],
+          "missing_evidence": [
+            "policy terms connecting these benefits to this return",
+            "return scenario details needed to test applicability",
+            "authoritative evidence showing whether the benefit changes fees or eligibility"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 7,
+        "event": "item_created",
+        "item": {
+          "id": "learned_205954b5c6b81f",
+          "template_id": "ct_152097d013cffb",
+          "obligation_id": "obl_1044b8503ad9f4",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "proactive_disclosure",
+          "description": "If a visible account benefit signal could affect the return terms, do not present a definitive total without checking benefit eligibility.",
+          "source": "completion_template:ct_152097d013cffb",
+          "status": "pending_evidence",
+          "priority": 2,
+          "activation": "A profile benefit signal is present and could affect refund amount, fees, or shipping treatment.",
+          "required_evidence": [
+            "benefit eligibility result or unresolved status",
+            "benefit effect on the customer-facing return terms"
+          ],
+          "discharge": "The response either explains the benefit-driven term change or explicitly withholds a definitive total until eligibility is resolved.",
+          "scope_key": "cust_001/ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T1",
+              "detail": "Visible benefit signal: platinum tier with restocking_fee_waiver and return_window_extension."
+            }
+          ],
+          "missing_evidence": [
+            "benefit eligibility result or unresolved status",
+            "benefit effect on customer-facing return terms"
+          ],
+          "scope": {
+            "family": "account_linked_return_benefit_resolution",
+            "title": "Resolve account-linked return benefits before quoting refund or fees"
+          }
+        }
+      },
+      {
+        "index": 8,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_5032b62d1b67cb",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The previewed process_return operation has not executed; explicit user approval and a successful confirmed operation are still required.",
+          "source": "tool:process_return:6",
+          "status": "awaiting_confirmation",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 3,
+              "tool": "process_return",
+              "status": "preview",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind"
+            },
+            "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 6,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 9,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_3f4e9afb52ebbc",
+          "template_id": "runtime_execution",
+          "obligation_id": "confirmation",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Obtain explicit user approval for the previewed process_return operation.",
+          "source": "tool:process_return:6",
+          "status": "pending",
+          "priority": 5,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 6,
+              "assistant_index": 3,
+              "tool": "process_return",
+              "status": "preview",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"discount_adjustment\": 0, \"free_return_shipping\": false, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"reason\": \"changed_mind\", \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_eligible\": true, \"shipping_clawback\": 8, \"shipping_refund\": false, \"status\": \"preview\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind"
+            },
+            "action_key": "[\"process_return\", {\"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 6,
+            "assistant_index": 3
+          }
+        }
+      },
+      {
+        "index": 10,
+        "event": "preview_refreshed",
+        "item_id": "runtime_5032b62d1b67cb",
+        "tool": "process_return",
+        "sequence": 7
+      },
+      {
+        "index": 11,
+        "event": "transition",
+        "item_id": "learned_5cd3fb5e3b5ac1",
+        "previous": "pending_evidence",
+        "status": "invalidated",
+        "reason": "semantic_condition_not_applicable"
+      },
+      {
+        "index": 12,
+        "event": "transition",
+        "item_id": "learned_83b449636af23b",
+        "previous": "pending_evidence",
+        "status": "invalidated",
+        "reason": "semantic_condition_not_applicable"
+      },
+      {
+        "index": 13,
+        "event": "transition",
+        "item_id": "learned_b06cc660fa7dc3",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 14,
+        "event": "transition",
+        "item_id": "learned_dfdd351b4ca979",
+        "previous": "pending_evidence",
+        "status": "pending",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 15,
+        "event": "item_created",
+        "item": {
+          "id": "learned_118c2ade7fa88d",
+          "template_id": "ct_36643a7ab9144d",
+          "obligation_id": "obl_016a64fd60323b",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating the amount the customer will receive for this return, ground the exact net amount in current authoritative return state, including applicable adjustments that affect the total.",
+          "source": "completion_template:ct_36643a7ab9144d",
+          "status": "pending",
+          "priority": 1,
+          "activation": "A concrete refund or store-credit amount is about to be stated.",
+          "required_evidence": [
+            "current preview or completed return/refund amount from authoritative state",
+            "any applicable adjustment components that explain the net total"
+          ],
+          "discharge": "The response states the exact grounded amount and it matches current authoritative state.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Preview shows refund_amount 241 for ITEM-9075."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Preview component includes shipping_clawback 8 and zero restocking_fee, bulk_clawback, and repeat_surcharge."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Policy says process_return preview component breakdown is used to compute net refund."
+            }
+          ],
+          "missing_evidence": [
+            "assistant communication stating a concrete amount, if any"
+          ],
+          "scope": {
+            "family": "return_credit_amount_and_method_grounded",
+            "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+          }
+        }
+      },
+      {
+        "index": 16,
+        "event": "item_created",
+        "item": {
+          "id": "learned_1d4ceea2f939c6",
+          "template_id": "ct_36643a7ab9144d",
+          "obligation_id": "obl_4115629ab0548c",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "When communicating a net return amount lower than the item's apparent purchase price, explain at a high level the policy-grounded reason for the difference.",
+          "source": "completion_template:ct_36643a7ab9144d",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The final amount includes a visible deduction, clawback, fee, discount, or other nonobvious adjustment.",
+          "required_evidence": [
+            "authoritative indication that an adjustment affected the net amount",
+            "the policy-grounded reason category for that adjustment"
+          ],
+          "discharge": "The response includes a concise explanation of the reason for the difference without inventing unsupported details.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T0",
+              "detail": "Item price is 249."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T6",
+              "detail": "Preview refund_amount is 241 with shipping_clawback 8."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T2",
+              "detail": "Policy includes shipping_clawback as a refund component."
+            }
+          ],
+          "missing_evidence": [
+            "assistant communication of the lower net amount and its reason"
+          ],
+          "scope": {
+            "family": "return_credit_amount_and_method_grounded",
+            "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+          }
+        }
+      },
+      {
+        "index": 17,
+        "event": "preview_refreshed",
+        "item_id": "runtime_5032b62d1b67cb",
+        "tool": "process_return",
+        "sequence": 3
+      },
+      {
+        "index": 18,
+        "event": "transition",
+        "item_id": "learned_205954b5c6b81f",
+        "previous": "pending_evidence",
+        "status": "violated",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 19,
+        "event": "transition",
+        "item_id": "learned_118c2ade7fa88d",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 20,
+        "event": "transition",
+        "item_id": "learned_1d4ceea2f939c6",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 21,
+        "event": "transition",
+        "item_id": "learned_b06cc660fa7dc3",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 22,
+        "event": "transition",
+        "item_id": "learned_ce8480fc3e179b",
+        "previous": "pending_evidence",
+        "status": "violated",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 23,
+        "event": "item_created",
+        "item": {
+          "id": "learned_08a3da22fd94d2",
+          "template_id": "ct_cf4ac61f93c383",
+          "obligation_id": "obl_4eb81ecdab51bd",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "Before stating a concrete refund outcome, ground the claim in current authoritative return evidence that resolves eligibility, refund method, and whether a label can be issued.",
+          "source": "completion_template:ct_cf4ac61f93c383",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "A response would mention a specific return eligibility decision or concrete refund terms.",
+          "required_evidence": [
+            "current return-eligibility evidence for the item",
+            "authoritative preview or equivalent state showing refund method and label/shipping outcome"
+          ],
+          "discharge": "The assistant's claim is supported by current return evidence matching the stated eligibility, method, and label outcome.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Preview shows return_eligible true and refund_method original_payment for ITEM-9075."
+            },
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant stated the headphones are eligible for return and the refund would go back to the original payment method."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_refund_preview_grounded_before_quote",
+            "title": "Ground the exact return outcome before quoting refund eligibility or amount"
+          }
+        }
+      },
+      {
+        "index": 24,
+        "event": "item_created",
+        "item": {
+          "id": "learned_84b89999dc8056",
+          "template_id": "ct_cf4ac61f93c383",
+          "obligation_id": "obl_c4d2d1af3b4caa",
+          "phase": "pre_claim",
+          "kind": "invariant",
+          "type": "cost_amount_reporting",
+          "description": "Any quoted refund amount must match the exact current net refund from authoritative evidence, including applicable policy components that change the total.",
+          "source": "completion_template:ct_cf4ac61f93c383",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The assistant states a specific refund amount or 'full refund' outcome.",
+          "required_evidence": [
+            "current authoritative net refund amount",
+            "any applicable refund components or adjustments needed to justify that net amount"
+          ],
+          "discharge": "The communicated amount matches the authoritative net amount, or the assistant withholds a concrete figure until grounded.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Current preview net refund is 241 with shipping_clawback 8 and restocking_fee 0."
+            },
+            {
+              "kind": "message",
+              "ref": "M1",
+              "detail": "Assistant quoted a $241 refund and attributed the $8 difference to shipping clawback."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_refund_preview_grounded_before_quote",
+            "title": "Ground the exact return outcome before quoting refund eligibility or amount"
+          }
+        }
+      },
+      {
+        "index": 25,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8d7b0e6113e3d0",
+          "template_id": "ct_4334dc5be09a1e",
+          "obligation_id": "obl_af07fc73f25e60",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "explanation_rationale",
+          "description": "Before asserting a concrete deduction or refund total that depends on a threshold or cutoff, state which side of the boundary the current order/return state is on and why that places this return under the applicable rule.",
+          "source": "completion_template:ct_4334dc5be09a1e",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "A fee, waiver, or refund component is triggered by crossing or not crossing an order-level or timing boundary.",
+          "required_evidence": [
+            "current authoritative policy defining the boundary",
+            "current order/item state needed to evaluate the boundary",
+            "grounded relation between the current state and the boundary condition"
+          ],
+          "discharge": "The response explicitly explains the present side of the boundary and links it to the applied or unapplied consequence.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant explained that returning this item brings the remaining order value below the free-shipping threshold."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant linked that boundary crossing to the $8 shipping clawback in the refund breakdown."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_boundary_transition_consequence_disclosure",
+            "title": "Explain threshold side and next consequence before stating return deductions or totals"
+          }
+        }
+      },
+      {
+        "index": 26,
+        "event": "item_created",
+        "item": {
+          "id": "learned_258e12b2e1e8a6",
+          "template_id": "ct_4334dc5be09a1e",
+          "obligation_id": "obl_790c9f1c8c4d13",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "cost_amount_reporting",
+          "description": "When a changed state could cross a material boundary, provide the exact next consequence from current authoritative evidence rather than only naming the rule.",
+          "source": "completion_template:ct_4334dc5be09a1e",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "A threshold/deadline boundary is observable and delay or state change could alter the refund, fees, or eligibility.",
+          "required_evidence": [
+            "authoritative evidence of the current boundary-triggered consequence",
+            "authoritative evidence of the next consequence that would apply after crossing, including the exact amount or effect if knowable"
+          ],
+          "discharge": "The response reports the exact consequence on the other side of the boundary, grounded in current evidence, or clearly states that the exact consequence is not yet established by available evidence.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Preview shows shipping_clawback 8 and refund_amount 241."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant reported the exact $8 shipping clawback as the consequence of dropping below the free-shipping threshold."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_boundary_transition_consequence_disclosure",
+            "title": "Explain threshold side and next consequence before stating return deductions or totals"
+          }
+        }
+      },
+      {
+        "index": 27,
+        "event": "item_created",
+        "item": {
+          "id": "learned_108b574f67f23c",
+          "template_id": "ct_4334dc5be09a1e",
+          "obligation_id": "obl_00295ff6e97614",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "comparison",
+          "description": "When delaying or changing state could cross the boundary and materially change the outcome, provide the exact next consequence from current authoritative evidence, not just the current-side result.",
+          "source": "completion_template:ct_4334dc5be09a1e",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "Observed state indicates a nearby or meaningful boundary transition where waiting could alter eligibility, fees, or refund amount.",
+          "required_evidence": [
+            "current authoritative evidence of the present outcome",
+            "current authoritative evidence of the consequence after crossing the next boundary, including any changed fee, loss of eligibility, or other material effect"
+          ],
+          "discharge": "The user is told both the current result and the evidence-grounded next consequence if the boundary is crossed.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant gave both the no-restocking-fee result and the exact $8 shipping clawback consequence tied to the threshold change."
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Preview grounds the changed-side consequence with shipping_clawback 8 and net refund 241."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_boundary_transition_consequence_disclosure",
+            "title": "Explain threshold side and next consequence before stating return deductions or totals"
+          }
+        }
+      },
+      {
+        "index": 28,
+        "event": "item_created",
+        "item": {
+          "id": "learned_69c48c0225641e",
+          "template_id": "ct_4334dc5be09a1e",
+          "obligation_id": "obl_5a07f6e514c300",
+          "phase": "pre_claim",
+          "kind": "achievement",
+          "type": "evidence_grounding",
+          "description": "When changing state could cross a consequential threshold, report the exact next consequence that would apply on the other side based on current authoritative evidence.",
+          "source": "completion_template:ct_4334dc5be09a1e",
+          "status": "satisfied",
+          "priority": 2,
+          "activation": "Observable state indicates the case is at or near a consequential threshold, or the applied explanation references a threshold/cutoff whose opposite-side effect would materially change the refund or fee outcome.",
+          "required_evidence": [
+            "current authoritative computation or policy for the next consequence",
+            "the exact component or amount that changes if the boundary is crossed",
+            "evidence that the change is contingent on crossing that boundary"
+          ],
+          "discharge": "The response grounds the boundary-dependent consequence with the exact current-evidence effect that would apply if the case were on the other side, or states that no different consequence would apply if supported by evidence.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "Current authoritative preview includes shipping_clawback 8."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant explicitly stated the exact component that changes is an $8 shipping clawback because the remaining order value falls below the threshold."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_boundary_transition_consequence_disclosure",
+            "title": "Explain threshold side and next consequence before stating return deductions or totals"
+          }
+        }
+      },
+      {
+        "index": 29,
+        "event": "item_created",
+        "item": {
+          "id": "learned_8efaf5dcb7e9fe",
+          "template_id": "ct_f320bb0404bf2d",
+          "obligation_id": "obl_684cf09ee74f33",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "user_confirmation_choice",
+          "description": "Before issuing an irreversible refund or credit for this return, obtain the customer's explicit confirmation of the exact amount and destination or method.",
+          "source": "completion_template:ct_f320bb0404bf2d",
+          "status": "satisfied",
+          "priority": 1,
+          "activation": "The agent is otherwise ready to finalize a refund or credit.",
+          "required_evidence": [
+            "the exact amount to be issued from current authoritative evidence",
+            "the selected refund destination or method",
+            "the customer's affirmative approval of those exact terms"
+          ],
+          "discharge": "A clear customer confirmation covers the amount and method/destination before execution occurs.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant restated the exact refund breakdown and original payment method, then asked whether to process it."
+            },
+            {
+              "kind": "message",
+              "ref": "M4",
+              "detail": "User explicitly approved processing the headphones return due to fit, with refund to original payment method and no restocking fee."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+          }
+        }
+      },
+      {
+        "index": 30,
+        "event": "item_created",
+        "item": {
+          "id": "learned_6f371ea471b43a",
+          "template_id": "ct_f320bb0404bf2d",
+          "obligation_id": "obl_4dc53a1c1f18db",
+          "phase": "pre_action",
+          "kind": "invariant",
+          "type": "boundary_must_not",
+          "description": "Do not state or imply that the refund or credit has been issued until the irreversible action has actually completed successfully.",
+          "source": "completion_template:ct_f320bb0404bf2d",
+          "status": "pending",
+          "priority": 2,
+          "activation": "The agent is discussing completion of a refund or credit.",
+          "required_evidence": [
+            "authoritative completed status for the executed adjustment"
+          ],
+          "discharge": "Any completion claim is made only after completed-state evidence exists; any earlier claim remains a violation.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T3",
+              "detail": "process_return result status is preview, not completed."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant offered to process the return rather than claiming completion."
+            }
+          ],
+          "missing_evidence": [
+            "authoritative completed status for an executed adjustment if any completion claim is later made"
+          ],
+          "scope": {
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+          }
+        }
+      },
+      {
+        "index": 31,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_7eecc870bb26e6",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The process_return operation completed successfully.",
+          "source": "tool:process_return:4",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 4,
+              "assistant_index": 5,
+              "tool": "process_return",
+              "status": "returned",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 241, \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 8, \"status\": \"returned\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 241
+            },
+            "action_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 4,
+            "assistant_index": 5
+          }
+        }
+      },
+      {
+        "index": 32,
+        "event": "item_created",
+        "item": {
+          "id": "runtime_0db45d17849656",
+          "template_id": "runtime_execution",
+          "obligation_id": "execution",
+          "phase": "pre_action",
+          "kind": "achievement",
+          "type": "execution",
+          "description": "The process_return operation completed successfully.",
+          "source": "tool:process_return:5",
+          "status": "satisfied",
+          "priority": 0,
+          "activation": "",
+          "required_evidence": [],
+          "discharge": "",
+          "scope_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "sequence": 5,
+              "assistant_index": 6,
+              "tool": "process_return",
+              "status": "returned",
+              "success": true,
+              "result": "{\"bulk_clawback\": 0, \"item_id\": \"ITEM-9075\", \"paid_return_shipping_fee\": 0, \"policy_computed_amount\": 241, \"refund_amount\": 241, \"refund_method\": \"original_payment\", \"repeat_surcharge\": 0, \"restocking_discount\": 0, \"restocking_fee\": 0, \"return_label_issued\": false, \"shipping_clawback\": 8, \"status\": \"returned\"}"
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "tool": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 241
+            },
+            "action_key": "[\"process_return\", {\"amount\": 241, \"item_id\": \"ITEM-9075\", \"reason\": \"changed_mind\"}]",
+            "preview_sequence": 5,
+            "assistant_index": 6
+          }
+        }
+      },
+      {
+        "index": 33,
+        "event": "item_created",
+        "item": {
+          "id": "learned_b92d2c3d0f2eb5",
+          "template_id": "ct_f320bb0404bf2d",
+          "obligation_id": "obl_1f86782995ec69",
+          "phase": "final",
+          "kind": "achievement",
+          "type": "final_state_reporting",
+          "description": "After execution succeeded, report the completed refund/return state with the final issued amount and destination/method.",
+          "source": "completion_template:ct_f320bb0404bf2d",
+          "status": "satisfied",
+          "priority": 3,
+          "activation": "The irreversible refund or credit has completed successfully.",
+          "required_evidence": [
+            "authoritative success status",
+            "final issued amount",
+            "final refund destination or method"
+          ],
+          "discharge": "A completion message communicates the successful final state with the amount and destination/method.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant said 'If you'd like, I can go ahead and process it.'"
+            },
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Return completed with status returned, refund_amount 241, refund_method original_payment."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "title": "Get explicit approval for the refund terms before execution and report the completed state afterward"
+          }
+        }
+      },
+      {
+        "index": 34,
+        "event": "item_created",
+        "item": {
+          "id": "learned_d629020dab41a0",
+          "template_id": "ct_36643a7ab9144d",
+          "obligation_id": "obl_99f72253fa08b2",
+          "phase": "final",
+          "kind": "invariant",
+          "type": "final_state_reporting",
+          "description": "When reporting completion, state the final recorded refund method exactly as stored after all updates.",
+          "source": "completion_template:ct_36643a7ab9144d",
+          "status": "pending",
+          "priority": 1,
+          "activation": "The assistant says the return/refund is completed or answers a confirmation question about final method.",
+          "required_evidence": [
+            "completed return/refund state showing the recorded final refund method"
+          ],
+          "discharge": "The completion message explicitly confirms the final recorded method and completion status without contradiction.",
+          "scope_key": "ord-6011/item-9075",
+          "evidence": [
+            {
+              "kind": "tool_result",
+              "ref": "T4",
+              "detail": "Completed return shows refund_method original_payment."
+            },
+            {
+              "kind": "message",
+              "ref": "M3",
+              "detail": "Assistant described original payment as the refund destination."
+            }
+          ],
+          "missing_evidence": [],
+          "scope": {
+            "family": "return_credit_amount_and_method_grounded",
+            "title": "Ground exact return/store-credit amount and final refund method before claiming completion"
+          }
+        }
+      },
+      {
+        "index": 35,
+        "event": "transition",
+        "item_id": "learned_0e69a01d704306",
+        "previous": "pending_evidence",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 36,
+        "event": "transition",
+        "item_id": "learned_6f371ea471b43a",
+        "previous": "pending",
+        "status": "violated",
+        "reason": "semantic_bookkeeping"
+      },
+      {
+        "index": 37,
+        "event": "transition",
+        "item_id": "learned_d629020dab41a0",
+        "previous": "pending",
+        "status": "satisfied",
+        "reason": "semantic_bookkeeping"
+      }
+    ],
+    "completion_retrievals": [
+      {
+        "index": 0,
+        "query_sha256": "58ff4c5c71f72b8245b84e49b4c7e3436953de968341f18ac3be8a3754b09832",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well.",
+        "candidates": [
+          {
+            "id": "ct_cd91d3e8acd5e7",
+            "family": "return_window_and_boundary_consequence_disclosure",
+            "score": 24.336501
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 22.000502
+          },
+          {
+            "id": "ct_48bdf2cce8ab18",
+            "family": "account_linked_benefit_resolution_for_return_credit",
+            "score": 21.985759
+          },
+          {
+            "id": "ct_a2d44a2e70958d",
+            "family": "protected_order_no_change_confirmation",
+            "score": 15.90513
+          },
+          {
+            "id": "ct_dba9764b531eed",
+            "family": "confirmed_return_processing_boundary",
+            "score": 21.508363
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 23.649362
+          },
+          {
+            "id": "ct_f03bad9b6690c8",
+            "family": "return_reason_and_refund_grounding",
+            "score": 20.014405
+          },
+          {
+            "id": "ct_5890c22024e73f",
+            "family": "multi_item_return_amount_breakdown_and_inclusion",
+            "score": 16.395395
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "query_sha256": "048ca950e1b25da100b04b105eaf88e35a7699d1f0efe00eace98d2d7c701f13",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. get_order order_id ORD-6011 customer_id cust_001 order_date 2026-06-01T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK89213373 delivery_date 2026-06-05T14:00:00 delivery_promised_date 2026-06-05T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-9075 order_id ORD-6011 product_id...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 91.268228
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 85.841174
+          },
+          {
+            "id": "ct_87d91d0ebc0f42",
+            "family": "return_threshold_clawback_boundary_disclosure",
+            "score": 66.885237
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 58.546028
+          },
+          {
+            "id": "ct_5890c22024e73f",
+            "family": "multi_item_return_amount_breakdown_and_inclusion",
+            "score": 79.536284
+          },
+          {
+            "id": "ct_98f40f96da07dd",
+            "family": "damaged_item_refund_grounded_resolution",
+            "score": 72.70877
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 73.548482
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 73.212201
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "query_sha256": "1c313ba748ae9a0710403292943a40833629f064d8be2d9c89e774324327c2a9",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. get_order order_id ORD-6011 customer_id cust_001 order_date 2026-06-01T10:00:00 status delivered shipping_status delivered shipping_method standard shipping_cost tracking_number TRK89213373 delivery_date 2026-06-05T14:00:00 delivery_promised_date 2026-06-05T18:00:00 signature_required false signature_on_file payment_method credit_card payment_details credit_card subtotal discount_code discount_amount total_paid is_gift false gift_sender items item_id ITEM-9075 order_id ORD-6011 product_id...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 92.823764
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 90.633579
+          },
+          {
+            "id": "ct_87d91d0ebc0f42",
+            "family": "return_threshold_clawback_boundary_disclosure",
+            "score": 71.99983
+          },
+          {
+            "id": "ct_0b1e20f93fcff9",
+            "family": "final_confirmation_of_scope_and_result_after_adjustment",
+            "score": 58.582846
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 84.975062
+          },
+          {
+            "id": "ct_5890c22024e73f",
+            "family": "multi_item_return_amount_breakdown_and_inclusion",
+            "score": 84.999822
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 77.877165
+          },
+          {
+            "id": "ct_19f6e62fc0aeef",
+            "family": "threshold_or_relation_adjustment_disclosure",
+            "score": 76.712485
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "query_sha256": "7da5bbde30851eaa23c36527af027a35f4cfa742124d30be25cd70f0f15187f6",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. Thanks for checking. Before I confirm, can you clarify the $8 difference? You mentioned Platinum waives the restocking fee, so I want to make sure this return is for the headphones due to fit, refunded to my original payment method, with no restocking fee charged. I checked it, and your headphones are eligible for return. Because they were opened and this is a fit/preference issue, it falls under a standard return; your Platinum benefits waive the usual restocking fee, so your refund woul...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 96.252586
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 81.081487
+          },
+          {
+            "id": "ct_d383aea2f08334",
+            "family": "return_window_boundary_consequence_disclosure",
+            "score": 77.861887
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 94.507056
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 92.21028
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 82.508037
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 92.123522
+          },
+          {
+            "id": "ct_cf4ac61f93c383",
+            "family": "return_refund_preview_grounded_before_quote",
+            "score": 79.141234
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "query_sha256": "af1c4c6fc8e3ff8279f399359285ea7408d9e504da61b150d34678df4897d54f",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. Thanks for checking. Before I confirm, can you clarify the $8 difference? You mentioned Platinum waives the restocking fee, so I want to make sure this return is for the headphones due to fit, refunded to my original payment method, with no restocking fee charged. Got it, thanks for explaining. Please go ahead and process the return for the headphones from ORD-6011 due to the fit issue, with the refund to my original payment method and no restocking fee. I checked it, and your headphones ...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 108.74918
+          },
+          {
+            "id": "ct_4334dc5be09a1e",
+            "family": "return_boundary_transition_consequence_disclosure",
+            "score": 95.291611
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 91.556376
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 98.695791
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 100.81301
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 96.105818
+          },
+          {
+            "id": "ct_f320bb0404bf2d",
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "score": 81.256051
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 87.190865
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "query_sha256": "2539011dddaa3269bad28d57274511f46087dc189d7b36075987fef6f69b3510",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. Thanks for checking. Before I confirm, can you clarify the $8 difference? You mentioned Platinum waives the restocking fee, so I want to make sure this return is for the headphones due to fit, refunded to my original payment method, with no restocking fee charged. Got it, thanks for explaining. Please go ahead and process the return for the headphones from ORD-6011 due to the fit issue, with the refund to my original payment method and no restocking fee. I checked it, and your headphones ...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 109.126917
+          },
+          {
+            "id": "ct_4334dc5be09a1e",
+            "family": "return_boundary_transition_consequence_disclosure",
+            "score": 95.783261
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 92.134434
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 99.343383
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 101.457178
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 96.719709
+          },
+          {
+            "id": "ct_f320bb0404bf2d",
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "score": 81.253088
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 87.768723
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "query_sha256": "f29fa2955fa17afc8668e0ac38fd09a6dd2777d3a12ce60f74301cdd4cfb376d",
+        "query_preview": "I'd like to return my headphones from order ORD-6011. I've opened them but they don't fit my ears well. Thanks for checking. Before I confirm, can you clarify the $8 difference? You mentioned Platinum waives the restocking fee, so I want to make sure this return is for the headphones due to fit, refunded to my original payment method, with no restocking fee charged. Got it, thanks for explaining. Please go ahead and process the return for the headphones from ORD-6011 due to the fit issue, with the refund to my original payment method and no restocking fee. I checked it, and your headphones ...",
+        "candidates": [
+          {
+            "id": "ct_152097d013cffb",
+            "family": "account_linked_return_benefit_resolution",
+            "score": 110.025718
+          },
+          {
+            "id": "ct_4334dc5be09a1e",
+            "family": "return_boundary_transition_consequence_disclosure",
+            "score": 95.774005
+          },
+          {
+            "id": "ct_c199d66bf695ff",
+            "family": "related_item_bundle_or_all_entity_return_closure",
+            "score": 92.127684
+          },
+          {
+            "id": "ct_409c5deaed8155",
+            "family": "return_refund_terms_must_be_grounded",
+            "score": 99.336582
+          },
+          {
+            "id": "ct_36643a7ab9144d",
+            "family": "return_credit_amount_and_method_grounded",
+            "score": 101.443684
+          },
+          {
+            "id": "ct_f320bb0404bf2d",
+            "family": "refund_execution_requires_confirmed_method_and_final_state_report",
+            "score": 83.168633
+          },
+          {
+            "id": "ct_360f8407c79280",
+            "family": "wrong_item_return_amount_grounding_and_preview_alignment",
+            "score": 96.708769
+          },
+          {
+            "id": "ct_7dc55ddd6d3854",
+            "family": "holiday_extension_multi_item_return_closure",
+            "score": 92.286732
+          }
+        ]
+      }
+    ],
+    "bookkeeper_calls": [
+      {
+        "index": 0,
+        "input_fingerprint": "3f62358826898f0321e28f750ca9a737a72b678396d5220cc0a6da13c3b1ded7",
+        "candidate_ids": [
+          "ct_cd91d3e8acd5e7",
+          "ct_c199d66bf695ff",
+          "ct_48bdf2cce8ab18",
+          "ct_a2d44a2e70958d",
+          "ct_dba9764b531eed",
+          "ct_36643a7ab9144d",
+          "ct_f03bad9b6690c8",
+          "ct_5890c22024e73f"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 4047,
+          "output_tokens": 9
+        },
+        "response_sha256": "eeb85c2675888473ec64b7580aa0c76c6fd6b2bd51828870286ef202ad89dae2",
+        "returned_items": 0
+      },
+      {
+        "index": 1,
+        "input_fingerprint": "f3bf36d1d02ecc7d3536953452aa6c6a4506d5ba1e1d6c8697d86e17533f1742",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_7dc55ddd6d3854",
+          "ct_87d91d0ebc0f42",
+          "ct_0b1e20f93fcff9",
+          "ct_5890c22024e73f",
+          "ct_98f40f96da07dd",
+          "ct_c199d66bf695ff",
+          "ct_409c5deaed8155"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 7234,
+          "output_tokens": 1258
+        },
+        "response_sha256": "e9d3df2ff4b16bfa08311ff3a5ce5c7e45c9755b98352c8155403cdda74952b1",
+        "returned_items": 8
+      },
+      {
+        "index": 2,
+        "input_fingerprint": "f6331e3e7f4d7a1b7d916d30ba0eaa478ac7817fa2fdeb3eaed8228be19066d2",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_7dc55ddd6d3854",
+          "ct_87d91d0ebc0f42",
+          "ct_0b1e20f93fcff9",
+          "ct_409c5deaed8155",
+          "ct_5890c22024e73f",
+          "ct_36643a7ab9144d",
+          "ct_19f6e62fc0aeef",
+          "ct_98f40f96da07dd"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10971,
+          "output_tokens": 1716
+        },
+        "response_sha256": "3e1ea17d6a3b29e4ed0939cad566a4bf56b95b5bb485423ef20cfc408236375d",
+        "returned_items": 9
+      },
+      {
+        "index": 3,
+        "input_fingerprint": "f43ce747c4878c0ef00bb86d5f1220d835558e46717cd3cc321e39c912dddc11",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_c199d66bf695ff",
+          "ct_d383aea2f08334",
+          "ct_409c5deaed8155",
+          "ct_36643a7ab9144d",
+          "ct_7dc55ddd6d3854",
+          "ct_360f8407c79280",
+          "ct_cf4ac61f93c383",
+          "ct_98f40f96da07dd"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 10887,
+          "output_tokens": 1574
+        },
+        "response_sha256": "8b98a838d006202f366354b6d201970513632df9bfddc4ca1989e9dc0979cc26",
+        "returned_items": 9
+      },
+      {
+        "index": 4,
+        "input_fingerprint": "bf0c121113896a3213b1ce1e83395bc2d3cbc2c04f1a2ca9e579c843f5300696",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_4334dc5be09a1e",
+          "ct_c199d66bf695ff",
+          "ct_409c5deaed8155",
+          "ct_36643a7ab9144d",
+          "ct_360f8407c79280",
+          "ct_f320bb0404bf2d",
+          "ct_7dc55ddd6d3854",
+          "ct_98f40f96da07dd",
+          "ct_cf4ac61f93c383"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 11040,
+          "output_tokens": 2262
+        },
+        "response_sha256": "0da1a815a962409a0d5d0faf489eb26400d4ce04447dc21de7b9a37b7ae3d1f7",
+        "returned_items": 13
+      },
+      {
+        "index": 5,
+        "input_fingerprint": "fbda31d1c42ac6eae93308fcf5ae7a89f760d6ad1e793dc5fbfede4c417882d6",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_4334dc5be09a1e",
+          "ct_c199d66bf695ff",
+          "ct_409c5deaed8155",
+          "ct_36643a7ab9144d",
+          "ct_360f8407c79280",
+          "ct_f320bb0404bf2d",
+          "ct_7dc55ddd6d3854",
+          "ct_cf4ac61f93c383",
+          "ct_98f40f96da07dd"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 12064,
+          "output_tokens": 1321
+        },
+        "response_sha256": "0243f3ac55f2408ac765604dea836e5d28e76ca288de72a4586bd822a910d586",
+        "returned_items": 9
+      },
+      {
+        "index": 6,
+        "input_fingerprint": "9ecbe91f9292da63a68daa7676f47007518c35b494526186437cec3e8f45cb80",
+        "candidate_ids": [
+          "ct_152097d013cffb",
+          "ct_4334dc5be09a1e",
+          "ct_c199d66bf695ff",
+          "ct_409c5deaed8155",
+          "ct_36643a7ab9144d",
+          "ct_f320bb0404bf2d",
+          "ct_360f8407c79280",
+          "ct_7dc55ddd6d3854",
+          "ct_cf4ac61f93c383",
+          "ct_98f40f96da07dd"
+        ],
+        "parsed": true,
+        "usage": {
+          "input_tokens": 11558,
+          "output_tokens": 553
+        },
+        "response_sha256": "f87fc19191a9439a0d45f7354c8129e907acd8f21ceeee6eda497c63941ef760",
+        "returned_items": 4
+      }
+    ],
+    "generations": [
+      {
+        "generation_index": 0,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": false,
+        "exposure_mode": null,
+        "exposure_prompt_sha256": null,
+        "exposure_signature": null,
+        "exposed_items": [],
+        "pending_items": [],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 0,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 1,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "claim_guard",
+        "exposure_prompt_sha256": "caa6d67e8e3e7568d785ad1717697ec064dfc42fefbfccaf88f8af0ff63002b3",
+        "exposure_signature": "fa667e1b1753a48f468493a7187cc0841e91102484b04627e3ec06bd02fe2b2f",
+        "exposed_items": [
+          "learned_dfdd351b4ca979",
+          "learned_b06cc660fa7dc3",
+          "learned_83b449636af23b",
+          "learned_c991f2f30bef96"
+        ],
+        "pending_items": [
+          "learned_dfdd351b4ca979",
+          "learned_b06cc660fa7dc3",
+          "learned_83b449636af23b",
+          "learned_c991f2f30bef96",
+          "learned_5cd3fb5e3b5ac1",
+          "learned_ce8480fc3e179b",
+          "learned_0e69a01d704306",
+          "learned_205954b5c6b81f"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 0,
+          "invalidated": 0,
+          "pending": 0,
+          "pending_evidence": 8,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind"
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 2,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "9d87650a4e3e745f5f6517bc87bee0c4aceac4eaedd914617629f1419256bc1f",
+        "exposure_signature": "2fe10a46f9f38f98018abe95e1f4f7b3c09adf8c9ba7f082b06aecc9f6107025",
+        "exposed_items": [
+          "runtime_5032b62d1b67cb"
+        ],
+        "pending_items": [
+          "learned_dfdd351b4ca979",
+          "learned_b06cc660fa7dc3",
+          "learned_c991f2f30bef96",
+          "learned_ce8480fc3e179b",
+          "learned_0e69a01d704306",
+          "learned_205954b5c6b81f",
+          "runtime_5032b62d1b67cb",
+          "runtime_3f4e9afb52ebbc",
+          "learned_118c2ade7fa88d",
+          "learned_1d4ceea2f939c6"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 2,
+          "pending": 5,
+          "pending_evidence": 4,
+          "satisfied": 0,
+          "violated": 0
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 3,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "9d87650a4e3e745f5f6517bc87bee0c4aceac4eaedd914617629f1419256bc1f",
+        "exposure_signature": "2fe10a46f9f38f98018abe95e1f4f7b3c09adf8c9ba7f082b06aecc9f6107025",
+        "exposed_items": [
+          "runtime_5032b62d1b67cb"
+        ],
+        "pending_items": [
+          "learned_dfdd351b4ca979",
+          "learned_c991f2f30bef96",
+          "learned_0e69a01d704306",
+          "runtime_5032b62d1b67cb",
+          "runtime_3f4e9afb52ebbc",
+          "learned_84b89999dc8056"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 2,
+          "pending": 3,
+          "pending_evidence": 2,
+          "satisfied": 4,
+          "violated": 2
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      },
+      {
+        "generation_index": 4,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "7a09dc180ed7f00846a8d770e2defc3c747e90291c29742e5f914e4d2d5797f9",
+        "exposure_signature": "96c9474b2d72932c222707e2eace3c653cff6a92ee6a30538908055463098e3d",
+        "exposed_items": [
+          "runtime_5032b62d1b67cb",
+          "learned_6f371ea471b43a"
+        ],
+        "pending_items": [
+          "learned_dfdd351b4ca979",
+          "learned_c991f2f30bef96",
+          "learned_0e69a01d704306",
+          "runtime_5032b62d1b67cb",
+          "runtime_3f4e9afb52ebbc",
+          "learned_84b89999dc8056",
+          "learned_6f371ea471b43a"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 2,
+          "pending": 4,
+          "pending_evidence": 2,
+          "satisfied": 9,
+          "violated": 2
+        },
+        "output_type": "tool_call",
+        "tool_calls_after_exposure": [
+          {
+            "name": "process_return",
+            "arguments": {
+              "item_id": "ITEM-9075",
+              "reason": "changed_mind",
+              "confirm": true,
+              "amount": 241
+            }
+          }
+        ]
+      },
+      {
+        "generation_index": 5,
+        "main_model_calls": 1,
+        "bookkeeper_calls": 1,
+        "regenerations": 0,
+        "closure_injected": true,
+        "exposure_mode": "action_guard",
+        "exposure_prompt_sha256": "7a09dc180ed7f00846a8d770e2defc3c747e90291c29742e5f914e4d2d5797f9",
+        "exposure_signature": "96c9474b2d72932c222707e2eace3c653cff6a92ee6a30538908055463098e3d",
+        "exposed_items": [
+          "runtime_5032b62d1b67cb",
+          "learned_6f371ea471b43a"
+        ],
+        "pending_items": [
+          "learned_dfdd351b4ca979",
+          "learned_c991f2f30bef96",
+          "runtime_5032b62d1b67cb",
+          "runtime_3f4e9afb52ebbc",
+          "learned_84b89999dc8056",
+          "learned_6f371ea471b43a",
+          "learned_d629020dab41a0"
+        ],
+        "status_counts": {
+          "approved_pending_execution": 0,
+          "awaiting_confirmation": 1,
+          "invalidated": 2,
+          "pending": 5,
+          "pending_evidence": 1,
+          "satisfied": 13,
+          "violated": 2
+        },
+        "output_type": "final_text",
+        "tool_calls_after_exposure": []
+      }
+    ],
+    "summary": {
+      "main_model_generations": 6,
+      "main_calls_per_generation": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "semantic_bookkeeper_calls": 7,
+      "regenerations": 0,
+      "exposures": 5,
+      "final_closure_exposures": 0,
+      "exposure_to_tool_call": 2,
+      "final_closure_to_tool_call": 0,
+      "assistant_turns": 3,
+      "tool_calls": 5,
+      "bookkeeper_input_tokens": 67801,
+      "bookkeeper_output_tokens": 8693,
+      "bookkeeper_total_tokens": 76494,
+      "scores": "state/task scores are written as sibling top-level fields by STATE-Bench scoring"
+    }
+  },
+  "token_usage": {
+    "input_tokens": 93516,
+    "cached_input_tokens": 0,
+    "output_tokens": 9067,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 102583,
+    "input_cost_usd": 0.0,
+    "cached_input_cost_usd": 0.0,
+    "output_cost_usd": 0.0,
+    "agent_turn_cost_usd": 0.0,
+    "memory_ingestion_cost_usd": 0.0,
+    "memory_retrieval_cost_usd": 0.0,
+    "other_llm_cost_usd": 0.0,
+    "total_cost_usd": 0.0
+  },
+  "input_tokens": 93516,
+  "cached_input_tokens": 0,
+  "output_tokens": 9067,
+  "reasoning_output_tokens": 0,
+  "total_tokens": 102583,
+  "state_diff": {
+    "created": {},
+    "modified": {
+      "order_items": {
+        "ITEM-9075": {
+          "item_status": {
+            "old": "delivered",
+            "new": "returned"
+          },
+          "restocking_fee": {
+            "old": null,
+            "new": 0
+          },
+          "refund_amount": {
+            "old": null,
+            "new": 241
+          },
+          "refund_method": {
+            "old": null,
+            "new": "original_payment"
+          },
+          "return_reason": {
+            "old": null,
+            "new": "changed_mind"
+          }
+        }
+      },
+      "orders": {
+        "ORD-6011": {
+          "status": {
+            "old": "delivered",
+            "new": "fully_returned"
+          }
+        }
+      }
+    },
+    "deleted": {}
+  },
+  "state_requirements_gt": [
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9075",
+      "field": "item_status",
+      "expected_value": "returned"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9075",
+      "field": "refund_amount",
+      "expected_value": 241
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9075",
+      "field": "refund_method",
+      "expected_value": "original_payment"
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9075",
+      "field": "restocking_fee",
+      "expected_value": 0
+    },
+    {
+      "entity_type": "order_items",
+      "record_key": "ITEM-9075",
+      "field": "return_reason",
+      "expected_value": "changed_mind"
+    },
+    {
+      "entity_type": "orders",
+      "record_key": "ORD-6011",
+      "field": "status",
+      "expected_value": "fully_returned"
+    }
+  ],
+  "ux_prompt_version": "v27",
+  "ux_user_effort": 5,
+  "ux_response_density": 5,
+  "ux_base_score": 5.0,
+  "ux_score_formula": "0.5_user_control_0.3_user_effort_0.2_response_density",
+  "ux_resource_penalty": 0.0,
+  "ux_resource_penalty_scheme": "fixed_global_v1",
+  "ux_assistant_turn_count": 3,
+  "ux_tool_call_count": 5,
+  "ux_tool_error_count": 0,
+  "ux_repeated_identical_tool_call_count": 0,
+  "ux_assistant_turn_threshold": 8,
+  "ux_tool_call_threshold": 12,
+  "ux_excess_assistant_turn_count": 0,
+  "ux_excess_tool_call_count": 0,
+  "scoring_protocol_id": "state_bench_v0.8.1_gpt54",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "high",
+  "judge_prompt_hashes": {
+    "judge_task_requirements.md": "246c76f59f3cd0e736da35b9beb985088778ff233287454b8bae674285718c72",
+    "judge_ux_quality.md": "8b6ecae22872ab860d4a54f37e5bd4a6a160033b833cd1b0de6a3673640d7067",
+    "judge_ux_quality_user.md": "5a6e9fa444fb5da4bd06991f907845a3023a8bb449dbb7c0994f4624fad67b94"
+  }
+}
