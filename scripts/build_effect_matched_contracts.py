@@ -1885,6 +1885,12 @@ def main() -> None:
     )
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--retries", type=int, default=4)
+    parser.add_argument(
+        "--max-failures",
+        type=int,
+        default=0,
+        help="stop submitting useful work after this many failures; 0 disables",
+    )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--max-candidates", type=int, default=8)
     parser.add_argument(
@@ -1911,6 +1917,8 @@ def main() -> None:
         raise ValueError("validation-percent must be in [0, 100)")
     if args.min_support < 1 or args.max_candidates < 1:
         raise ValueError("min-support and max-candidates must be positive")
+    if args.max_failures < 0:
+        raise ValueError("max-failures must be non-negative")
     if (
         args.min_contract_validation_retrievals < 0
         or args.min_contract_validation_negative_retrievals < 0
@@ -1990,9 +1998,14 @@ def main() -> None:
                 raw_contracts.extend(result.contracts)
                 terminal_assessment_counts[result.terminal_label] += 1
             except Exception as error:
-                failures.append(
-                    f"{contrast.trace.domain}/{contrast.trace.task_id}: {error}"
-                )
+                failure = f"{contrast.trace.domain}/{contrast.trace.task_id}: {error}"
+                failures.append(failure)
+                print(f"FAILED {failure}", flush=True)
+                if args.max_failures and len(failures) >= args.max_failures:
+                    for pending in futures:
+                        if pending is not future:
+                            pending.cancel()
+                    break
             if completed % 10 == 0 or completed == len(futures):
                 print(
                     f"induced {completed}/{len(futures)} contrasts; "
