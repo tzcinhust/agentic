@@ -85,6 +85,23 @@ def test_successful_and_failed_tool_calls_update_execution_evidence() -> None:
     assert has_valid_tool_evidence(conversation)
 
 
+def test_preview_creates_confirmation_but_not_satisfied_execution() -> None:
+    memory = CompletionMemory()
+    memory.sync_evidence(
+        [
+            assistant_call(
+                "cancel_order",
+                {"order_id": "O-1", "confirm": False},
+                {"status": "preview", "refund_amount": 59},
+            )
+        ]
+    )
+    assert not [item for item in memory.items if item.type == "execution"]
+    confirmation = next(item for item in memory.items if item.type == "user_confirmation_choice")
+    assert confirmation.status == "pending"
+    assert confirmation.source == "tool:cancel_order:0"
+
+
 def test_failed_tool_alone_is_not_valid_evidence() -> None:
     conversation = [
         assistant_call(
@@ -96,7 +113,7 @@ def test_failed_tool_alone_is_not_valid_evidence() -> None:
     assert not has_valid_tool_evidence(conversation)
 
 
-def test_explicit_user_confirmation_satisfies_confirmation_item() -> None:
+def test_explicit_user_confirmation_only_satisfies_preceding_preview() -> None:
     memory = CompletionMemory()
     memory.ingest_workflows(
         [
@@ -106,16 +123,50 @@ Branches:
 """
         ]
     )
-    memory.ingest_user_messages(
+    memory.sync_evidence(
         [
-            {"role": "user", "content": "Please review it."},
-            {"role": "assistant", "content": "Would you like me to proceed?"},
+            {"role": "user", "content": "Review both bookings."},
+            {
+                "role": "assistant",
+                "content": "Booking BK-1 is previewed. Would you like me to proceed?",
+                "tool_calls": [
+                    {
+                        "name": "cancel_booking",
+                        "arguments": {"booking_id": "BK-1", "confirm": False},
+                        "result": {"status": "preview", "booking_id": "BK-1"},
+                    }
+                ],
+            },
             {"role": "user", "content": "Yes, go ahead."},
+            {
+                "role": "assistant",
+                "content": "Booking BK-2 is previewed. Would you like me to proceed?",
+                "tool_calls": [
+                    {
+                        "name": "cancel_booking",
+                        "arguments": {"booking_id": "BK-2", "confirm": False},
+                        "result": {"status": "preview", "booking_id": "BK-2"},
+                    }
+                ],
+            },
         ]
     )
-    confirmation = next(item for item in memory.items if item.type == "user_confirmation_choice")
-    assert confirmation.status == "satisfied"
-    assert confirmation.evidence[-1]["kind"] == "user_confirmation"
+    tool_confirmations = {
+        item.source: item
+        for item in memory.items
+        if item.type == "user_confirmation_choice" and item.source.startswith("tool:")
+    }
+    assert tool_confirmations["tool:cancel_booking:0"].status == "satisfied"
+    assert tool_confirmations["tool:cancel_booking:1"].status == "pending"
+    assert tool_confirmations["tool:cancel_booking:0"].evidence[-1][
+        "bound_preview_source"
+    ] == "tool:cancel_booking:0"
+    workflow_confirmation = next(
+        item
+        for item in memory.items
+        if item.type == "user_confirmation_choice" and item.source.startswith("workflow:")
+    )
+    assert workflow_confirmation.status == "pending"
 
 
 def test_tool_state_adds_amount_disclosure_and_final_state_items() -> None:
@@ -155,3 +206,19 @@ Branches:
     assert all(isinstance(item, str) for item in requirements)
     assert not any(isinstance(item, CompletionItem) for item in requirements)
 
+
+def test_prompt_items_deduplicate_same_description_across_types() -> None:
+    memory = CompletionMemory()
+    description = "Compare the fees and explain the final amount."
+    memory.ingest_workflows(
+        [
+            f"""Workflow: compare paths
+Branches:
+- {description}
+"""
+        ]
+    )
+    matching_items = [item for item in memory.items if item.description == description]
+    assert len(matching_items) >= 3
+    prompt_items = memory.prompt_items(limit=6)
+    assert sum(item.description == description for item in prompt_items) == 1

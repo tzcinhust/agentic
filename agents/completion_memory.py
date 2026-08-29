@@ -287,13 +287,34 @@ def _status(result: Any) -> str:
     return str(result.get("status", "")).lower() if isinstance(result, dict) else ""
 
 
+def _mutation_completed(event: ToolEvent) -> bool:
+    if not result_succeeded(event.result) or _status(event.result) in PREVIEW_STATUSES:
+        return False
+    return _status(event.result) in SUCCESS_STATUSES or event.arguments.get("confirm") is True
+
+
+def _preview_sources_for_assistant(
+    conversation: list[dict[str, Any]], assistant_index: int
+) -> set[str]:
+    sources: set[str] = set()
+    sequence = 0
+    for message_index, message in enumerate(conversation):
+        if message.get("role") != "assistant":
+            continue
+        for call in message.get("tool_calls") or []:
+            if message_index == assistant_index and _status(call.get("result")) in PREVIEW_STATUSES:
+                sources.add(f"tool:{call.get('name', '')}:{sequence}")
+            sequence += 1
+    return sources
+
+
 class CompletionMemory:
     """Persistent per-task ledger of structured completion requirements."""
 
     def __init__(self, *, max_workflow_items: int = 12):
         self.items: list[CompletionItem] = []
         self.max_workflow_items = max_workflow_items
-        self._keys: set[tuple[str, str]] = set()
+        self._keys: set[tuple[str, ...]] = set()
         self._seen_tool_events: set[str] = set()
         self._seen_user_messages: set[str] = set()
 
@@ -307,7 +328,18 @@ class CompletionMemory:
         evidence: list[dict[str, Any]] | None = None,
     ) -> CompletionItem | None:
         description = _compact(description)
-        key = (item_type, description.lower())
+        # Repeated tool operations can carry independent confirmation and
+        # execution obligations even when their human-readable text matches.
+        source_scoped = source.startswith("tool:") and item_type in {
+            "execution",
+            "user_confirmation_choice",
+            "final_state_reporting",
+        }
+        key = (
+            (item_type, description.lower(), source)
+            if source_scoped
+            else (item_type, description.lower())
+        )
         if not description or key in self._keys:
             return None
         self._keys.add(key)
@@ -379,9 +411,7 @@ class CompletionMemory:
         completed_mutations = [
             event
             for event in tool_events(conversation)
-            if result_succeeded(event.result)
-            and MUTATION_NAME.match(event.name)
-            and (_status(event.result) in SUCCESS_STATUSES or event.arguments.get("confirm") is True)
+            if MUTATION_NAME.match(event.name) and _mutation_completed(event)
         ]
         for item in self.items:
             match = re.fullmatch(r"tool:(.+):(\d+)", item.source)
@@ -417,16 +447,21 @@ class CompletionMemory:
             "status": _status(event.result),
         }
         is_mutation = bool(MUTATION_NAME.match(event.name))
-        if is_mutation:
+        completed_mutation = is_mutation and _mutation_completed(event)
+        if completed_mutation:
             self.add(
                 "execution",
-                (
-                    f"The operation represented by {event.name} is complete."
-                    if success
-                    else f"The operation represented by {event.name} is not complete; report the failure if ending."
-                ),
+                f"The operation represented by {event.name} is complete.",
                 f"tool:{event.name}:{event.sequence}",
-                status="satisfied" if success else "pending",
+                status="satisfied",
+                evidence=[evidence],
+            )
+        elif is_mutation and not success:
+            self.add(
+                "execution",
+                f"The operation represented by {event.name} is not complete; report the failure if ending.",
+                f"tool:{event.name}:{event.sequence}",
+                status="pending",
                 evidence=[evidence],
             )
         if not success:
@@ -454,7 +489,7 @@ class CompletionMemory:
                 f"tool:{event.name}:{event.sequence}",
                 evidence=[evidence],
             )
-        if is_mutation and (_status(event.result) in SUCCESS_STATUSES or event.arguments.get("confirm") is True):
+        if completed_mutation:
             self.add(
                 "final_state_reporting",
                 f"Report the tool-confirmed final outcome of {event.name} without inventing additional changes.",
@@ -466,23 +501,38 @@ class CompletionMemory:
         for index, item in enumerate(conversation):
             if item.get("role") != "user" or not AFFIRMATIVE.search(str(item.get("content", ""))):
                 continue
-            previous_assistant = next(
+            previous_assistant_index = next(
                 (
-                    str(conversation[prior].get("content", ""))
+                    prior
                     for prior in range(index - 1, -1, -1)
                     if conversation[prior].get("role") == "assistant"
                 ),
-                "",
+                None,
+            )
+            if previous_assistant_index is None:
+                continue
+            previous_assistant = str(
+                conversation[previous_assistant_index].get("content", "")
             )
             if not CONFIRMATION_REQUEST.search(previous_assistant):
                 continue
+            preview_sources = _preview_sources_for_assistant(
+                conversation, previous_assistant_index
+            )
+            if not preview_sources:
+                continue
             for completion in self.items:
-                if completion.type == "user_confirmation_choice" and completion.status == "pending":
+                if (
+                    completion.type == "user_confirmation_choice"
+                    and completion.status == "pending"
+                    and completion.source in preview_sources
+                ):
                     completion.status = "satisfied"
                     completion.evidence.append(
                         {
                             "kind": "user_confirmation",
                             "conversation_index": index,
+                            "bound_preview_source": completion.source,
                             "text": _compact(item.get("content", ""), 120),
                         }
                     )
@@ -501,14 +551,25 @@ class CompletionMemory:
             "user_confirmation_choice": 6,
             "final_state_reporting": 7,
         }
-        return sorted(
+        ordered = sorted(
             self.pending(),
             key=lambda item: (
                 0 if item.source.startswith("user:") else 1 if item.source.startswith("tool:") else 2,
                 priority[item.type],
                 item.id,
             ),
-        )[:limit]
+        )
+        selected: list[CompletionItem] = []
+        seen_descriptions: set[str] = set()
+        for item in ordered:
+            normalized = re.sub(r"\s+", " ", item.description).strip().rstrip(".").casefold()
+            if normalized in seen_descriptions:
+                continue
+            seen_descriptions.add(normalized)
+            selected.append(item)
+            if len(selected) >= limit:
+                break
+        return selected
 
     def snapshot(self) -> list[dict[str, Any]]:
         return [item.to_dict() for item in self.items]
