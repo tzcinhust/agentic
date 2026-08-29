@@ -212,18 +212,6 @@ class PolicyObligationAgent(_Parent):
         ranked = pinned + [item for _, item in scored]
         return ranked[: max(0, self.policy_topics)]
 
-    def _rank_topics_for_conversation(
-        self,
-        query: str,
-        conversation: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        """Compatibility hook for agents with runtime policy activation.
-
-        Existing agents retain byte-for-byte ranking behavior.  A composed
-        agent may override this hook to filter branches using canonical facts.
-        """
-        return self._rank_topics(query)
-
     # ----------------------------------------------------------------- rendering
 
     @staticmethod

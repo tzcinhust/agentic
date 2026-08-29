@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
-from agents.runtime_fact_ledger import RuntimeFactLedger
 
 
 INTENT_HINTS = {
@@ -91,12 +90,7 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             if item.get("role") == "assistant"
             for call in item.get("tool_calls") or []
         ]
-        # Tool names describe the path taken, but not the branch the current
-        # state activates.  Add only a compact, source-labelled projection of
-        # canonical observations; never serialize complete tool payloads into
-        # the retrieval query.
-        fact_summary = RuntimeFactLedger(conversation).compact_summary(max_chars=1200)
-        return f"{user_text} {' '.join(observed_tools)} {fact_summary}".strip()
+        return f"{user_text} {' '.join(observed_tools)}".strip()
 
     def prepare_conversation(self, conversation: list[Any]) -> list[Any]:
         query = self._query_from_conversation(conversation)

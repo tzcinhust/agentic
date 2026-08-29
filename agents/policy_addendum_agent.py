@@ -37,49 +37,6 @@ ADDENDUM_REQUEST = (
 )
 
 
-def review_policy_addendum(
-    agent: Any,
-    *,
-    system_prompt: str,
-    conversation: list[dict[str, Any]],
-    draft: AgentTurnResponse,
-    items: list[dict[str, Any]] | None = None,
-) -> AgentTurnResponse:
-    """Run the existing append-only review as a reusable composition helper."""
-    if draft.tool_calls or not draft.text.strip():
-        return draft
-    if items is None:
-        query = agent._query_from_conversation(conversation)
-        items = agent._rank_topics_for_conversation(query, conversation)
-    card = agent._render(items)
-    if not card:
-        return draft
-
-    review_conversation = [
-        *conversation,
-        {"role": "assistant", "content": draft.text},
-        {"role": "user", "content": ADDENDUM_REQUEST},
-    ]
-    result = agent.client.generate(
-        system_prompt=f"{system_prompt}\n\n{ADDENDUM_INSTRUCTIONS}\n\n{card}",
-        conversation=review_conversation,
-        tools=[],
-    )
-    usage = result.usage
-    agent.add_token_usage(
-        input_tokens=getattr(usage, "prompt_tokens", None),
-        output_tokens=getattr(usage, "completion_tokens", None),
-    )
-    if result.tool_calls:
-        return draft
-    addendum = result.text.strip()
-    if not addendum or addendum.upper().strip("` .\n\t") == "NONE":
-        return draft
-    if addendum.lower() in draft.text.lower():
-        return draft
-    return AgentTurnResponse(text=f"{draft.text.rstrip()}\n\n{addendum}", tool_calls=[])
-
-
 class PolicyAddendumAgent(_LateParent):
     """Keep PWM's action policy intact and append only missing policy speech acts."""
 
@@ -98,9 +55,33 @@ class PolicyAddendumAgent(_LateParent):
             conversation=conversation,
             tools=tools,
         )
-        return review_policy_addendum(
-            self,
-            system_prompt=system_prompt,
-            conversation=conversation,
-            draft=draft,
+        if draft.tool_calls or not draft.text.strip():
+            return draft
+
+        query = self._query_from_conversation(conversation)
+        items = self._rank_topics(query)
+        card = self._render(items)
+        if not card:
+            return draft
+
+        review_conversation = [
+            *conversation,
+            {"role": "assistant", "content": draft.text},
+            {"role": "user", "content": ADDENDUM_REQUEST},
+        ]
+        result = self.client.generate(
+            system_prompt=f"{system_prompt}\n\n{ADDENDUM_INSTRUCTIONS}\n\n{card}",
+            conversation=review_conversation,
+            tools=[],
         )
+        usage = result.usage
+        self.add_token_usage(
+            input_tokens=getattr(usage, "prompt_tokens", None),
+            output_tokens=getattr(usage, "completion_tokens", None),
+        )
+        if result.tool_calls:
+            return draft
+        addendum = result.text.strip()
+        if not addendum or addendum.upper().strip("` .\n\t") == "NONE":
+            return draft
+        return AgentTurnResponse(text=f"{draft.text.rstrip()}\n\n{addendum}", tool_calls=[])

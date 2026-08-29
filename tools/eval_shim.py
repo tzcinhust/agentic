@@ -101,17 +101,6 @@ class Handler(BaseHTTPRequestHandler):
             for key, value in self.headers.items()
             if key.lower() not in _HOP_BY_HOP
         }
-        # STATE-Bench's locked Azure client authenticates with ``api-key``;
-        # OpenAI-compatible relays such as NovaCode require the equivalent
-        # ``Authorization: Bearer`` header.  Translate only the header shape —
-        # prompts, model, body, response, and protocol remain untouched.
-        azure_key = next(
-            (value for key, value in headers.items() if key.lower() == "api-key"),
-            None,
-        )
-        if azure_key and not any(key.lower() == "authorization" for key in headers):
-            headers = {key: value for key, value in headers.items() if key.lower() != "api-key"}
-            headers["Authorization"] = f"Bearer {azure_key}"
 
         started = time.time()
         last_error = "unknown"

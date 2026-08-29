@@ -180,7 +180,7 @@ class PostToolPolicyAgent(_LateParent):
         ranked_items: list[dict[str, Any]] = []
         if grounded:
             query = self._query_from_conversation(conversation)
-            ranked_items = self._rank_topics_for_conversation(query, conversation)
+            ranked_items = self._rank_topics(query)
             items = self._contextual_items(ranked_items, conversation)
             card = self._render(items)
             if card:
