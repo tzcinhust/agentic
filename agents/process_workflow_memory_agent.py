@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import re
@@ -10,7 +11,26 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from agents.completion_memory import (
+    COMMUNICATION_TYPES,
+    CompletionMemory,
+    has_valid_tool_evidence,
+    latest_user_completion_types,
+    static_completion_requirements,
+)
 from agents.opencode_agent import OpenCodeAgent as _OpenCodeAgent
+
+
+COMPLETION_MODES = frozenset({"pwm_only", "generic", "static", "structured"})
+SINGLE_CALL_CLOSURE_RULE = (
+    "If you choose to call tools in this turn, ignore all closure requirements below. "
+    "They must not affect tool selection, tool arguments, or whether another tool call is needed. "
+    "Apply them only if you are otherwise ready to answer the user without tool calls."
+)
+GENERIC_COMPLETENESS_REMINDER = (
+    "Before ending, cover the user's explicit request and material outcomes already established by "
+    "authoritative tool evidence."
+)
 
 
 INTENT_HINTS = {
@@ -77,6 +97,17 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
         )
         self._avg_len = sum(len(item.get("tokens", [])) for item in self._cards) / max(len(self._cards), 1)
         self._card_ngrams = [_char_ngrams(item.get("search_text", "")) for item in self._cards]
+        self.completion_mode = os.environ.get("STATE_BENCH_COMPLETION_MODE", "structured")
+        if self.completion_mode not in COMPLETION_MODES:
+            raise ValueError(
+                "STATE_BENCH_COMPLETION_MODE must be pwm_only, generic, static, or structured"
+            )
+        self.completion_memory = (
+            CompletionMemory() if self.completion_mode == "structured" else None
+        )
+        self._static_requirements: list[str] = []
+        self._initial_completion_items: list[dict[str, Any]] | None = None
+        self._generation_log: list[dict[str, Any]] = []
 
     def _query_from_conversation(self, conversation: list[Any]) -> str:
         user_text = " ".join(
@@ -95,6 +126,7 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
     def prepare_conversation(self, conversation: list[Any]) -> list[Any]:
         query = self._query_from_conversation(conversation)
         learnings = self.retrieve_learnings(query, top_k=self.retrieve_learnings_top_k)
+        self._update_completion_knowledge(learnings, conversation)
         if not learnings:
             return conversation
         memory_prompt = (
@@ -105,6 +137,179 @@ class ProcessWorkflowMemoryAgent(_OpenCodeAgent):
             + "\n\n---\n\n".join(learnings)
         )
         return self.inject_system_message(conversation, memory_prompt)
+
+    def _update_completion_knowledge(
+        self,
+        learnings: list[str],
+        conversation: list[dict[str, Any]],
+    ) -> None:
+        if self.completion_mode == "structured" and self.completion_memory is not None:
+            self.completion_memory.ingest_workflows(learnings)
+            self.completion_memory.ingest_user_messages(conversation)
+            if self._initial_completion_items is None:
+                self._initial_completion_items = self.completion_memory.snapshot()
+        elif self.completion_mode == "static":
+            seen = {item.lower() for item in self._static_requirements}
+            for requirement in static_completion_requirements(learnings, conversation):
+                if requirement.lower() not in seen:
+                    seen.add(requirement.lower())
+                    self._static_requirements.append(requirement)
+
+    @staticmethod
+    def _last_non_system_role(conversation: list[dict[str, Any]]) -> str:
+        return next(
+            (
+                str(item.get("role", ""))
+                for item in reversed(conversation)
+                if item.get("role") != "system"
+            ),
+            "",
+        )
+
+    def _pending_prompt_data(self) -> tuple[list[str], list[dict[str, Any]]]:
+        if self.completion_mode == "generic":
+            return [GENERIC_COMPLETENESS_REMINDER], []
+        if self.completion_mode == "static":
+            return self._static_requirements[:8], []
+        if self.completion_mode == "structured" and self.completion_memory is not None:
+            items = self.completion_memory.prompt_items()
+            return [f"[{item.type}] {item.description}" for item in items], [
+                item.to_dict() for item in items
+            ]
+        return [], []
+
+    def _closure_gate_reason(
+        self,
+        conversation: list[dict[str, Any]],
+        requirements: list[str],
+    ) -> str | None:
+        if self.completion_mode == "pwm_only" or not requirements:
+            return None
+        if not has_valid_tool_evidence(conversation):
+            return None
+        role = self._last_non_system_role(conversation)
+        if role == "tool":
+            return "post_tool_with_valid_evidence"
+        if role == "user" and (
+            latest_user_completion_types(conversation) & COMMUNICATION_TYPES
+        ):
+            return "evidence_backed_communication_followup"
+        return None
+
+    def _closure_prompt(self, requirements: list[str]) -> str:
+        if self.completion_mode == "structured":
+            title = "Remaining task-closure requirements, if supported by current evidence:"
+        elif self.completion_mode == "static":
+            title = "Static completion text (untracked; no status or evidence is maintained):"
+        else:
+            title = "Generic completeness reminder:"
+        lines = ["Single-call task-closure gate:", SINGLE_CALL_CLOSURE_RULE, title]
+        lines.extend(f"- {item}" for item in requirements)
+        lines.append(
+            "Use only facts already supported by the conversation and tool results; do not invent facts or actions."
+        )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _response_tool_calls(response: Any) -> list[dict[str, Any]]:
+        calls = []
+        for call in getattr(response, "tool_calls", []) or []:
+            if isinstance(call, dict):
+                calls.append(
+                    {"name": str(call.get("name", "")), "arguments": call.get("arguments") or {}}
+                )
+            else:
+                calls.append(
+                    {
+                        "name": str(getattr(call, "name", "")),
+                        "arguments": getattr(call, "arguments", {}) or {},
+                    }
+                )
+        return calls
+
+    def generate_next_turn(
+        self,
+        *,
+        system_prompt: str,
+        conversation: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ):
+        """Make exactly one model call, with an optional single-call closure gate."""
+
+        if self.completion_memory is not None:
+            self.completion_memory.sync_evidence(conversation)
+        requirements, structured_items = self._pending_prompt_data()
+        gate_reason = self._closure_gate_reason(conversation, requirements)
+        closure_prompt = self._closure_prompt(requirements) if gate_reason else ""
+        model_conversation = (
+            self.inject_system_message(conversation, closure_prompt, before_last_user=False)
+            if closure_prompt
+            else conversation
+        )
+
+        # One and only one model call.  There is no verifier, rejection, or regeneration.
+        response = super().generate_next_turn(
+            system_prompt=system_prompt,
+            conversation=model_conversation,
+            tools=tools,
+        )
+        response_calls = self._response_tool_calls(response)
+        pending_items = (
+            [item.to_dict() for item in self.completion_memory.pending()]
+            if self.completion_memory is not None
+            else []
+        )
+        self._generation_log.append(
+            {
+                "generation_index": len(self._generation_log),
+                "model_calls_for_generation": 1,
+                "closure_injected": bool(closure_prompt),
+                "closure_gate_reason": gate_reason,
+                "closure_prompt_sha256": (
+                    hashlib.sha256(closure_prompt.encode("utf-8")).hexdigest()
+                    if closure_prompt
+                    else None
+                ),
+                "pending_items": [item["id"] for item in pending_items],
+                "injected_items": [item["id"] for item in structured_items]
+                if closure_prompt
+                else [],
+                "injected_requirements": requirements if closure_prompt else [],
+                "output_type": "tool_call" if response_calls else "final_text",
+                "tool_calls_after_closure": response_calls if closure_prompt and response_calls else [],
+            }
+        )
+        return response
+
+    def ingest_trajectory(self, trajectory: Any) -> None:
+        final_items = self.completion_memory.snapshot() if self.completion_memory else []
+        trajectory.metadata["completion_memory"] = {
+            "version": "task_closure_memory_v1",
+            "mode": self.completion_mode,
+            "initial_items": self._initial_completion_items or [],
+            "static_requirements": list(self._static_requirements),
+            "final_items": final_items,
+            "final_pending_items": [item["id"] for item in final_items if item["status"] == "pending"],
+            "final_satisfied_items": [
+                item["id"] for item in final_items if item["status"] == "satisfied"
+            ],
+            "final_invalidated_items": [
+                item["id"] for item in final_items if item["status"] == "invalidated"
+            ],
+            "generations": list(self._generation_log),
+            "summary": {
+                "model_generations": len(self._generation_log),
+                "model_calls_per_generation": [1 for _ in self._generation_log],
+                "regenerations": 0,
+                "closure_injections": sum(
+                    int(item["closure_injected"]) for item in self._generation_log
+                ),
+                "closure_injected_tool_calls": sum(
+                    int(item["closure_injected"] and item["output_type"] == "tool_call")
+                    for item in self._generation_log
+                ),
+            },
+        }
 
     def memory_tool_schemas(self) -> list[dict[str, Any]]:
         return [
