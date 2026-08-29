@@ -17,6 +17,7 @@ from scripts.build_effect_matched_contracts import (
     merge_contracts,
     normalize_payload,
     normalize_selector,
+    repair_checkpoint,
     resolved_terminal_label,
     split_is_validation,
     validation_gate_intercepts,
@@ -70,6 +71,7 @@ def valid_payload():
                 "reason": "the user explicitly requests the omitted rationale",
             }
         ],
+        "repair_abstentions": [],
         "contracts": [
             {
                 "source_checkpoint_id": "cp_1",
@@ -145,6 +147,24 @@ def test_contrast_requires_exactly_unchanged_realized_effect() -> None:
     assert [item.id for item in contrast.candidates] == ["cp_1"]
     assert contrast.terminal.id == "cp_3"
     assert contrast.candidates[0].effect_signature == contrast.terminal.effect_signature
+    repaired = repair_checkpoint(contrast, contrast.candidates[0])
+    assert repaired.id == "cp_3"
+    assert repaired.effect_signature == contrast.candidates[0].effect_signature
+
+
+def test_text_selector_rejects_trajectory_position_paths() -> None:
+    trace = trace_with_same_effect()
+    selector = {
+        "source": "user_text",
+        "tool": "*",
+        "path": "M3",
+        "operator": "contains",
+        "value": "confirm",
+    }
+
+    assert normalize_selector(selector, trace=trace) is None
+    selector["path"] = "content"
+    assert normalize_selector(selector, trace=trace)["path"] == "content"
 
 
 def test_numeric_selector_requires_typed_observed_structural_constant() -> None:
@@ -224,6 +244,7 @@ def test_analyze_only_reports_pair_availability_without_model_calls() -> None:
     assert report["terminal_trajectories"] == 1
     assert report["pairable_trajectories"] == 1
     assert report["selected_candidate_checkpoints"] == 1
+    assert report["local_effect_stable_repair_pairs"] == 1
     assert report["api_calls"] == 0
 
 
@@ -271,27 +292,28 @@ def test_marker_only_terminal_model_label_is_deterministically_protocol_only() -
     assert len(normalize_payload(valid_payload(), contrast)) == 1
 
 
-def test_protocol_only_label_with_semantic_feedback_abstains() -> None:
+def test_protocol_only_with_semantic_feedback_does_not_suppress_local_pair() -> None:
     contrast = build_contrast_set(trace_with_same_effect())
     payload = valid_payload()
     payload["terminal_assessment"]["label"] = "protocol_only"
 
     assert resolved_terminal_label(payload, contrast) == "ambiguous"
-    assert normalize_payload(payload, contrast) == []
+    assert len(normalize_payload(payload, contrast)) == 1
 
 
-def test_positive_terminal_label_cannot_hide_explicit_ordering_violation() -> None:
+def test_adverse_terminal_is_audit_label_not_local_pair_gate() -> None:
     sample = trace_with_same_effect()
     sample.conversation[-1][
         "content"
     ] = "That matches, even though approval happened out of order. [TASK_DONE]"
     contrast = build_contrast_set(sample)
 
-    with pytest.raises(ValueError, match="explicit adverse feedback"):
-        normalize_payload(valid_payload(), contrast)
+    payload = valid_payload()
+    assert resolved_terminal_label(payload, contrast) == "qualified_or_adverse"
+    assert len(normalize_payload(payload, contrast)) == 1
 
 
-def test_qualified_terminal_feedback_cannot_anchor_contracts() -> None:
+def test_qualified_terminal_does_not_suppress_discharged_local_repair() -> None:
     contrast = build_contrast_set(trace_with_same_effect())
     payload = valid_payload()
     payload["terminal_assessment"] = {
@@ -299,16 +321,47 @@ def test_qualified_terminal_feedback_cannot_anchor_contracts() -> None:
         "reason": "the user notes that approval happened out of order",
     }
 
-    assert normalize_payload(payload, contrast) == []
+    assert len(normalize_payload(payload, contrast)) == 1
 
 
-def test_contract_must_be_observably_discharged_at_terminal_boundary() -> None:
+def test_contract_must_be_observably_discharged_at_local_repair_boundary() -> None:
     sample = trace_with_same_effect()
     sample.conversation[3]["content"] = "Okay."
     contrast = build_contrast_set(sample)
 
     with pytest.raises(ValueError, match="machine-checkable"):
         normalize_payload(valid_payload(), contrast)
+
+
+def test_every_repair_checkpoint_requires_contract_or_explicit_abstention() -> None:
+    sample = trace_with_same_effect()
+    sample.conversation[-1]["content"] = "Also confirm the final cancellation status."
+    sample.conversation.extend(
+        [
+            {"role": "assistant", "content": "The cancellation is complete."},
+            {"role": "user", "content": "Thanks. [TASK_DONE]"},
+        ]
+    )
+    contrast = build_contrast_set(sample)
+    payload = valid_payload()
+    payload["candidate_labels"].append(
+        {
+            "checkpoint_id": "cp_3",
+            "label": "closure_repair",
+            "reason": "the user requests omitted final-state confirmation",
+        }
+    )
+
+    with pytest.raises(ValueError, match="lack contract or explicit abstention"):
+        normalize_payload(payload, contrast)
+
+    payload["repair_abstentions"] = [
+        {
+            "checkpoint_id": "cp_3",
+            "reason": "no safe evidence selector represents this repair",
+        }
+    ]
+    assert len(normalize_payload(payload, contrast)) == 1
 
 
 def test_unrepresentable_contract_is_cached_as_auditable_abstention(tmp_path) -> None:
