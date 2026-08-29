@@ -15,6 +15,7 @@ from scripts.build_effect_matched_contracts import (
     merge_contracts,
     normalize_payload,
     normalize_selector,
+    resolved_terminal_label,
     split_is_validation,
     validation_gate_intercepts,
     validate_contracts,
@@ -259,13 +260,13 @@ def test_terminal_marker_alone_is_not_treated_as_success_but_can_bound_discharge
     assert len(normalize_payload(payload, contrast)) == 1
 
 
-def test_marker_only_terminal_cannot_be_labeled_explicit_acceptance() -> None:
+def test_marker_only_terminal_model_label_is_deterministically_protocol_only() -> None:
     sample = trace_with_same_effect()
     sample.conversation[-1]["content"] = "[TASK_DONE]"
     contrast = build_contrast_set(sample)
 
-    with pytest.raises(ValueError, match="only a marker"):
-        normalize_payload(valid_payload(), contrast)
+    assert resolved_terminal_label(valid_payload(), contrast) == "protocol_only"
+    assert len(normalize_payload(valid_payload(), contrast)) == 1
 
 
 def test_protocol_only_label_cannot_hide_semantic_terminal_feedback() -> None:

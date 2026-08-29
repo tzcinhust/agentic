@@ -1106,23 +1106,32 @@ def terminal_label_from_payload(payload: dict[str, Any]) -> str:
     return terminal_label
 
 
-def normalize_payload(
-    payload: dict[str, Any], contrast: ContrastSet
-) -> list[dict[str, Any]]:
+def resolved_terminal_label(payload: dict[str, Any], contrast: ContrastSet) -> str:
+    """Resolve deterministic protocol evidence before trusting model semantics."""
     terminal_label = terminal_label_from_payload(payload)
     terminal_feedback = HARNESS_MARKER.sub(
         "", contrast.terminal.following_user_text
     ).strip()
-    if terminal_label == "protocol_only" and terminal_feedback:
+    # A bare harness marker has exactly one observable interpretation.  Treating
+    # it as explicit acceptance would manufacture a user-success label and waste
+    # retries on a judgment that does not require a model.
+    if not terminal_feedback:
+        return "protocol_only"
+    if terminal_label == "protocol_only":
         raise ValueError("protocol_only terminal contains semantic user feedback")
-    if terminal_label == "explicit_acceptance" and not terminal_feedback:
-        raise ValueError("explicit_acceptance terminal contains only a marker")
     if terminal_label in {"explicit_acceptance", "protocol_only"} and (
         ADVERSE_TERMINAL.search(terminal_feedback)
     ):
         raise ValueError(
             "positive terminal label conflicts with explicit adverse feedback"
         )
+    return terminal_label
+
+
+def normalize_payload(
+    payload: dict[str, Any], contrast: ContrastSet
+) -> list[dict[str, Any]]:
+    terminal_label = resolved_terminal_label(payload, contrast)
     valid_ids = {item.id for item in contrast.candidates}
     labels: dict[str, str] = {}
     for item in payload.get("candidate_labels", []):
@@ -1167,7 +1176,7 @@ def induce_one(
             if cached.get("prompt_version") == PROMPT_VERSION:
                 payload = cached.get("payload", {})
                 return InductionResult(
-                    terminal_label=terminal_label_from_payload(payload),
+                    terminal_label=resolved_terminal_label(payload, contrast),
                     contracts=tuple(normalize_payload(payload, contrast)),
                 )
         except (OSError, ValueError, TypeError):
@@ -1212,7 +1221,7 @@ def induce_one(
             )
             cache_temporary.replace(cache_path)
             return InductionResult(
-                terminal_label=terminal_label_from_payload(payload),
+                terminal_label=resolved_terminal_label(payload, contrast),
                 contracts=tuple(contracts),
             )
         except Exception as error:
