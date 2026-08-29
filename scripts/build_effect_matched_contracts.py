@@ -19,13 +19,16 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from itertools import combinations
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from agents.effect_matched_contracts import (
     ContractEvaluator,
+    EvidenceLedger,
     EffectMatchedContractIndex,
+    TruthValue,
     compact,
     effect_signatures,
     normalize_retrieval_query,
@@ -36,7 +39,7 @@ from agents.effect_matched_contracts import (
 )
 
 
-PROMPT_VERSION = "effect_stable_local_repair_closure_v5_20260830"
+PROMPT_VERSION = "effect_stable_atomic_closure_v6_20260830"
 DEADLINES = {"before_claim", "before_action", "before_final"}
 TYPES = {
     "comparison",
@@ -89,6 +92,23 @@ TERMINAL_LABELS = {
     "protocol_only",
     "qualified_or_adverse",
     "ambiguous",
+}
+ATOM_TYPES = {
+    "comparison",
+    "explanation_rationale",
+    "cost_amount_reporting",
+    "proactive_disclosure",
+    "final_state_reporting",
+    "evidence_grounding",
+    "claim_safety",
+}
+ATOM_DEADLINES = {"before_claim", "before_final"}
+ATOM_DISCHARGE_KINDS = {
+    "mention_bound_value",
+    "mention_terms",
+    "causal_explanation",
+    "comparison",
+    "claim_requires_binding",
 }
 ID_LITERAL = re.compile(r"\b[A-Z]{1,8}[-_][A-Z0-9]{2,}\b")
 MONEY_LITERAL = re.compile(
@@ -211,6 +231,22 @@ class InductionResult:
     terminal_label: str
     contracts: tuple[dict[str, Any], ...]
     abstention_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class AtomInductionResult:
+    terminal_label: str
+    atoms: tuple[dict[str, Any], ...]
+    semantic_abstentions: tuple[str, ...] = ()
+    schema_failure: str | None = None
+
+
+class AtomSchemaError(ValueError):
+    """The model found a repair but emitted an invalid atomic representation."""
+
+    def __init__(self, diagnostics: list[str]):
+        self.diagnostics = tuple(dict.fromkeys(diagnostics))
+        super().__init__("; ".join(self.diagnostics))
 
 
 class UnrepresentableContractError(ValueError):
@@ -652,6 +688,177 @@ Observable train transcript excerpt:
 """
 
 
+def repair_mode(contrast: ContrastSet, rejected: Checkpoint) -> str:
+    """Classify what changed without asking the inducer to infer execution state."""
+
+    repaired = repair_checkpoint(contrast, rejected)
+    if repaired is None:
+        return "unsupported"
+    added_events = [
+        event
+        for event in tool_events(contrast.trace.conversation)
+        if rejected.assistant_index < event.assistant_index <= repaired.assistant_index
+    ]
+    return "evidence_bridge" if added_events else "response_closure"
+
+
+def atom_induction_prompt(contrast: ContrastSet) -> str:
+    selector_schema = {
+        "source": "user_text|tool_argument|tool_result",
+        "tool": "exact name or glob; * for user_text",
+        "path": "observable JSON path; content for user_text",
+        "operator": "exists|nonempty|truthy|falsy|equals|not_equals|in|contains|contains_any|contains_all|gt|gte|lt|lte",
+        "quantifier": "any|all|consistent",
+        "outcome": "any|success|preview|failure for tool sources",
+        "value": "optional generalized non-task-specific value",
+        "value_kind": "structural_constant only for a policy threshold",
+        "value_evidence": {
+            "tool": "authoritative non-failed tool-result glob containing that threshold",
+            "path": "result path containing the same observed threshold",
+        },
+        "values": ["optional generalized alternatives"],
+    }
+    schema = {
+        "terminal_assessment": {
+            "label": "explicit_acceptance|protocol_only|qualified_or_adverse|ambiguous",
+            "reason": "short observable justification",
+        },
+        "candidate_labels": [
+            {
+                "checkpoint_id": "cp_#",
+                "label": "closure_repair|normal_progress|confirmation|new_request|ambiguous",
+                "reason": "short observable justification",
+            }
+        ],
+        "repair_abstentions": [
+            {
+                "checkpoint_id": "closure_repair checkpoint with no reusable atom",
+                "reason": "why the repair delta is not a reusable communication/evidence closure",
+            }
+        ],
+        "closure_atoms": [
+            {
+                "source_checkpoint_id": "closure_repair checkpoint",
+                "title": "short generalized atom title",
+                "intent": "generalized user intent for retrieval",
+                "keywords": ["generalized paraphrases"],
+                "confidence": 0.0,
+                "deadline": "before_claim|before_final",
+                "type": "one allowed atom type",
+                "requirement": "one atomic user-visible condition added by the repair",
+                "trigger_candidates": [selector_schema],
+                "bindings": [
+                    {
+                        "id": "short_snake_case_id",
+                        "description": "authoritative semantic slot used by the atom",
+                        "required": True,
+                        "selectors": [selector_schema],
+                    }
+                ],
+                "discharge": [
+                    {
+                        "kind": "mention_bound_value",
+                        "binding_ids": ["binding id"],
+                        "value_mode": "any|numeric|identifier|text",
+                        "min_mentions": 1,
+                    },
+                    {
+                        "kind": "mention_terms",
+                        "mode": "any|all",
+                        "terms": ["generalized non-answer terms"],
+                    },
+                    {
+                        "kind": "causal_explanation",
+                        "binding_ids": ["optional binding ids"],
+                        "terms": ["optional generalized causal markers"],
+                    },
+                    {
+                        "kind": "comparison",
+                        "binding_ids": ["binding ids being compared"],
+                        "terms": ["optional generalized comparison markers"],
+                    },
+                    {
+                        "kind": "claim_requires_binding",
+                        "binding_ids": ["binding ids grounding a claim"],
+                        "claim_types": ["amount|percentage|duration|status|identifier"],
+                        "terms": ["optional generalized claim terms"],
+                    },
+                ],
+            }
+        ],
+    }
+    start = min(item.assistant_index for item in contrast.candidates)
+    end = contrast.terminal.following_user_index
+    candidate_views: list[dict[str, Any]] = []
+    for candidate in contrast.candidates:
+        repaired = repair_checkpoint(contrast, candidate)
+        view = candidate.prompt_view()
+        view["repair_mode"] = repair_mode(contrast, candidate)
+        view["pre_boundary"] = {
+            "conversation_messages_end_before": f"M{candidate.assistant_index}",
+            "held_draft": f"M{candidate.assistant_index}",
+            "observable_tool_events": (
+                f"tool arguments/results attached to M{candidate.assistant_index} are observable before its held user-visible text"
+            ),
+        }
+        view["local_repair_response"] = (
+            {
+                "assistant_message": f"M{repaired.assistant_index}",
+                "effect_signature": repaired.effect_signature,
+            }
+            if repaired is not None
+            else None
+        )
+        candidate_views.append(view)
+
+    return f"""Extract atomic task-closure deltas from local effect-stable repair transitions.
+
+This stage does NOT create a complete runtime contract.  It only identifies WHAT reusable user-visible condition
+was added by the local repair and binds it to observable evidence.  Cross-task code will infer recurring triggers
+and compile contracts later.  Do not output families, applicability objects, workflow steps, tool plans, execution
+requirements, or confirmation requirements.
+
+The three information roles are disjoint:
+1. trigger_candidates: facts observable strictly BEFORE the rejected assistant's user-visible text.  They may use
+   opening/prior user text, prior tool arguments/results, and tool arguments/results attached to the rejected
+   assistant message because those tool events complete before its held text is shown.  Never use assistant_text,
+   the rejected text, the following repair message, or the repaired response as a trigger.
+2. bindings: authoritative semantic slots from user_text, tool_argument, or tool_result.  For response_closure,
+   bindings must already exist before the rejected draft.  For evidence_bridge, a binding may first appear in the
+   local repair response's read/preview result.  Never use assistant_text as evidence.
+3. discharge: a strict tagged union describing only how a candidate response closes the atom.  Use fields belonging
+   to that kind only.  mention_bound_value and claim_requires_binding reference binding_ids; mention_terms contains
+   terms only; causal_explanation and comparison may reference bindings but do not automatically require verbatim
+   value copying.
+
+Label closure_repair only for an explicit correction, challenge, omitted decision-critical information, premature
+closure, or unsupported concrete claim.  Confirmation, normal progress, and a new request are not closure repairs.
+For each closure_repair checkpoint, emit one or more minimal closure_atoms, or exactly one repair_abstention.  These
+sets must be disjoint.  The atom must be visibly discharged by the listed local repair response.  A single repair
+may yield multiple atoms only when the user independently identifies multiple missing conditions.
+
+Effect-stable data identifies communication closure and read-only evidence bridges.  It does not identify mutation
+execution or confirmation lifecycle; never emit those as learned atoms.  Do not copy task IDs, entity IDs, names,
+dates, exact case-specific amounts, or final answers.  A numeric selector is allowed only as an observed candidate
+structural policy threshold with value_kind=structural_constant and value_evidence pointing to the authoritative
+tool-result field containing that same threshold.  It becomes deployable only if the compiler finds the identical
+threshold across distinct train tasks.
+
+Allowed atom deadlines: {sorted(ATOM_DEADLINES)}
+Allowed atom types: {sorted(ATOM_TYPES)}
+Allowed discharge kinds: {sorted(ATOM_DISCHARGE_KINDS)}
+
+Return JSON only with this schema:
+{json.dumps(schema, ensure_ascii=False)}
+
+Domain: {contrast.trace.domain}
+Opening request: {contrast.trace.opening_request}
+Candidates: {json.dumps(candidate_views, ensure_ascii=False)}
+Observable transcript:
+{contrast.trace.render(start, end)}
+"""
+
+
 def parse_json_object(text: str) -> dict[str, Any]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -666,8 +873,10 @@ def parse_json_object(text: str) -> dict[str, Any]:
         raise ValueError("induction response is not an object")
     if not isinstance(payload.get("candidate_labels"), list):
         raise ValueError("induction response is missing candidate_labels")
-    if not isinstance(payload.get("contracts"), list):
-        raise ValueError("induction response is missing contracts")
+    if not isinstance(payload.get("contracts"), list) and not isinstance(
+        payload.get("closure_atoms"), list
+    ):
+        raise ValueError("induction response is missing contracts or closure_atoms")
     return payload
 
 
@@ -773,6 +982,16 @@ def trace_specific_literals(trace: TrainTrace) -> set[str]:
 
 
 def contains_trace_literal(contract: dict[str, Any], trace: TrainTrace) -> bool:
+    atomic_fields = (
+        {
+            "requirement": contract.get("requirement"),
+            "trigger_candidates": contract.get("trigger_candidates"),
+            "bindings": contract.get("bindings"),
+            "discharge": contract.get("discharge"),
+        }
+        if "bindings" in contract or "discharge" in contract
+        else {}
+    )
     exposed = json.dumps(
         {
             "family": contract.get("family"),
@@ -781,6 +1000,7 @@ def contains_trace_literal(contract: dict[str, Any], trace: TrainTrace) -> bool:
             "keywords": contract.get("keywords"),
             "applicability": contract.get("applicability"),
             "obligations": contract.get("obligations"),
+            **atomic_fields,
         },
         ensure_ascii=False,
     ).casefold()
@@ -1034,6 +1254,538 @@ def normalize_obligation(
         "evidence_requirements": evidence[:8],
         "response_requirements": response[:8],
     }
+
+
+def _selector_holds(
+    selector: dict[str, Any], conversation: list[dict[str, Any]]
+) -> bool:
+    ledger = EvidenceLedger(conversation)
+    truth, facts = ledger.evaluate(selector)
+    if truth != TruthValue.TRUE:
+        return False
+    if selector.get("outcome", "any") == "failure":
+        return bool(facts)
+    return any(fact.outcome != "failure" for fact in facts)
+
+
+def _atom_binding(
+    raw: Any,
+    *,
+    trace: TrainTrace,
+    rejected_conversation: list[dict[str, Any]],
+    repaired_conversation: list[dict[str, Any]],
+    mode: str,
+    diagnostics: list[str],
+    prefix: str,
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        diagnostics.append(f"{prefix}: binding must be an object")
+        return None
+    identifier = re.sub(
+        r"[^a-z0-9_]+", "_", str(raw.get("id", "")).casefold()
+    ).strip("_")
+    description = _safe_text(raw.get("description", ""), 180)
+    if not identifier or not description:
+        diagnostics.append(f"{prefix}: binding needs id and description")
+        return None
+    selectors: list[dict[str, Any]] = []
+    for position, value in enumerate(raw.get("selectors", [])):
+        selector = normalize_selector(value, trace=trace)
+        if selector is None:
+            diagnostics.append(f"{prefix}.selectors[{position}]: invalid selector")
+            continue
+        if selector["source"] == "assistant_text":
+            diagnostics.append(
+                f"{prefix}.selectors[{position}]: assistant_text cannot ground a binding"
+            )
+            continue
+        pre_available = _selector_holds(selector, rejected_conversation)
+        repaired_available = _selector_holds(selector, repaired_conversation)
+        if mode == "response_closure" and not pre_available:
+            diagnostics.append(
+                f"{prefix}.selectors[{position}]: response_closure binding was not available before the rejected draft"
+            )
+            continue
+        if mode == "evidence_bridge" and selector["source"] == "user_text" and not pre_available:
+            diagnostics.append(
+                f"{prefix}.selectors[{position}]: repair-only user text cannot become runtime evidence"
+            )
+            continue
+        if not repaired_available:
+            diagnostics.append(
+                f"{prefix}.selectors[{position}]: binding is not grounded by the local repair boundary"
+            )
+            continue
+        selectors.append(selector)
+    if not selectors:
+        diagnostics.append(f"{prefix}: no authoritative selector survived")
+        return None
+    return {
+        "id": identifier[:64],
+        "description": description,
+        "required": raw.get("required", True) is not False,
+        "selectors": selectors[:8],
+    }
+
+
+def _atom_discharge(
+    raw: Any,
+    *,
+    binding_ids: set[str],
+    trace: TrainTrace,
+    diagnostics: list[str],
+    prefix: str,
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        diagnostics.append(f"{prefix}: discharge must be an object")
+        return None
+    kind = str(raw.get("kind", ""))
+    if kind not in ATOM_DISCHARGE_KINDS:
+        diagnostics.append(f"{prefix}: unsupported discharge kind {kind!r}")
+        return None
+    common = {"kind"}
+    allowed = {
+        "mention_bound_value": common
+        | {"binding_ids", "value_mode", "min_mentions"},
+        "mention_terms": common | {"mode", "terms"},
+        "causal_explanation": common | {"binding_ids", "terms"},
+        "comparison": common | {"binding_ids", "terms"},
+        "claim_requires_binding": common
+        | {"binding_ids", "claim_types", "terms"},
+    }[kind]
+    extra = set(raw) - allowed
+    if extra:
+        diagnostics.append(
+            f"{prefix}: {kind} contains fields from another discharge variant: {sorted(extra)}"
+        )
+        return None
+    output: dict[str, Any] = {"kind": kind}
+    if kind == "mention_terms":
+        terms = [_safe_text(value, 80) for value in raw.get("terms", []) if value]
+        terms = [value for value in terms if value and not unsafe_runtime_text(value)]
+        if not terms:
+            diagnostics.append(f"{prefix}: mention_terms needs generalized terms")
+            return None
+        output["mode"] = "all" if raw.get("mode") == "all" else "any"
+        output["terms"] = terms[:16]
+        return output
+
+    references = [str(value) for value in raw.get("binding_ids", []) if value]
+    if not references or any(value not in binding_ids for value in references):
+        diagnostics.append(f"{prefix}: discharge references unknown or no bindings")
+        return None
+    output["binding_ids"] = list(dict.fromkeys(references))[:8]
+    terms = [_safe_text(value, 80) for value in raw.get("terms", []) if value]
+    terms = [value for value in terms if value and not unsafe_runtime_text(value)]
+    if terms:
+        output["terms"] = terms[:16]
+    if kind == "mention_bound_value":
+        output["value_mode"] = (
+            str(raw.get("value_mode"))
+            if str(raw.get("value_mode")) in {"any", "numeric", "identifier", "text"}
+            else "any"
+        )
+        try:
+            minimum = int(raw.get("min_mentions", 1))
+        except (TypeError, ValueError):
+            diagnostics.append(f"{prefix}: min_mentions must be an integer")
+            return None
+        output["min_mentions"] = min(
+            len(output["binding_ids"]), max(1, minimum)
+        )
+    if kind == "claim_requires_binding":
+        claim_types = [
+            str(value)
+            for value in raw.get("claim_types", [])
+            if str(value) in CLAIM_TYPES
+        ]
+        if not claim_types:
+            diagnostics.append(f"{prefix}: claim_requires_binding needs claim_types")
+            return None
+        output["claim_types"] = list(dict.fromkeys(claim_types))
+    return output
+
+
+def _binding_selectors(
+    bindings: list[dict[str, Any]], binding_ids: list[str]
+) -> list[dict[str, Any]]:
+    selected = set(binding_ids)
+    return [
+        selector
+        for binding in bindings
+        if binding.get("id") in selected
+        for selector in binding.get("selectors", [])
+        if isinstance(selector, dict)
+    ]
+
+
+def _compile_discharge(
+    discharge: dict[str, Any], bindings: list[dict[str, Any]]
+) -> dict[str, Any]:
+    kind = discharge["kind"]
+    if kind == "mention_bound_value":
+        selected = set(discharge["binding_ids"])
+        selector_groups = [
+            binding["selectors"]
+            for binding in bindings
+            if binding.get("id") in selected
+        ]
+        return {
+            "kind": "mention_evidence",
+            "description": "mention the bound authoritative value",
+            "selectors": _binding_selectors(bindings, discharge["binding_ids"]),
+            "selector_groups": selector_groups,
+            "value_mode": discharge.get("value_mode", "any"),
+            "min_mentions": discharge.get("min_mentions", 1),
+            "min_groups": min(
+                len(selector_groups), discharge.get("min_mentions", 1)
+            ),
+        }
+    if kind == "mention_terms":
+        return {
+            "kind": "mention_all" if discharge.get("mode") == "all" else "mention_any",
+            "description": "include the learned closure semantics",
+            "terms": discharge["terms"],
+        }
+    if kind == "causal_explanation":
+        output = {
+            "kind": "causal_explanation",
+            "description": "provide the required causal explanation",
+        }
+        if discharge.get("terms"):
+            output["terms"] = discharge["terms"]
+        return output
+    if kind == "comparison":
+        output = {
+            "kind": "comparison",
+            "description": "make the required comparison explicit",
+        }
+        if discharge.get("terms"):
+            output["terms"] = discharge["terms"]
+        return output
+    return {
+        "kind": "claim_requires_evidence",
+        "description": "ground the concrete claim in authoritative evidence",
+        "claim_types": discharge["claim_types"],
+        "terms": discharge.get("terms", []),
+        "evidence_any_of": _binding_selectors(bindings, discharge["binding_ids"]),
+    }
+
+
+def atom_as_contract(atom: dict[str, Any]) -> dict[str, Any]:
+    runtime_type = (
+        "boundary_must_not" if atom["type"] == "claim_safety" else atom["type"]
+    )
+    response = [
+        _compile_discharge(item, atom["bindings"])
+        for item in atom.get("discharge", [])
+    ]
+    evidence = [
+        {
+            "description": binding["description"],
+            "required": binding.get("required", True),
+            "any_of": binding["selectors"],
+        }
+        for binding in atom["bindings"]
+    ]
+    family = f"{atom['type']}_{atom['deadline']}_{'_'.join(item['kind'] for item in atom['discharge'])}"
+    output = {
+        "id": stable_hash([atom.get("id"), family], prefix="contract_")[:30],
+        "domain": atom["domain"],
+        "family": family[:120],
+        "title": atom["title"],
+        "intent": atom["intent"],
+        "keywords": atom["keywords"],
+        "support": int(atom.get("support", 1)),
+        "confidence": float(atom.get("confidence", 0.6)),
+        "applicability": {
+            "mode": "all",
+            "unknown_policy": "inactive",
+            "unknown_description": "",
+            "predicates": atom.get("trigger_candidates", []),
+        },
+        "obligations": [
+            {
+                "id": stable_hash([atom.get("id"), "obligation"], prefix="obl_")[:24],
+                "deadline": atom["deadline"],
+                "type": runtime_type,
+                "requirement": atom["requirement"],
+                "priority": 10,
+                "evidence_requirements": evidence,
+                "response_requirements": response,
+            }
+        ],
+        "search_text": compact(
+            " ".join(
+                [atom["title"], atom["intent"], *atom["keywords"], atom["requirement"]]
+            ),
+            7000,
+        ),
+        "tokens": tokens(
+            " ".join(
+                [atom["title"], atom["intent"], *atom["keywords"], atom["requirement"]]
+            )
+        ),
+        "validation": {"retrieved": 0, "matched": 0, "precision": 0.0},
+    }
+    for key in (
+        "source_task",
+        "source_sha256",
+        "source_pair",
+        "opening_request",
+        "validation_conversation",
+        "validation_draft_text",
+        "validation_tool_calls",
+        "validation_nonrepair_boundaries",
+    ):
+        if key in atom:
+            output[key] = atom[key]
+    return output
+
+
+def normalize_atom(
+    raw: Any,
+    contrast: ContrastSet,
+    labels: dict[str, str],
+    position: int,
+    diagnostics: list[str],
+) -> dict[str, Any] | None:
+    prefix = f"closure_atoms[{position}]"
+    if not isinstance(raw, dict):
+        diagnostics.append(f"{prefix}: atom must be an object")
+        return None
+    checkpoint_id = str(raw.get("source_checkpoint_id", ""))
+    if labels.get(checkpoint_id) != "closure_repair":
+        diagnostics.append(f"{prefix}: source is not labeled closure_repair")
+        return None
+    checkpoint = next(
+        (item for item in contrast.candidates if item.id == checkpoint_id), None
+    )
+    if checkpoint is None:
+        diagnostics.append(f"{prefix}: unknown source checkpoint")
+        return None
+    repaired = repair_checkpoint(contrast, checkpoint)
+    mode = repair_mode(contrast, checkpoint)
+    if repaired is None or mode == "unsupported":
+        diagnostics.append(f"{prefix}: no local effect-stable repair response")
+        return None
+    title = _safe_text(raw.get("title", ""), 180)
+    intent = _safe_text(raw.get("intent", ""), 220)
+    requirement = _safe_text(raw.get("requirement", ""), 520)
+    deadline = str(raw.get("deadline", ""))
+    atom_type = str(raw.get("type", ""))
+    if not title or not intent or not requirement:
+        diagnostics.append(f"{prefix}: title, intent, and requirement are required")
+        return None
+    if deadline not in ATOM_DEADLINES or atom_type not in ATOM_TYPES:
+        diagnostics.append(f"{prefix}: unsupported atom deadline/type")
+        return None
+    rejected_boundary = validation_boundary(contrast.trace, checkpoint)
+    repaired_boundary = validation_boundary(contrast.trace, repaired)
+    triggers: list[dict[str, Any]] = []
+    for trigger_position, value in enumerate(raw.get("trigger_candidates", [])):
+        selector = normalize_selector(value, trace=contrast.trace)
+        trigger_prefix = f"{prefix}.trigger_candidates[{trigger_position}]"
+        if selector is None:
+            diagnostics.append(f"{trigger_prefix}: invalid selector")
+            continue
+        if selector["source"] == "assistant_text":
+            diagnostics.append(f"{trigger_prefix}: assistant_text trigger is forbidden")
+            continue
+        if not _selector_holds(selector, rejected_boundary["conversation"]):
+            diagnostics.append(
+                f"{trigger_prefix}: trigger is not true before the rejected draft"
+            )
+            continue
+        triggers.append(selector)
+    bindings = [
+        binding
+        for binding_position, value in enumerate(raw.get("bindings", []))
+        if (
+            binding := _atom_binding(
+                value,
+                trace=contrast.trace,
+                rejected_conversation=rejected_boundary["conversation"],
+                repaired_conversation=repaired_boundary["conversation"],
+                mode=mode,
+                diagnostics=diagnostics,
+                prefix=f"{prefix}.bindings[{binding_position}]",
+            )
+        )
+        is not None
+    ]
+    binding_ids = {item["id"] for item in bindings}
+    if len(binding_ids) != len(bindings):
+        diagnostics.append(f"{prefix}: binding ids must be unique")
+        return None
+    discharge = [
+        item
+        for discharge_position, value in enumerate(raw.get("discharge", []))
+        if (
+            item := _atom_discharge(
+                value,
+                binding_ids=binding_ids,
+                trace=contrast.trace,
+                diagnostics=diagnostics,
+                prefix=f"{prefix}.discharge[{discharge_position}]",
+            )
+        )
+        is not None
+    ]
+    if len({item["kind"] for item in discharge}) != len(discharge):
+        diagnostics.append(f"{prefix}: discharge kinds must be unique within an atom")
+        return None
+    if not bindings or not discharge:
+        diagnostics.append(f"{prefix}: at least one binding and discharge are required")
+        return None
+    discharge_kinds = {item["kind"] for item in discharge}
+    required_kind = {
+        "comparison": "comparison",
+        "explanation_rationale": "causal_explanation",
+        "cost_amount_reporting": "mention_bound_value",
+        "claim_safety": "claim_requires_binding",
+    }.get(atom_type)
+    if required_kind and required_kind not in discharge_kinds:
+        diagnostics.append(
+            f"{prefix}: {atom_type} requires {required_kind} discharge"
+        )
+        return None
+    keywords = [_safe_text(value, 80) for value in raw.get("keywords", []) if value]
+    keywords = [value for value in keywords if value]
+    nonrepair_boundaries: list[dict[str, Any]] = []
+    for other in contrast.candidates:
+        label = labels.get(other.id, "ambiguous")
+        if label not in {"normal_progress", "confirmation", "new_request"}:
+            continue
+        boundary = validation_boundary(contrast.trace, other)
+        boundary["label"] = label
+        nonrepair_boundaries.append(boundary)
+    repaired_negative = dict(repaired_boundary)
+    repaired_negative["label"] = "local_repair_discharge"
+    nonrepair_boundaries.append(repaired_negative)
+    try:
+        confidence = min(1.0, max(0.0, float(raw.get("confidence", 0.6))))
+    except (TypeError, ValueError):
+        diagnostics.append(f"{prefix}: confidence must be numeric")
+        return None
+    atom = {
+        "id": stable_hash(
+            [contrast.trace.source_sha256, checkpoint.id, position], prefix="atom_"
+        )[:30],
+        "domain": contrast.trace.domain,
+        "title": title,
+        "intent": intent,
+        "keywords": list(dict.fromkeys(keywords))[:24],
+        "confidence": confidence,
+        "deadline": deadline,
+        "type": atom_type,
+        "requirement": requirement,
+        "repair_mode": mode,
+        "trigger_candidates": triggers[:8],
+        "bindings": bindings[:8],
+        "discharge": discharge[:6],
+        "source_task": contrast.trace.task_id,
+        "source_sha256": contrast.trace.source_sha256,
+        "source_pair": {
+            "id": stable_hash(
+                [contrast.trace.source_sha256, checkpoint.id, repaired.id],
+                prefix="pair_",
+            )[:34],
+            "rejected_checkpoint": checkpoint.id,
+            "repair_checkpoint": repaired.id,
+            "effect_signature": checkpoint.effect_signature,
+        },
+        "opening_request": sanitize_retrieval_text(
+            contrast.trace.opening_request,
+            source_literals=trace_specific_literals(contrast.trace),
+        ),
+        "validation_conversation": rejected_boundary["conversation"],
+        "validation_draft_text": rejected_boundary["draft_text"],
+        "validation_tool_calls": rejected_boundary["tool_calls"],
+        "validation_nonrepair_boundaries": nonrepair_boundaries,
+    }
+    if contains_trace_literal(atom, contrast.trace):
+        diagnostics.append(f"{prefix}: atom copied a trace-specific literal")
+        return None
+    try:
+        if validation_example_intercepts(atom_as_contract(atom), repaired_boundary):
+            diagnostics.append(
+                f"{prefix}: local repair response does not discharge the atom"
+            )
+            return None
+    except Exception as error:
+        diagnostics.append(
+            f"{prefix}: local discharge replay failed: {type(error).__name__}"
+        )
+        return None
+    return atom
+
+
+def normalize_atom_payload(
+    payload: dict[str, Any], contrast: ContrastSet
+) -> list[dict[str, Any]]:
+    resolved_terminal_label(payload, contrast)
+    valid_ids = {item.id for item in contrast.candidates}
+    labels: dict[str, str] = {}
+    for item in payload.get("candidate_labels", []):
+        if not isinstance(item, dict):
+            continue
+        checkpoint_id = str(item.get("checkpoint_id", ""))
+        label = str(item.get("label", "ambiguous"))
+        if checkpoint_id in valid_ids and label in OUTCOME_LABELS:
+            labels[checkpoint_id] = label
+    if labels.keys() != valid_ids:
+        raise AtomSchemaError(
+            [f"candidate_labels missing checkpoints: {sorted(valid_ids - labels.keys())}"]
+        )
+    diagnostics: list[str] = []
+    atoms = [
+        item
+        for position, raw in enumerate(payload.get("closure_atoms", []))
+        if (
+            item := normalize_atom(raw, contrast, labels, position, diagnostics)
+        )
+        is not None
+    ]
+    atom_checkpoints = {
+        str(item["source_pair"]["rejected_checkpoint"]) for item in atoms
+    }
+    abstentions: dict[str, str] = {}
+    for position, item in enumerate(payload.get("repair_abstentions", [])):
+        if not isinstance(item, dict):
+            diagnostics.append(f"repair_abstentions[{position}]: must be an object")
+            continue
+        checkpoint_id = str(item.get("checkpoint_id", ""))
+        reason = _safe_text(item.get("reason", ""), 300)
+        if labels.get(checkpoint_id) != "closure_repair" or not reason:
+            diagnostics.append(
+                f"repair_abstentions[{position}]: invalid checkpoint or reason"
+            )
+            continue
+        abstentions[checkpoint_id] = reason
+    overlap = atom_checkpoints & abstentions.keys()
+    if overlap:
+        diagnostics.append(
+            f"closure atom and abstention overlap: {sorted(overlap)}"
+        )
+    repair_checkpoints = {
+        checkpoint_id
+        for checkpoint_id, label in labels.items()
+        if label == "closure_repair"
+    }
+    uncovered = repair_checkpoints - atom_checkpoints - abstentions.keys()
+    if uncovered:
+        diagnostics.append(
+            f"closure repairs lack atom or semantic abstention: {sorted(uncovered)}"
+        )
+    raw_atom_count = len(payload.get("closure_atoms", []))
+    if raw_atom_count and len(atoms) != raw_atom_count:
+        diagnostics.append(
+            f"only {len(atoms)}/{raw_atom_count} raw closure atoms passed validation"
+        )
+    if diagnostics:
+        raise AtomSchemaError(diagnostics)
+    return atoms
 
 
 def validation_boundary(trace: TrainTrace, checkpoint: Checkpoint) -> dict[str, Any]:
@@ -1380,6 +2132,132 @@ def induce_one(
     )
 
 
+def _semantic_abstention_ids(payload: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            str(item.get("checkpoint_id", ""))
+            for item in payload.get("repair_abstentions", [])
+            if isinstance(item, dict) and item.get("checkpoint_id")
+        )
+    )
+
+
+def induce_atoms_one(
+    client: Any,
+    model: str,
+    contrast: ContrastSet,
+    cache_dir: Path,
+    retries: int,
+) -> AtomInductionResult:
+    cache_key = stable_hash(
+        [PROMPT_VERSION, model, contrast.trace.source_sha256, contrast.id],
+        prefix="atom_cache_",
+    )[:42]
+    cache_path = (
+        cache_dir / contrast.trace.domain / f"{contrast.trace.task_id}.{cache_key}.json"
+    )
+    if cache_path.exists():
+        try:
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            if cached.get("prompt_version") == PROMPT_VERSION:
+                payload = cached.get("payload", {})
+                status = str(cached.get("status", ""))
+                if status == "invalid_atom_schema":
+                    return AtomInductionResult(
+                        terminal_label=resolved_terminal_label(payload, contrast),
+                        atoms=(),
+                        schema_failure=str(cached.get("schema_failure", "invalid atom schema")),
+                    )
+                atoms = tuple(normalize_atom_payload(payload, contrast))
+                return AtomInductionResult(
+                    terminal_label=resolved_terminal_label(payload, contrast),
+                    atoms=atoms,
+                    semantic_abstentions=_semantic_abstention_ids(payload),
+                )
+        except (OSError, ValueError, TypeError):
+            pass
+
+    last_error: Exception | None = None
+    last_payload: dict[str, Any] | None = None
+    for attempt in range(max(1, retries)):
+        try:
+            prompt = atom_induction_prompt(contrast)
+            if last_error is not None:
+                prompt += (
+                    "\n\nThe previous atomic extraction failed deterministic validation. "
+                    "Correct the complete JSON using these exact diagnostics:\n- "
+                    + "\n- ".join(
+                        last_error.diagnostics
+                        if isinstance(last_error, AtomSchemaError)
+                        else [f"{type(last_error).__name__}: {compact(last_error, 800)}"]
+                    )
+                    + "\nDo not convert a schema error into a semantic abstention."
+                )
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=5000,
+            )
+            payload = parse_json_object(response.choices[0].message.content or "")
+            last_payload = payload
+            atoms = tuple(normalize_atom_payload(payload, contrast))
+            semantic_abstentions = _semantic_abstention_ids(payload)
+            write_induction_cache(
+                cache_path,
+                {
+                    "status": "semantic_abstention" if not atoms and semantic_abstentions else "accepted",
+                    "prompt_version": PROMPT_VERSION,
+                    "model": model,
+                    "source_sha256": contrast.trace.source_sha256,
+                    "contrast_id": contrast.id,
+                    "payload": payload,
+                },
+            )
+            return AtomInductionResult(
+                terminal_label=resolved_terminal_label(payload, contrast),
+                atoms=atoms,
+                semantic_abstentions=semantic_abstentions,
+            )
+        except Exception as error:
+            last_error = error
+            if attempt + 1 < max(1, retries):
+                time.sleep(min(2**attempt, 8))
+
+    failure = f"{type(last_error).__name__}: {compact(last_error, 1600)}"
+    payload = last_payload or {
+        "terminal_assessment": {"label": "ambiguous", "reason": "induction failed"},
+        "candidate_labels": [
+            {
+                "checkpoint_id": item.id,
+                "label": "ambiguous",
+                "reason": "induction failed",
+            }
+            for item in contrast.candidates
+        ],
+        "closure_atoms": [],
+        "repair_abstentions": [],
+    }
+    write_induction_cache(
+        cache_path,
+        {
+            "status": "invalid_atom_schema",
+            "prompt_version": PROMPT_VERSION,
+            "model": model,
+            "source_sha256": contrast.trace.source_sha256,
+            "contrast_id": contrast.id,
+            "schema_failure": failure,
+            "payload": payload,
+        },
+    )
+    return AtomInductionResult(
+        terminal_label=resolved_terminal_label(payload, contrast),
+        atoms=(),
+        schema_failure=failure,
+    )
+
+
 def semantic_text(contract: dict[str, Any]) -> str:
     return " ".join(
         [
@@ -1722,6 +2600,569 @@ def merge_contracts(
     return sorted(output, key=lambda item: (item["domain"], item["family"]))
 
 
+def atom_semantic_text(atom: dict[str, Any]) -> str:
+    return " ".join(
+        [
+            str(atom.get("title", "")),
+            str(atom.get("intent", "")),
+            str(atom.get("requirement", "")),
+            *[str(value) for value in atom.get("keywords", [])],
+        ]
+    )
+
+
+def atom_semantic_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
+    left_text = atom_semantic_text(left).casefold()
+    right_text = atom_semantic_text(right).casefold()
+    left_tokens, right_tokens = set(tokens(left_text)), set(tokens(right_text))
+    jaccard = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
+    sequence = SequenceMatcher(None, left_text, right_text).ratio()
+    return max(jaccard, sequence)
+
+
+def _atom_discharge_signature(atom: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(sorted(str(item.get("kind", "")) for item in atom.get("discharge", [])))
+
+
+def _atomic_neighbors(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if (
+        left.get("domain"),
+        left.get("deadline"),
+        left.get("type"),
+        _atom_discharge_signature(left),
+    ) != (
+        right.get("domain"),
+        right.get("deadline"),
+        right.get("type"),
+        _atom_discharge_signature(right),
+    ):
+        return False
+    semantic = atom_semantic_similarity(left, right)
+    left_loci = {
+        locus
+        for binding in left.get("bindings", [])
+        for locus in _binding_loci(binding)
+    }
+    right_loci = {
+        locus
+        for binding in right.get("bindings", [])
+        for locus in _binding_loci(binding)
+    }
+    return semantic >= 0.44 or (bool(left_loci & right_loci) and semantic >= 0.28)
+
+
+def cluster_atoms(
+    atoms: list[dict[str, Any]], *, min_support: int = 2
+) -> list[list[dict[str, Any]]]:
+    """Cluster atomic deltas before synthesizing any full runtime contract."""
+
+    groups: list[list[dict[str, Any]]] = []
+    for atom in sorted(atoms, key=lambda item: str(item["id"])):
+        group = next(
+            (
+                candidate
+                for candidate in groups
+                if all(
+                    atom["source_task"] != member["source_task"]
+                    and _atomic_neighbors(atom, member)
+                    for member in candidate
+                )
+            ),
+            None,
+        )
+        if group is None:
+            groups.append([atom])
+        else:
+            group.append(atom)
+    return [
+        group
+        for group in groups
+        if len({item["source_task"] for item in group}) >= min_support
+    ]
+
+
+def _recurring_selectors(
+    group: list[dict[str, Any]],
+    selector_lists: list[tuple[str, list[dict[str, Any]]]],
+    *,
+    min_support: int,
+) -> list[dict[str, Any]]:
+    by_semantics: dict[str, dict[str, Any]] = {}
+    support: dict[str, set[str]] = {}
+    for task_id, selectors in selector_lists:
+        for selector in selectors:
+            signature = _selector_semantics(selector)
+            by_semantics.setdefault(signature, selector)
+            support.setdefault(signature, set()).add(task_id)
+    selected = [
+        copy.deepcopy(by_semantics[signature])
+        for signature in sorted(by_semantics)
+        if len(support[signature]) >= min_support
+    ]
+    if not selected:
+        return []
+    stamped = _stamp_structural_constants(
+        {"selectors": selected},
+        [
+            (task_id, {"selectors": selectors})
+            for task_id, selectors in selector_lists
+        ],
+        min_support=min_support,
+    )
+    return stamped["selectors"] if stamped is not None else []
+
+
+def _recurring_terms(
+    group: list[dict[str, Any]], kind: str, *, min_support: int
+) -> list[str]:
+    support: dict[str, set[str]] = {}
+    original: dict[str, str] = {}
+    for atom in group:
+        for discharge in atom.get("discharge", []):
+            if discharge.get("kind") != kind:
+                continue
+            for term in discharge.get("terms", []):
+                normalized = " ".join(tokens(str(term)))
+                if not normalized:
+                    continue
+                support.setdefault(normalized, set()).add(atom["source_task"])
+                original.setdefault(normalized, str(term))
+    return [
+        original[key]
+        for key in sorted(support)
+        if len(support[key]) >= min_support
+    ][:16]
+
+
+def _binding_loci(binding: dict[str, Any]) -> set[tuple[str, str, str]]:
+    return {
+        (
+            str(selector.get("source", "")),
+            str(selector.get("tool", "")),
+            str(selector.get("path", "")),
+        )
+        for selector in binding.get("selectors", [])
+        if isinstance(selector, dict)
+    }
+
+
+def _binding_neighbors(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if _binding_loci(left) & _binding_loci(right):
+        return True
+    left_text = str(left.get("description", "")).casefold()
+    right_text = str(right.get("description", "")).casefold()
+    left_tokens, right_tokens = set(tokens(left_text)), set(tokens(right_text))
+    jaccard = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
+    return max(jaccard, SequenceMatcher(None, left_text, right_text).ratio()) >= 0.56
+
+
+def _compile_binding_groups(
+    atoms: list[dict[str, Any]], *, min_support: int
+) -> list[dict[str, Any]]:
+    records = [
+        {
+            "atom_id": atom["id"],
+            "source_task": atom["source_task"],
+            "binding": binding,
+        }
+        for atom in atoms
+        for binding in atom.get("bindings", [])
+    ]
+    groups: list[list[dict[str, Any]]] = []
+    for record in records:
+        group = next(
+            (
+                candidate
+                for candidate in groups
+                if all(
+                    record["atom_id"] != member["atom_id"]
+                    and _binding_neighbors(record["binding"], member["binding"])
+                    for member in candidate
+                )
+            ),
+            None,
+        )
+        if group is None:
+            groups.append([record])
+        else:
+            group.append(record)
+
+    output: list[dict[str, Any]] = []
+    for group in groups:
+        source_tasks = sorted({item["source_task"] for item in group})
+        if len(source_tasks) < min_support:
+            continue
+        selectors = _recurring_selectors(
+            atoms,
+            [
+                (item["source_task"], item["binding"].get("selectors", []))
+                for item in group
+            ],
+            min_support=min_support,
+        )
+        if not selectors:
+            continue
+        representative = max(
+            group,
+            key=lambda item: len(str(item["binding"].get("description", ""))),
+        )["binding"]
+        output.append(
+            {
+                "id": f"binding_{len(output)}",
+                "description": representative["description"],
+                "required": any(
+                    item["binding"].get("required", True) for item in group
+                ),
+                "selectors": selectors,
+                "members": {
+                    (item["atom_id"], item["binding"]["id"]) for item in group
+                },
+                "support_tasks": source_tasks,
+            }
+        )
+    return output
+
+
+def _compiled_selectors_for_discharge(
+    group: list[dict[str, Any]],
+    binding_groups: list[dict[str, Any]],
+    kind: str,
+    *,
+    min_support: int,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    referenced_by_task: dict[str, set[str]] = {}
+    for atom in group:
+        for discharge in atom.get("discharge", []):
+            if discharge.get("kind") != kind:
+                continue
+            references = {
+                str(value) for value in discharge.get("binding_ids", []) if value
+            }
+            for binding_group in binding_groups:
+                if any(
+                    (atom["id"], reference) in binding_group["members"]
+                    for reference in references
+                ):
+                    referenced_by_task.setdefault(binding_group["id"], set()).add(
+                        atom["source_task"]
+                    )
+    selected_groups = {
+        identifier
+        for identifier, tasks in referenced_by_task.items()
+        if len(tasks) >= min_support
+    }
+    selectors = [
+        selector
+        for binding_group in binding_groups
+        if binding_group["id"] in selected_groups
+        for selector in binding_group["selectors"]
+    ]
+    return selectors, selected_groups
+
+
+def _select_trigger_conjunction(
+    candidates: list[dict[str, Any]],
+    atoms: list[dict[str, Any]],
+    *,
+    min_support: int,
+) -> list[dict[str, Any]]:
+    """Choose a small pre-draft trigger using train-only repair/nonrepair boundaries."""
+
+    if not candidates:
+        return []
+    positives = [
+        item.get("validation_conversation", [])
+        for item in atoms
+        if item.get("validation_conversation")
+    ]
+    negatives: dict[str, list[dict[str, Any]]] = {}
+    for atom in atoms:
+        for example in atom.get("validation_nonrepair_boundaries", []):
+            if not isinstance(example, dict) or not example.get("conversation"):
+                continue
+            if example.get("label") == "local_repair_discharge":
+                continue
+            identifier = str(example.get("id") or stable_hash(example["conversation"]))
+            negatives[identifier] = example["conversation"]
+
+    def hits(selectors: tuple[dict[str, Any], ...], conversation: list[dict[str, Any]]) -> bool:
+        return all(_selector_holds(selector, conversation) for selector in selectors)
+
+    best: tuple[float, tuple[dict[str, Any], ...]] | None = None
+    for width in range(1, min(3, len(candidates)) + 1):
+        for selected in combinations(candidates, width):
+            positive_hits = sum(hits(selected, conversation) for conversation in positives)
+            if positive_hits < min_support:
+                continue
+            negative_hits = sum(
+                hits(selected, conversation) for conversation in negatives.values()
+            )
+            coverage = positive_hits / max(len(positives), 1)
+            specificity = 1 - negative_hits / max(len(negatives), 1)
+            precision = positive_hits / max(positive_hits + negative_hits, 1)
+            score = (
+                0.5 * precision
+                + 0.3 * coverage
+                + 0.2 * specificity
+                - 0.015 * width
+            )
+            if best is None or score > best[0]:
+                best = (score, selected)
+    return [copy.deepcopy(item) for item in best[1]] if best else []
+
+
+def compile_atom_group(
+    group: list[dict[str, Any]], *, min_support: int
+) -> dict[str, Any] | None:
+    source_tasks = sorted({item["source_task"] for item in group})
+    if len(source_tasks) < min_support:
+        return None
+    representative = max(group, key=lambda item: float(item.get("confidence", 0.0)))
+    triggers = _recurring_selectors(
+        group,
+        [
+            (item["source_task"], item.get("trigger_candidates", []))
+            for item in group
+        ],
+        min_support=min_support,
+    )
+    triggers = _select_trigger_conjunction(
+        triggers, group, min_support=min_support
+    )
+    binding_groups = _compile_binding_groups(group, min_support=min_support)
+    if not binding_groups:
+        return None
+    response_requirements: list[dict[str, Any]] = []
+    used_binding_groups: set[str] = set()
+    signature = _atom_discharge_signature(representative)
+    for kind in signature:
+        bound_selectors, referenced_groups = _compiled_selectors_for_discharge(
+            group,
+            binding_groups,
+            kind,
+            min_support=min_support,
+        )
+        if kind == "mention_bound_value":
+            if not bound_selectors:
+                return None
+            used_binding_groups.update(referenced_groups)
+            selector_groups = [
+                item["selectors"]
+                for item in binding_groups
+                if item["id"] in referenced_groups
+            ]
+            minimum = max(
+                1,
+                min(
+                    len(selector_groups),
+                    min(
+                        int(discharge.get("min_mentions", 1))
+                        for atom in group
+                        for discharge in atom.get("discharge", [])
+                        if discharge.get("kind") == kind
+                    ),
+                ),
+            )
+            modes = [
+                str(discharge.get("value_mode", "any"))
+                for atom in group
+                for discharge in atom.get("discharge", [])
+                if discharge.get("kind") == kind
+            ]
+            mode = Counter(modes).most_common(1)[0][0]
+            response_requirements.append(
+                {
+                    "kind": "mention_evidence",
+                    "description": "mention the recurring authoritative value",
+                    "selectors": bound_selectors,
+                    "selector_groups": selector_groups,
+                    "value_mode": mode,
+                    "min_mentions": minimum,
+                    "min_groups": minimum,
+                }
+            )
+        elif kind == "mention_terms":
+            terms = _recurring_terms(group, kind, min_support=min_support)
+            if not terms:
+                return None
+            modes = [
+                discharge.get("mode", "any")
+                for atom in group
+                for discharge in atom.get("discharge", [])
+                if discharge.get("kind") == kind
+            ]
+            response_requirements.append(
+                {
+                    "kind": "mention_all"
+                    if Counter(modes).most_common(1)[0][0] == "all"
+                    else "mention_any",
+                    "description": "include the recurring closure semantics",
+                    "terms": terms,
+                }
+            )
+        elif kind == "causal_explanation":
+            if not bound_selectors:
+                return None
+            used_binding_groups.update(referenced_groups)
+            response_requirements.append(
+                {
+                    "kind": "causal_explanation",
+                    "description": "make the causal relation explicit",
+                }
+            )
+        elif kind == "comparison":
+            if not bound_selectors:
+                return None
+            used_binding_groups.update(referenced_groups)
+            response_requirements.append(
+                {
+                    "kind": "comparison",
+                    "description": "make the comparison explicit",
+                }
+            )
+        elif kind == "claim_requires_binding":
+            if not bound_selectors:
+                return None
+            used_binding_groups.update(referenced_groups)
+            claim_types = sorted(
+                {
+                    claim_type
+                    for atom in group
+                    for discharge in atom.get("discharge", [])
+                    if discharge.get("kind") == kind
+                    for claim_type in discharge.get("claim_types", [])
+                }
+            )
+            if not claim_types:
+                return None
+            response_requirements.append(
+                {
+                    "kind": "claim_requires_evidence",
+                    "description": "ground the concrete claim before stating it",
+                    "claim_types": claim_types,
+                    "evidence_any_of": bound_selectors,
+                }
+            )
+    if not response_requirements:
+        return None
+    if not used_binding_groups:
+        used_binding_groups = {item["id"] for item in binding_groups}
+    selected_binding_groups = [
+        item for item in binding_groups if item["id"] in used_binding_groups
+    ]
+    evidence_requirements = [
+        {
+            "description": item["description"],
+            "required": item["required"],
+            "any_of": item["selectors"],
+        }
+        for item in selected_binding_groups
+    ]
+    recurring_bindings = [
+        selector
+        for item in selected_binding_groups
+        for selector in item["selectors"]
+    ]
+    runtime_type = (
+        "boundary_must_not"
+        if representative["type"] == "claim_safety"
+        else representative["type"]
+    )
+    semantic_key = stable_hash(
+        [
+            representative["domain"],
+            representative["deadline"],
+            representative["type"],
+            signature,
+            sorted(_selector_semantics(item) for item in recurring_bindings),
+        ],
+        prefix="family_",
+    )[:16]
+    family = f"{representative['type']}_{representative['deadline']}_{semantic_key}"
+    openings = list(dict.fromkeys(item["opening_request"] for item in group))[:12]
+    keywords = list(
+        dict.fromkeys(
+            value for item in group for value in item.get("keywords", [])
+        )
+    )[:40]
+    search_text = compact(
+        " ".join(
+            [
+                representative["title"],
+                representative["intent"],
+                representative["requirement"],
+                *keywords,
+                *openings,
+            ]
+        ),
+        7000,
+    )
+    identifier = stable_hash(
+        [representative["domain"], family, triggers, recurring_bindings],
+        prefix="contract_",
+    )[:30]
+    return {
+        "id": identifier,
+        "domain": representative["domain"],
+        "family": family,
+        "title": representative["title"],
+        "intent": representative["intent"],
+        "keywords": keywords,
+        "support": len(source_tasks),
+        "contrast_count": len({item["source_pair"]["id"] for item in group}),
+        "confidence": round(
+            sum(float(item.get("confidence", 0.0)) for item in group) / len(group),
+            4,
+        ),
+        "applicability": {
+            "mode": "all",
+            "unknown_policy": "inactive",
+            "unknown_description": "",
+            "predicates": triggers,
+        },
+        "obligations": [
+            {
+                "id": stable_hash([identifier, "obligation"], prefix="obl_")[:24],
+                "deadline": representative["deadline"],
+                "type": runtime_type,
+                "requirement": representative["requirement"],
+                "priority": 10,
+                "support": len(source_tasks),
+                "confidence": round(
+                    sum(float(item.get("confidence", 0.0)) for item in group)
+                    / len(group),
+                    4,
+                ),
+                "provenance_sha256": stable_hash(source_tasks),
+                "evidence_requirements": evidence_requirements,
+                "response_requirements": response_requirements,
+            }
+        ],
+        "search_text": search_text,
+        "tokens": tokens(search_text),
+        "provenance": {
+            "source_tasks_sha256": stable_hash(source_tasks),
+            "source_pairs": sorted({item["source_pair"]["id"] for item in group}),
+            "source_trace_sha256": sorted(
+                {item["source_sha256"] for item in group}
+            ),
+            "atomic_induction": True,
+        },
+        "validation": {"retrieved": 0, "matched": 0, "precision": 0.0},
+    }
+
+
+def compile_atoms(
+    atoms: list[dict[str, Any]], *, min_support: int = 2
+) -> list[dict[str, Any]]:
+    contracts = [
+        contract
+        for group in cluster_atoms(atoms, min_support=min_support)
+        if (contract := compile_atom_group(group, min_support=min_support)) is not None
+    ]
+    return sorted(contracts, key=lambda item: (item["domain"], item["family"]))
+
+
 def split_is_validation(task_id: str, validation_percent: int) -> bool:
     bucket = int(hashlib.sha256(task_id.encode("utf-8")).hexdigest()[:8], 16) % 100
     return bucket < validation_percent
@@ -1796,7 +3237,7 @@ def validate_contracts(
             "specificity": 0.0,
         }
     artifact = {
-        "version": 4,
+        "version": 5,
         "kind": "effect_matched_closure_contracts",
         "contracts": contracts,
     }
@@ -1909,6 +3350,74 @@ def validate_contracts(
     }
 
 
+def atomic_induction_audit(
+    atoms: list[dict[str, Any]],
+    *,
+    validation_percent: int,
+    min_support: int,
+) -> dict[str, Any]:
+    safe_atoms = [
+        {
+            "id": item["id"],
+            "domain": item["domain"],
+            "split": (
+                "validation"
+                if split_is_validation(item["source_task"], validation_percent)
+                else "train"
+            ),
+            "source_task_sha256": stable_hash(item["source_task"]),
+            "type": item["type"],
+            "deadline": item["deadline"],
+            "repair_mode": item["repair_mode"],
+            "title": item["title"],
+            "intent": item["intent"],
+            "requirement": item["requirement"],
+            "trigger_candidates": item["trigger_candidates"],
+            "bindings": item["bindings"],
+            "discharge": item["discharge"],
+        }
+        for item in atoms
+    ]
+    train_atoms = [
+        item
+        for item in atoms
+        if not split_is_validation(item["source_task"], validation_percent)
+    ]
+    groups = cluster_atoms(train_atoms, min_support=1)
+    cluster_views = []
+    for group in groups:
+        support = len({item["source_task"] for item in group})
+        compiled = (
+            compile_atom_group(group, min_support=min_support)
+            if support >= min_support
+            else None
+        )
+        cluster_views.append(
+            {
+                "id": stable_hash(
+                    sorted(item["id"] for item in group), prefix="atom_cluster_"
+                )[:30],
+                "atom_ids": sorted(item["id"] for item in group),
+                "support": support,
+                "contract_compiled": compiled is not None,
+                "compiled_contract_id": compiled.get("id") if compiled else None,
+            }
+        )
+    return {
+        "schema": "closure_atom_v1",
+        "contains_raw_conversations": False,
+        "atoms": safe_atoms,
+        "train_clusters": cluster_views,
+        "singleton_clusters": sum(item["support"] == 1 for item in cluster_views),
+        "recurrent_clusters": sum(
+            item["support"] >= min_support for item in cluster_views
+        ),
+        "compiled_clusters": sum(
+            item["contract_compiled"] for item in cluster_views
+        ),
+    }
+
+
 def build_artifact(
     traces: list[TrainTrace],
     raw_contracts: list[dict[str, Any]],
@@ -1925,6 +3434,9 @@ def build_artifact(
     terminal_assessment_counts: dict[str, int] | None = None,
     induction_abstention_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
+    atomic = bool(raw_contracts) and all(
+        "bindings" in item and "discharge" in item for item in raw_contracts
+    )
     train_candidates = [
         item
         for item in raw_contracts
@@ -1935,8 +3447,17 @@ def build_artifact(
         for item in raw_contracts
         if split_is_validation(item["source_task"], validation_percent)
     ]
-    contracts = merge_contracts(train_candidates, min_support=min_support)
-    validation = validate_contracts(contracts, validation_candidates)
+    contracts = (
+        compile_atoms(train_candidates, min_support=min_support)
+        if atomic
+        else merge_contracts(train_candidates, min_support=min_support)
+    )
+    validation_inputs = (
+        [atom_as_contract(item) for item in validation_candidates]
+        if atomic
+        else validation_candidates
+    )
+    validation = validate_contracts(contracts, validation_inputs)
     monitor_contracts = contracts
     for contract in monitor_contracts:
         metrics = contract.get("validation") or {}
@@ -1958,9 +3479,13 @@ def build_artifact(
         contract for contract in monitor_contracts if contract["runtime_eligible"]
     ]
     return {
-        "version": 4,
+        "version": 5,
         "kind": "effect_matched_closure_contracts",
-        "method": "within_trajectory_local_effect_stable_repair_induction",
+        "method": (
+            "effect_stable_atomic_delta_induction_then_cross_task_contract_compilation"
+            if atomic
+            else "within_trajectory_local_effect_stable_repair_induction"
+        ),
         "prompt_version": PROMPT_VERSION,
         "model": model,
         "source": {
@@ -1979,6 +3504,16 @@ def build_artifact(
             "positive_anchor": "the immediate assistant response after explicit user repair, with unchanged realized-mutation fingerprint and observable contract discharge",
             "negative_outcome": "observable semantic closure-repair feedback",
             "effect_match": "equal cumulative realized-mutation fingerprint between a rejected response and its local repair response",
+            "learned_scope": (
+                "communication closure and read-only evidence bridges; action execution remains deterministic infrastructure"
+                if atomic
+                else "legacy full-contract induction"
+            ),
+            "contract_roles": (
+                "pre-draft trigger, authoritative binding, and candidate-only discharge are compiled separately"
+                if atomic
+                else "legacy mixed contract schema"
+            ),
             "structural_constants": "typed numeric selectors observed in non-failed tool results and supported by distinct train tasks",
             "terminal_assessments": dict(terminal_assessment_counts or {}),
             "induction_abstentions": dict(induction_abstention_counts or {}),
@@ -2007,6 +3542,27 @@ def build_artifact(
             "effect_matched_trajectories": contrast_count,
             "candidate_checkpoints": candidate_checkpoint_count,
             "raw_contracts": len(raw_contracts),
+            "raw_atoms": len(raw_contracts) if atomic else 0,
+            "atomic_clusters": (
+                len(cluster_atoms(train_candidates, min_support=min_support))
+                if atomic
+                else 0
+            ),
+            "atom_types": (
+                dict(Counter(str(item.get("type", "unknown")) for item in raw_contracts))
+                if atomic
+                else {}
+            ),
+            "repair_modes": (
+                dict(
+                    Counter(
+                        str(item.get("repair_mode", "unknown"))
+                        for item in raw_contracts
+                    )
+                )
+                if atomic
+                else {}
+            ),
             "induction_abstentions": sum((induction_abstention_counts or {}).values()),
             "train_candidates": len(train_candidates),
             "validation_candidates": len(validation_candidates),
@@ -2019,6 +3575,15 @@ def build_artifact(
             **validation,
             "kind": "induction_retrieval_evaluator_consistency_not_effect_validation",
         },
+        "atomic_induction_audit": (
+            atomic_induction_audit(
+                raw_contracts,
+                validation_percent=validation_percent,
+                min_support=min_support,
+            )
+            if atomic
+            else None
+        ),
         "contracts": runtime_contracts,
         "monitor_contracts": monitor_contracts,
     }
@@ -2141,14 +3706,19 @@ def main() -> None:
         raise RuntimeError(
             "no effect-matched terminal/candidate checkpoint sets were found"
         )
-    raw_contracts: list[dict[str, Any]] = []
+    raw_atoms: list[dict[str, Any]] = []
     terminal_assessment_counts: Counter[str] = Counter()
     induction_abstention_counts: Counter[str] = Counter()
     failures: list[str] = []
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
         futures = {
             executor.submit(
-                induce_one, client, args.model, contrast, args.cache_dir, args.retries,
+                induce_atoms_one,
+                client,
+                args.model,
+                contrast,
+                args.cache_dir,
+                args.retries,
             ): contrast
             for contrast in contrasts
         }
@@ -2156,10 +3726,14 @@ def main() -> None:
             contrast = futures[future]
             try:
                 result = future.result()
-                raw_contracts.extend(result.contracts)
+                raw_atoms.extend(result.atoms)
                 terminal_assessment_counts[result.terminal_label] += 1
-                if result.abstention_reason:
-                    induction_abstention_counts[result.abstention_reason] += 1
+                if result.semantic_abstentions:
+                    induction_abstention_counts["semantic_unrepresentable"] += len(
+                        result.semantic_abstentions
+                    )
+                if result.schema_failure:
+                    raise AtomSchemaError([result.schema_failure])
             except Exception as error:
                 failure = f"{contrast.trace.domain}/{contrast.trace.task_id}: {error}"
                 failures.append(failure)
@@ -2172,21 +3746,21 @@ def main() -> None:
             if completed % 10 == 0 or completed == len(futures):
                 print(
                     f"induced {completed}/{len(futures)} contrasts; "
-                    f"contracts={len(raw_contracts)} "
+                    f"atoms={len(raw_atoms)} "
                     f"abstentions={sum(induction_abstention_counts.values())} "
                     f"failures={len(failures)}",
                     flush=True,
                 )
     if failures:
         raise RuntimeError("contract induction incomplete:\n" + "\n".join(failures))
-    if not raw_contracts:
+    if not raw_atoms:
         raise RuntimeError(
-            "no closure-repair contracts survived induction and validation"
+            "no atomic closure deltas survived induction and validation"
         )
 
     artifact = build_artifact(
         traces,
-        raw_contracts,
+        raw_atoms,
         model=args.model,
         validation_percent=args.validation_percent,
         min_support=args.min_support,

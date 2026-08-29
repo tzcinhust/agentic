@@ -779,6 +779,60 @@ def test_final_gate_disappears_when_proposed_answer_discharges_contract() -> Non
     assert evaluator.gate(complete).should_recover is False
 
 
+def test_grouped_evidence_discharge_requires_distinct_semantic_slots() -> None:
+    contract = copy.deepcopy(boundary_contract())
+    contract["obligations"][0]["response_requirements"] = [
+        {
+            "kind": "mention_evidence",
+            "description": "state both current and next amounts",
+            "selectors": [
+                {
+                    "source": "tool_result",
+                    "tool": "preview_cancel",
+                    "path": "current_fee",
+                    "operator": "exists",
+                },
+                {
+                    "source": "tool_result",
+                    "tool": "preview_cancel",
+                    "path": "next_fee",
+                    "operator": "exists",
+                },
+            ],
+            "selector_groups": [
+                [
+                    {
+                        "source": "tool_result",
+                        "tool": "preview_cancel",
+                        "path": "current_fee",
+                        "operator": "exists",
+                    }
+                ],
+                [
+                    {
+                        "source": "tool_result",
+                        "tool": "preview_cancel",
+                        "path": "next_fee",
+                        "operator": "exists",
+                    }
+                ],
+            ],
+            "value_mode": "numeric",
+            "min_groups": 2,
+        }
+    ]
+    evaluator = ContractEvaluator([contract], evidence_conversation())
+    partial = type("Response", (), {"text": "The current fee is $90.", "tool_calls": []})()
+    complete = type(
+        "Response",
+        (),
+        {"text": "The current fee is $90 and the next fee is $180.", "tool_calls": []},
+    )()
+
+    assert evaluator.gate(partial).should_recover is True
+    assert evaluator.gate(complete).should_recover is False
+
+
 def test_also_is_not_mistaken_for_a_causal_explanation() -> None:
     evaluator = ContractEvaluator([boundary_contract()], evidence_conversation())
     response = type(
@@ -946,7 +1000,7 @@ def test_preclaim_gate_uses_each_contracts_own_claim_scope() -> None:
     assert evaluator.gate(amount).should_recover is True
 
 
-def test_draft_text_can_activate_a_contract_without_joining_the_trajectory() -> None:
+def test_draft_text_cannot_self_activate_contract_applicability() -> None:
     contract = {
         **boundary_contract(),
         "id": "contract_draft_claim",
@@ -987,7 +1041,7 @@ def test_draft_text_can_activate_a_contract_without_joining_the_trajectory() -> 
         "Response", (), {"text": "The request is complete.", "tool_calls": []}
     )()
 
-    assert evaluator.gate(fee_draft).should_recover is True
+    assert evaluator.gate(fee_draft).should_recover is False
     assert evaluator.gate(unrelated_draft).should_recover is False
     assert evaluator.conversation == [{"role": "user", "content": "What happened?"}]
 
@@ -1020,7 +1074,7 @@ def test_runtime_index_rejects_unvalidated_numeric_selectors() -> None:
         "kind": "effect_matched_closure_contracts",
         "contracts": [contract],
     }
-    with pytest.raises(ValueError, match="unvalidated numeric selector"):
+    with pytest.raises(ValueError, match="unsafe or unvalidated selector"):
         EffectMatchedContractIndex(artifact, domain="travel")
 
     selector = contract["applicability"]["predicates"][0]
@@ -1037,6 +1091,27 @@ def test_runtime_index_rejects_unvalidated_numeric_selectors() -> None:
         }
     )
     assert EffectMatchedContractIndex(artifact, domain="travel").contracts
+
+
+def test_runtime_index_rejects_assistant_text_as_applicability_evidence() -> None:
+    contract = boundary_contract()
+    contract["applicability"]["predicates"] = [
+        {
+            "source": "assistant_text",
+            "tool": "*",
+            "path": "content",
+            "operator": "contains",
+            "value": "fee",
+        }
+    ]
+    artifact = {
+        "version": 5,
+        "kind": "effect_matched_closure_contracts",
+        "contracts": [contract],
+    }
+
+    with pytest.raises(ValueError, match="unsafe or unvalidated selector"):
+        EffectMatchedContractIndex(artifact, domain="travel")
 
 
 def test_runtime_retrieval_query_masks_task_literals() -> None:

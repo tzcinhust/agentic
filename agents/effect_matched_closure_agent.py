@@ -612,7 +612,7 @@ class EffectMatchedClosureAgent(_FrozenPWM):
             metadata = {}
             trajectory.metadata = metadata
         metadata["effect_matched_closure_memory"] = {
-            "version": "effect_matched_closure_v2",
+            "version": "effect_matched_atomic_closure_v3",
             "mode": self.closure_mode,
             "enforce_pre_action": self.enforce_pre_action,
             "max_recoveries_per_task": self.max_recoveries_per_task,

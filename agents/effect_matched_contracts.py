@@ -1167,6 +1167,39 @@ def _selector_nodes(value: Any):
 
 
 def _runtime_contract_is_safe(contract: dict[str, Any]) -> bool:
+    applicability = contract.get("applicability") or {}
+    if any(
+        isinstance(selector, dict) and selector.get("source") == "assistant_text"
+        for selector in applicability.get("predicates", [])
+    ):
+        return False
+    for obligation in contract.get("obligations", []):
+        if not isinstance(obligation, dict):
+            continue
+        for group in obligation.get("evidence_requirements", []):
+            if any(
+                isinstance(selector, dict)
+                and selector.get("source") == "assistant_text"
+                for selector in (group.get("any_of", []) if isinstance(group, dict) else [])
+            ):
+                return False
+        for clause in obligation.get("response_requirements", []):
+            if not isinstance(clause, dict):
+                continue
+            if clause.get("kind") == "mention_evidence" and any(
+                isinstance(selector, dict)
+                and selector.get("source") == "assistant_text"
+                for selector in [
+                    *clause.get("selectors", []),
+                    *[
+                        member
+                        for group in clause.get("selector_groups", [])
+                        if isinstance(group, list)
+                        for member in group
+                    ],
+                ]
+            ):
+                return False
     for selector in _selector_nodes(contract):
         value = selector.get("value")
         if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -1235,7 +1268,7 @@ class EffectMatchedContractIndex:
         ]
         if unsafe:
             raise ValueError(
-                "runtime contract contains an unvalidated numeric selector: "
+                "runtime contract contains an unsafe or unvalidated selector: "
                 + ", ".join(unsafe)
             )
         self.contracts = available
@@ -1593,6 +1626,34 @@ class ContractEvaluator:
             markers = markers or list(COMPARISON_MARKERS)
             return any(marker in text.casefold() for marker in markers)
         if kind == "mention_evidence":
+            selector_groups = [
+                [item for item in group if isinstance(item, dict)]
+                for group in clause.get("selector_groups", [])
+                if isinstance(group, list)
+            ]
+            selector_groups = [group for group in selector_groups if group]
+            if selector_groups:
+                mode = str(clause.get("value_mode", "any"))
+                mentioned_groups = 0
+                for group in selector_groups:
+                    facts = [
+                        fact
+                        for selector in group
+                        for fact in evidence_view.satisfying(
+                            selector, trustworthy_only=True
+                        )
+                    ]
+                    if any(_value_is_mentioned(fact.value, text, mode) for fact in facts):
+                        mentioned_groups += 1
+                required_groups = max(
+                    1,
+                    int(
+                        clause.get(
+                            "min_groups", clause.get("min_mentions", 1)
+                        )
+                    ),
+                )
+                return mentioned_groups >= required_groups
             selectors = [
                 item for item in clause.get("selectors", []) if isinstance(item, dict)
             ]
@@ -1632,21 +1693,13 @@ class ContractEvaluator:
         proposed_text: str = "",
         proposed_calls: list[dict[str, Any]] | None = None,
     ) -> list[ObligationState]:
-        # Held text/tool arguments are observable to applicability at this gate,
-        # but are not committed evidence. Reparse neither draft text nor calls.
+        # Applicability is fixed before the candidate response.  Proposed text
+        # is evaluated only by response clauses and can never self-activate a
+        # contract. Proposed tool arguments remain visible for deterministic
+        # pre-action contracts, but are not committed evidence.
         applicability_view = self.evidence
-        if proposed_text or proposed_calls:
+        if proposed_calls:
             applicability_view = EvidenceLedger(self.conversation)
-        if proposed_text:
-            applicability_view.facts.append(
-                EvidenceFact(
-                    ref="DRAFT",
-                    source="assistant_text",
-                    value=proposed_text,
-                    path="content",
-                    conversation_index=len(self.conversation),
-                )
-            )
         for call_position, call in enumerate(proposed_calls or []):
             for path, value in _flatten(call.get("arguments") or {}):
                 applicability_view.facts.append(

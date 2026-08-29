@@ -8,14 +8,18 @@ from types import SimpleNamespace
 import pytest
 
 from scripts.build_effect_matched_contracts import (
+    AtomSchemaError,
     TrainTrace,
     analyze_pair_availability,
     build_artifact,
     build_contrast_set,
+    compile_atoms,
+    induce_atoms_one,
     induce_one,
     load_traces,
     merge_contracts,
     normalize_payload,
+    normalize_atom_payload,
     normalize_selector,
     repair_checkpoint,
     resolved_terminal_label,
@@ -134,6 +138,64 @@ def valid_payload():
                                 "description": "state the causal rationale",
                             },
                         ],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def valid_atom_payload():
+    return {
+        "terminal_assessment": {
+            "label": "explicit_acceptance",
+            "reason": "the terminal feedback explicitly confirms resolution",
+        },
+        "candidate_labels": [
+            {
+                "checkpoint_id": "cp_1",
+                "label": "closure_repair",
+                "reason": "the user explicitly requests the omitted rationale",
+            }
+        ],
+        "repair_abstentions": [],
+        "closure_atoms": [
+            {
+                "source_checkpoint_id": "cp_1",
+                "title": "Grounded fee rationale",
+                "intent": "resolve a fee-bearing operation",
+                "keywords": ["fee", "reason", "explain"],
+                "confidence": 0.9,
+                "deadline": "before_final",
+                "type": "explanation_rationale",
+                "requirement": "Explain why an applicable fee applies using authoritative evidence.",
+                "trigger_candidates": [
+                    {
+                        "source": "tool_result",
+                        "tool": "cancel_*",
+                        "path": "fee",
+                        "operator": "exists",
+                    }
+                ],
+                "bindings": [
+                    {
+                        "id": "fee_outcome",
+                        "description": "authoritative fee outcome",
+                        "required": True,
+                        "selectors": [
+                            {
+                                "source": "tool_result",
+                                "tool": "cancel_*",
+                                "path": "fee",
+                                "operator": "exists",
+                            }
+                        ],
+                    }
+                ],
+                "discharge": [
+                    {
+                        "kind": "causal_explanation",
+                        "binding_ids": ["fee_outcome"],
                     }
                 ],
             }
@@ -270,6 +332,144 @@ def test_normalization_keeps_only_explicit_closure_repair_contracts() -> None:
     assert normalize_payload(payload, contrast) == []
 
 
+def test_atomic_extraction_separates_binding_from_qualitative_discharge() -> None:
+    atoms = normalize_atom_payload(
+        valid_atom_payload(), build_contrast_set(trace_with_same_effect())
+    )
+
+    assert len(atoms) == 1
+    assert atoms[0]["bindings"][0]["selectors"][0]["source"] == "tool_result"
+    assert atoms[0]["discharge"] == [
+        {
+            "kind": "causal_explanation",
+            "binding_ids": ["fee_outcome"],
+        }
+    ]
+
+
+def test_atomic_binding_cannot_self_ground_in_assistant_text() -> None:
+    payload = valid_atom_payload()
+    payload["closure_atoms"][0]["bindings"][0]["selectors"][0] = {
+        "source": "assistant_text",
+        "tool": "*",
+        "path": "content",
+        "operator": "contains",
+        "value": "fee",
+    }
+
+    with pytest.raises(AtomSchemaError, match="assistant_text cannot ground"):
+        normalize_atom_payload(payload, build_contrast_set(trace_with_same_effect()))
+
+
+def test_repair_only_phrase_cannot_become_an_applicability_trigger() -> None:
+    payload = valid_atom_payload()
+    payload["closure_atoms"][0]["trigger_candidates"] = [
+        {
+            "source": "user_text",
+            "tool": "*",
+            "path": "content",
+            "operator": "contains",
+            "value": "does not explain",
+        }
+    ]
+
+    with pytest.raises(AtomSchemaError, match="not true before the rejected draft"):
+        normalize_atom_payload(payload, build_contrast_set(trace_with_same_effect()))
+
+
+def test_atom_and_semantic_abstention_must_be_disjoint() -> None:
+    payload = valid_atom_payload()
+    payload["repair_abstentions"] = [
+        {"checkpoint_id": "cp_1", "reason": "cannot generalize"}
+    ]
+
+    with pytest.raises(AtomSchemaError, match="atom and abstention overlap"):
+        normalize_atom_payload(payload, build_contrast_set(trace_with_same_effect()))
+
+
+def test_cross_task_atomic_compilation_does_not_require_free_form_family_match() -> None:
+    first = trace_with_same_effect()
+    second = replace(
+        trace_with_same_effect(),
+        task_id="train-b",
+        source_sha256="b" * 64,
+        path=Path("train-b.json"),
+    )
+    second.conversation[1]["tool_calls"][0]["arguments"]["booking_id"] = "BK-OTHER"
+    atoms = [
+        *normalize_atom_payload(valid_atom_payload(), build_contrast_set(first)),
+        *normalize_atom_payload(valid_atom_payload(), build_contrast_set(second)),
+    ]
+
+    contracts = compile_atoms(atoms, min_support=2)
+
+    assert len(contracts) == 1
+    assert contracts[0]["support"] == 2
+    clauses = contracts[0]["obligations"][0]["response_requirements"]
+    assert [item["kind"] for item in clauses] == ["causal_explanation"]
+    assert contracts[0]["provenance"]["atomic_induction"] is True
+
+    artifact = build_artifact(
+        [first, second],
+        atoms,
+        model="model",
+        validation_percent=0,
+        min_support=2,
+    )
+    assert artifact["version"] == 5
+    assert artifact["method"].startswith("effect_stable_atomic_delta")
+    assert artifact["stats"]["raw_atoms"] == 2
+    assert artifact["stats"]["atomic_clusters"] == 1
+    assert artifact["atomic_induction_audit"]["contains_raw_conversations"] is False
+    assert artifact["atomic_induction_audit"]["compiled_clusters"] == 1
+
+
+def test_atomic_compiler_keeps_distinct_binding_slots_separate() -> None:
+    first = trace_with_same_effect()
+    second = replace(
+        trace_with_same_effect(),
+        task_id="train-b",
+        source_sha256="b" * 64,
+        path=Path("train-b.json"),
+    )
+    atoms = [
+        *normalize_atom_payload(valid_atom_payload(), build_contrast_set(first)),
+        *normalize_atom_payload(valid_atom_payload(), build_contrast_set(second)),
+    ]
+    for atom in atoms:
+        atom["type"] = "comparison"
+        atom["title"] = "Compare operation outcome and fee"
+        atom["intent"] = "compare two authoritative operation properties"
+        atom["requirement"] = "Compare the authoritative fee with the operation state."
+        atom["bindings"].append(
+            {
+                "id": "operation_state",
+                "description": "authoritative operation state",
+                "required": True,
+                "selectors": [
+                    {
+                        "source": "tool_result",
+                        "tool": "cancel_*",
+                        "path": "status",
+                        "operator": "exists",
+                    }
+                ],
+            }
+        )
+        atom["discharge"] = [
+            {
+                "kind": "comparison",
+                "binding_ids": ["fee_outcome", "operation_state"],
+            }
+        ]
+
+    contract = compile_atoms(atoms, min_support=2)[0]
+
+    evidence = contract["obligations"][0]["evidence_requirements"]
+    assert len(evidence) == 2
+    assert {item["any_of"][0]["path"] for item in evidence} == {"fee", "status"}
+
+
 def test_terminal_marker_alone_is_not_treated_as_success_but_can_bound_discharge() -> None:
     sample = trace_with_same_effect()
     sample.conversation[-1]["content"] = "[TASK_DONE]"
@@ -395,7 +595,40 @@ def test_unrepresentable_contract_is_cached_as_auditable_abstention(tmp_path) ->
     cache = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
     assert cache["status"] == "abstained"
 
-    cached = induce_one(
+
+def test_invalid_atomic_schema_is_not_mislabeled_as_semantic_abstention(
+    tmp_path,
+) -> None:
+    contrast = build_contrast_set(trace_with_same_effect())
+    payload = valid_atom_payload()
+    payload["closure_atoms"][0]["bindings"][0]["selectors"][0] = {
+        "source": "assistant_text",
+        "tool": "*",
+        "path": "content",
+        "operator": "contains",
+        "value": "fee",
+    }
+
+    class Completions:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload)))
+                ]
+            )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=Completions())
+    )
+    result = induce_atoms_one(client, "model", contrast, tmp_path, retries=1)
+
+    assert result.atoms == ()
+    assert result.semantic_abstentions == ()
+    assert "assistant_text cannot ground" in result.schema_failure
+    cache = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
+    assert cache["status"] == "invalid_atom_schema"
+
+    cached = induce_atoms_one(
         SimpleNamespace(chat=None), "model", contrast, tmp_path, retries=1
     )
     assert cached == result
