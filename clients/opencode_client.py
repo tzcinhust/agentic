@@ -164,21 +164,13 @@ class OpenCodeLLMClient(BaseLLMClient):
         system_prompt: str,
         conversation: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        audit_id: str | None = None,
-        task_key: str | None = None,
     ) -> AgentCompletion:
-        extra_headers = {}
-        if audit_id:
-            extra_headers["X-PWM-Audit-ID"] = audit_id
-        if task_key:
-            extra_headers["X-PWM-Task-Key"] = task_key
         response = self._client.chat.completions.create(
             model=self.model,
             messages=_chat_messages(system_prompt, conversation),
             tools=_chat_tools(tools),
             temperature=0,
             max_tokens=self.max_tokens,
-            extra_headers=extra_headers or None,
         )
         message = response.choices[0].message
         tool_calls = []

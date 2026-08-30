@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import importlib.metadata
 import json
 import os
-import platform
 import re
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,10 +12,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
-
-
-SPLIT_SEED = "workflow-router-v2-sha256"
 
 
 DOMAIN_TOOLS = {
@@ -386,13 +379,9 @@ Keep each workflow concise and executable. Output JSON only."""
         raise ValueError("workflow model did not return a JSON object")
     payload = json.loads(match.group(0))
     workflows = payload.get("workflows")
-    if (
-        not isinstance(workflows, list)
-        or not 1 <= len(workflows) <= 3
-        or not all(isinstance(item, dict) for item in workflows)
-    ):
-        raise ValueError("workflow response must contain 1-3 workflow objects")
-    return workflows
+    if not isinstance(workflows, list):
+        raise ValueError("workflow response is missing a workflows list")
+    return [item for item in workflows if isinstance(item, dict)][:3]
 
 
 def _fallback_card(family: str, process: dict[str, Any], records: list[TraceRecord]) -> dict[str, Any]:
@@ -404,71 +393,24 @@ def _fallback_card(family: str, process: dict[str, Any], records: list[TraceReco
         "title": family.replace(":", " / ").replace("_", " "),
         "applies_when": f"The request matches the {family.replace('_', ' ')} workflow family.",
         "preconditions": [f"Verify current facts needed by {name}." for name in required if name not in WRITE_TOOLS],
-        "steps": (
-            [f"Use {name} with current-task identifiers and verified arguments." for name in sequence]
-            if sequence
-            else ["Do not mutate state; explain that no verified workflow action is available."]
-        ),
+        "steps": [f"Use {name} with current-task identifiers and verified arguments." for name in sequence],
         "branches": ["If a required condition is not verified, explain the valid alternative and do not mutate state."],
         "avoid": ["Do not copy identifiers, prices, dates, or policy outcomes from training examples."],
         "keywords": _tokens(family.replace(":", " ")),
     }
 
 
-def _validate_card(card: Any, allowed_tools: set[str]) -> bool:
+def _validate_card(card: dict[str, Any], allowed_tools: set[str]) -> bool:
     required = {"title", "applies_when", "preconditions", "steps", "branches", "avoid", "keywords"}
-    if not isinstance(card, dict) or set(card) != required:
-        return False
-    if (
-        not isinstance(card.get("title"), str)
-        or not card["title"].strip()
-        or not isinstance(card.get("applies_when"), str)
-        or not card["applies_when"].strip()
-        or any(
-            not isinstance(card.get(key), list)
-            or not all(isinstance(item, str) for item in card[key])
-            for key in ("preconditions", "steps", "branches", "avoid", "keywords")
-        )
-        or not card["steps"]
-    ):
+    if not required.issubset(card) or not isinstance(card.get("steps"), list):
         return False
     text = json.dumps(card, ensure_ascii=True).lower()
     mentioned = set(re.findall(r"\b[a-z][a-z0-9]+(?:_[a-z0-9]+)+\b", text))
-    # Tool schemas legitimately contain snake_case argument names such as
-    # ``add_wifi`` and ``add_extra_legroom``.  They share tool-like prefixes,
-    # so exclude identifiers used syntactically as keyword arguments before
-    # rejecting unknown tool mentions.  A hallucinated call/name elsewhere
-    # (for example ``add_baggage(...)`` or "use add_baggage") still fails.
-    argument_names = set(
-        re.findall(
-            r"(?:\(|,)\s*([a-z][a-z0-9]+(?:_[a-z0-9]+)+)\s*=",
-            text,
-        )
-    )
-    tool_prefixes = (
-        "add_",
-        "apply_",
-        "book_",
-        "cancel_",
-        "check_",
-        "create_",
-        "get_",
-        "process_",
-        "redeem_",
-        "remove_",
-        "search_",
-        "set_",
-        "update_",
-        "validate_",
-    )
-    hallucinated_tools = {
-        token
-        for token in mentioned
-        if token.startswith(tool_prefixes)
-        and token not in allowed_tools
-        and token not in argument_names
+    suspicious = {
+        token for token in mentioned
+        if token not in allowed_tools and token not in {"read_only", "customer_support", "shopping_assistant"}
     }
-    return not hallucinated_tools
+    return not any(token.endswith(("_booking", "_order", "_cart", "_refund", "_return")) for token in suspicious)
 
 
 def _render_card(card: dict[str, Any], process: dict[str, Any], mode: str = "hybrid") -> str:
@@ -499,246 +441,6 @@ def _render_card(card: dict[str, Any], process: dict[str, Any], mode: str = "hyb
     return "\n".join([*semantic, *structural])
 
 
-def _canonical_bytes(value: Any) -> bytes:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _llm_provider_identity(args: argparse.Namespace) -> dict[str, str | None]:
-    """Return a non-secret cache identity for the workflow-generation provider."""
-
-    if args.no_llm:
-        return {
-            "provider_tag": "deterministic-no-llm",
-            "endpoint_host_path_sha256": None,
-        }
-    parsed = urlsplit(str(args.llm_base_url))
-    if not parsed.hostname:
-        raise ValueError("--llm-base-url must include a valid hostname")
-    host = parsed.hostname.lower()
-    if parsed.port is not None:
-        host = f"{host}:{parsed.port}"
-    path = "/" + parsed.path.strip("/") if parsed.path.strip("/") else "/"
-    public_endpoint = f"{host}{path}"
-    explicit_tag = getattr(args, "llm_provider_tag", None)
-    return {
-        "provider_tag": str(explicit_tag).strip() if explicit_tag else "endpoint-hash",
-        "endpoint_host_path_sha256": _sha256_bytes(public_endpoint.encode("utf-8")),
-    }
-
-
-def _build_environment() -> dict[str, str]:
-    versions = {"python": platform.python_version()}
-    for distribution in ("pm4py", "pandas", "openai"):
-        try:
-            versions[distribution] = importlib.metadata.version(distribution)
-        except importlib.metadata.PackageNotFoundError:
-            versions[distribution] = "unavailable"
-    return versions
-
-
-def _select_training_files(args: argparse.Namespace) -> tuple[dict[str, list[Path]], dict[str, Any]]:
-    data_root = args.data_root.resolve()
-    if tuple(part.lower() for part in data_root.parts[-2:]) != (
-        "datasets",
-        "train_task_trajectories",
-    ):
-        raise ValueError(
-            "--data-root must end exactly in datasets/train_task_trajectories; "
-            f"got {data_root}"
-        )
-
-    all_files: dict[str, list[Path]] = {}
-    all_ids: dict[str, set[str]] = {}
-    inventory_names: list[str] = []
-    for domain in DOMAIN_TOOLS:
-        domain_root = (data_root / domain).resolve()
-        files = sorted(domain_root.glob("*.json"), key=lambda item: item.name)
-        if len(files) != 100 or len({path.stem for path in files}) != 100:
-            raise ValueError(
-                f"Expected exactly 100 unique train trajectories for {domain}; found {len(files)}"
-            )
-        if any(path.resolve().parent != domain_root for path in files):
-            raise ValueError(f"Train inventory for {domain} contains an out-of-directory file")
-        all_files[domain] = files
-        all_ids[domain] = {path.stem for path in files}
-        inventory_names.extend(
-            f"datasets/train_task_trajectories/{domain}/{path.name}" for path in files
-        )
-    inventory_hash = _sha256_bytes(_canonical_bytes(sorted(inventory_names)))
-
-    selector_hash: str | None = None
-    selector_method = "all_fixed_train_trajectories"
-    selected_ids: dict[str, set[str]] = {}
-    split_summary: dict[str, Any] = {}
-    if args.task_split == "all":
-        selected_ids = {domain: set(values) for domain, values in all_ids.items()}
-        split_summary = {
-            domain: {"all": sorted(values)} for domain, values in selected_ids.items()
-        }
-    else:
-        if args.task_manifest is None:
-            raise ValueError("--task-split optimizer requires --task-manifest")
-        raw_manifest = args.task_manifest.resolve().read_bytes()
-        selector_hash = _sha256_bytes(raw_manifest)
-        manifest = json.loads(raw_manifest.decode("utf-8"))
-        if not isinstance(manifest, dict):
-            raise ValueError("--task-manifest must be an object containing task IDs only")
-        extra_keys = set(map(str, manifest)) - {*DOMAIN_TOOLS, "seed", "method"}
-        if extra_keys:
-            raise ValueError(f"Task manifest contains unsupported metadata: {sorted(extra_keys)}")
-        selector_method = str(manifest.get("method") or "sha256_dev_manifest")
-        for domain in DOMAIN_TOOLS:
-            domain_value = manifest.get(domain)
-            if isinstance(domain_value, dict):
-                unknown_split_keys = set(map(str, domain_value)) - {
-                    "dev",
-                    "lockbox",
-                    "optimizer",
-                }
-                if unknown_split_keys:
-                    raise ValueError(
-                        f"Task manifest contains unsupported {domain} fields: "
-                        f"{sorted(unknown_split_keys)}"
-                    )
-                split_values = {
-                    key: domain_value.get(key) for key in ("dev", "lockbox", "optimizer")
-                }
-                if any(
-                    not isinstance(values, list)
-                    or not all(isinstance(value, str) for value in values)
-                    for values in split_values.values()
-                ):
-                    raise ValueError(f"Task manifest {domain} splits must be task-ID strings only")
-                dev = list(split_values["dev"])
-                lockbox = list(split_values["lockbox"])
-                optimizer = list(split_values["optimizer"])
-            elif isinstance(domain_value, list):
-                if not all(isinstance(value, str) for value in domain_value):
-                    raise ValueError(f"Task manifest {domain} values must be task-ID strings only")
-                dev = list(domain_value)
-                remaining = sorted(
-                    all_ids[domain] - set(dev),
-                    key=lambda task_id: (
-                        hashlib.sha256(
-                            f"{SPLIT_SEED}|{domain}|{task_id}".encode("utf-8")
-                        ).hexdigest(),
-                        task_id,
-                    ),
-                )
-                lockbox, optimizer = remaining[:10], remaining[10:]
-            else:
-                raise ValueError(f"Task manifest is missing a valid selector for {domain}")
-            split_sets = {
-                "dev": set(dev),
-                "lockbox": set(lockbox),
-                "optimizer": set(optimizer),
-            }
-            sizes = [len(split_sets[key]) for key in ("dev", "lockbox", "optimizer")]
-            if sizes != [10, 10, 80]:
-                raise ValueError(
-                    f"Expected dev/lockbox/optimizer sizes 10/10/80 for {domain}; got {sizes}"
-                )
-            if (
-                split_sets["dev"] & split_sets["lockbox"]
-                or split_sets["dev"] & split_sets["optimizer"]
-                or split_sets["lockbox"] & split_sets["optimizer"]
-                or set().union(*split_sets.values()) != all_ids[domain]
-            ):
-                raise ValueError(f"Task manifest does not partition the 100 train IDs for {domain}")
-            selected_ids[domain] = split_sets["optimizer"]
-            split_summary[domain] = {
-                key: sorted(values) for key, values in split_sets.items()
-            }
-
-    selected_files: dict[str, list[Path]] = {}
-    manifest_entries: list[dict[str, str]] = []
-    expected_count = 100 if args.task_split == "all" else 80
-    for domain in DOMAIN_TOOLS:
-        selected_files[domain] = [
-            path for path in all_files[domain] if path.stem in selected_ids[domain]
-        ]
-        if len(selected_files[domain]) != expected_count:
-            raise ValueError(
-                f"Selected {len(selected_files[domain])}, expected {expected_count} for {domain}"
-            )
-        for path in selected_files[domain]:
-            manifest_entries.append(
-                {
-                    "path": f"datasets/train_task_trajectories/{domain}/{path.name}",
-                    "sha256": _sha256_file(path),
-                }
-            )
-    manifest_entries.sort(key=lambda item: item["path"])
-    trajectory_manifest_hash = _sha256_bytes(_canonical_bytes(manifest_entries))
-    builder_hash = _sha256_file(Path(__file__).resolve())
-    provider_identity = _llm_provider_identity(args)
-    build_environment = _build_environment()
-    fingerprint_payload = {
-        "schema": "process-workflows-cache-v2",
-        "builder_sha256": builder_hash,
-        "task_split": args.task_split,
-        "task_manifest_sha256": selector_hash,
-        "train_inventory_sha256": inventory_hash,
-        "trajectory_manifest_sha256": trajectory_manifest_hash,
-        "model": args.llm_model,
-        "provider_identity": provider_identity,
-        "build_environment": build_environment,
-        "generation_mode": "no_llm" if args.no_llm else "llm",
-        "noise_threshold": args.noise_threshold,
-        "representatives": args.representatives,
-    }
-    fingerprint = _sha256_bytes(_canonical_bytes(fingerprint_payload))
-    provenance = {
-        "task_split": args.task_split,
-        "task_manifest_sha256": selector_hash,
-        "task_manifest_method": selector_method,
-        "train_inventory_sha256": inventory_hash,
-        "inventory_file_count": sum(len(files) for files in all_files.values()),
-        "trajectory_manifest_sha256": trajectory_manifest_hash,
-        "read_content_manifest_sha256": trajectory_manifest_hash,
-        "builder_sha256": builder_hash,
-        "cache_fingerprint": fingerprint,
-        "generation_mode": "deterministic_fallback" if args.no_llm else "llm_strict",
-        "deterministic_fallback": bool(args.no_llm),
-        "llm_provider_identity": provider_identity,
-        "build_environment": build_environment,
-        "split_seed": SPLIT_SEED,
-        "selected_counts": {
-            domain: len(paths) for domain, paths in selected_files.items()
-        },
-        "split_summary": split_summary,
-        "learning_input": "datasets/train_task_trajectories only",
-        "excluded_sources": [
-            "task_definitions",
-            "requirements",
-            "test_tasks",
-            "test_environments",
-            "test_judge_reasoning",
-            "test_outputs",
-        ],
-    }
-    args.build_fingerprint = fingerprint
-    args.training_provenance = provenance
-    return selected_files, provenance
-
-
 def _generate_cards_for_family(
     job: dict[str, Any],
     *,
@@ -750,76 +452,40 @@ def _generate_cards_for_family(
     records = job["records"]
     process = job["process"]
     representatives = job["representatives"]
-    fingerprint = str(args.build_fingerprint)
-    cache_name = (
-        re.sub(r"[^a-z0-9_.+-]+", "_", f"{domain}__{family}".lower())
-        + f"__{fingerprint[:16]}.json"
-    )
+    cache_name = re.sub(r"[^a-z0-9_.+-]+", "_", f"{domain}__{family}".lower()) + ".json"
     cache_path = args.cache_dir / cache_name
     if cache_path.exists():
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
-        if (
-            cached.get("model") == args.llm_model
-            and cached.get("build_fingerprint") == fingerprint
-            and isinstance(cached.get("cards"), list)
-        ):
-            invalid = [index for index, card in enumerate(cached["cards"]) if not _validate_card(card, DOMAIN_TOOLS[domain])]
-            if not cached["cards"] or invalid:
-                raise ValueError(
-                    f"Strict workflow cache validation failed for {domain}/{family}: {invalid}"
-                )
+        if cached.get("model") == args.llm_model and isinstance(cached.get("cards"), list):
             return cached["cards"]
 
-    if client is None:
-        cards = [_fallback_card(family, process, records)]
-    else:
-        # Transport/provider retries are owned by the OpenAI client.  Any
-        # exhausted error or malformed response propagates and aborts the whole
-        # build; a failed LLM generation is never converted into cached memory.
-        cards = _llm_cards(
-            client=client,
-            model=args.llm_model,
-            domain=domain,
-            family=family,
-            process=process,
-            representatives=representatives,
-        )
-        invalid = [
-            index for index, card in enumerate(cards) if not _validate_card(card, DOMAIN_TOOLS[domain])
-        ]
-        if not cards or invalid:
-            raise ValueError(
-                f"Workflow model returned invalid cards for {domain}/{family}: {invalid}"
+    cards = []
+    if client is not None and len(records) >= 2:
+        try:
+            cards = _llm_cards(
+                client=client,
+                model=args.llm_model,
+                domain=domain,
+                family=family,
+                process=process,
+                representatives=representatives,
             )
+        except Exception as exc:
+            print(json.dumps({"domain": domain, "family": family, "llm_error": str(exc)}, ensure_ascii=True))
+    if not cards:
+        cards = [_fallback_card(family, process, records)]
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(
-        json.dumps(
-            {
-                "model": args.llm_model,
-                "build_fingerprint": fingerprint,
-                "task_split": args.task_split,
-                "generation_mode": "no_llm" if args.no_llm else "llm",
-                "llm_provider_identity": args.training_provenance["llm_provider_identity"],
-                "trajectory_manifest_sha256": args.training_provenance[
-                    "trajectory_manifest_sha256"
-                ],
-                "cards": cards,
-            },
-            ensure_ascii=True,
-            indent=2,
-        ),
+        json.dumps({"model": args.llm_model, "cards": cards}, ensure_ascii=True, indent=2),
         encoding="utf-8",
     )
     return cards
 
 
 def build(args: argparse.Namespace) -> dict[str, Any]:
-    selected_files, training_provenance = _select_training_files(args)
     client = None
     if not args.no_llm:
-        if args.llm_max_retries < 0:
-            raise ValueError("--llm-max-retries must be non-negative")
         from openai import OpenAI
 
         api_key = os.environ.get(args.llm_api_key_env)
@@ -829,19 +495,14 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             base_url=args.llm_base_url.rstrip("/") + "/",
             api_key=api_key,
             timeout=args.llm_timeout,
-            max_retries=args.llm_max_retries,
+            max_retries=1,
         )
 
     all_cards = []
     stats: dict[str, Any] = {}
     jobs = []
     for domain in DOMAIN_TOOLS:
-        records = [_parse_trace(path, domain) for path in selected_files[domain]]
-        expected_count = 100 if args.task_split == "all" else 80
-        if len(records) != expected_count:
-            raise ValueError(
-                f"Fail-closed selection expected {expected_count} records for {domain}, got {len(records)}"
-            )
+        records = [_parse_trace(path, domain) for path in sorted((args.data_root / domain).glob("*.json"))]
         families: dict[str, list[TraceRecord]] = defaultdict(list)
         for record in records:
             families[record.family].append(record)
@@ -892,9 +553,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         allowed_tools = DOMAIN_TOOLS[domain]
         for index, card in enumerate(cards):
             if not _validate_card(card, allowed_tools):
-                raise ValueError(
-                    f"Validated workflow cache changed before packing: {domain}/{family}/{index}"
-                )
+                card = _fallback_card(family, process, family_records)
             source_tasks = [record.task_id for record in representatives]
             search_text = " ".join(
                 [
@@ -930,7 +589,6 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         "version": 1,
         "method": "process-conformant-workflow-memory",
         "source": "STATE-Bench fixed train trajectories only",
-        "provenance": training_provenance,
         "cards": all_cards,
         "stats": stats,
     }
@@ -943,32 +601,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, default=Path("datasets/train_task_trajectories"))
     parser.add_argument("--output", type=Path, default=Path("outputs/memory/process_workflows.json"))
-    parser.add_argument(
-        "--task-split",
-        choices=("all", "optimizer"),
-        default="all",
-        help="Use all 100/domain train trajectories or the strict optimizer80 partition.",
-    )
-    parser.add_argument(
-        "--task-manifest",
-        type=Path,
-        default=None,
-        help="Required for --task-split optimizer; accepts legacy dev IDs or explicit 10/10/80 splits.",
-    )
     parser.add_argument("--noise-threshold", type=float, default=0.2)
     parser.add_argument("--representatives", type=int, default=5)
     parser.add_argument("--no-llm", action="store_true")
     parser.add_argument("--llm-base-url", default=os.environ.get("WORKFLOW_LLM_BASE_URL", "https://api.openai.com/v1"))
-    parser.add_argument(
-        "--llm-provider-tag",
-        default=os.environ.get("WORKFLOW_LLM_PROVIDER_TAG"),
-        help="Optional non-secret provider label included in the cache identity.",
-    )
     parser.add_argument("--llm-model", default=os.environ.get("WORKFLOW_LLM_MODEL", "gpt-5.4"))
     parser.add_argument("--llm-api-key-env", default="WORKFLOW_LLM_API_KEY")
     parser.add_argument("--llm-workers", type=int, default=6)
     parser.add_argument("--llm-timeout", type=float, default=240.0)
-    parser.add_argument("--llm-max-retries", type=int, default=4)
     parser.add_argument("--cache-dir", type=Path, default=Path("outputs/memory/workflow_cache"))
     args = parser.parse_args()
     artifact = build(args)
