@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tzcinhust/agentic/schemas/novacode-billing-evidence-v1.2.json",
+  "title": "NovaCode official750 billing evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "provider", "binding", "evidence"],
+  "properties": {
+    "schema_version": { "const": "1.2.0" },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "model", "base_url_origin_sha256"],
+      "properties": {
+        "name": { "const": "NovaCode" },
+        "model": { "const": "gpt-5.4" },
+        "base_url_origin_sha256": { "$ref": "#/$defs/nonzero_sha256" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trajectory_manifest_sha256",
+        "final_agent_audit_manifest_sha256",
+        "relay_agent_attribution_sha256",
+        "relay_ledger_manifest_sha256",
+        "session_chain_manifest_sha256",
+        "run_manifest_bundle_sha256",
+        "artifact_hashes",
+        "transport"
+      ],
+      "properties": {
+        "trajectory_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "final_agent_audit_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "relay_agent_attribution_sha256": { "$ref": "#/$defs/sha256" },
+        "relay_ledger_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "session_chain_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "run_manifest_bundle_sha256": { "$ref": "#/$defs/sha256" },
+        "artifact_hashes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memory_sha256",
+            "router_sha256",
+            "runner_sha256",
+            "state_bench_protocol_sha256",
+            "state_bench_commit"
+          ],
+          "properties": {
+            "memory_sha256": { "$ref": "#/$defs/sha256" },
+            "router_sha256": { "$ref": "#/$defs/sha256" },
+            "runner_sha256": { "$ref": "#/$defs/sha256" },
+            "state_bench_protocol_sha256": { "$ref": "#/$defs/sha256" },
+            "state_bench_commit": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          }
+        },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "upstream_origin_sha256",
+            "relay_sha256",
+            "ledger_relative_path",
+            "ledger_sha256"
+          ],
+          "properties": {
+            "provider": { "const": "novacode" },
+            "upstream_origin_sha256": { "$ref": "#/$defs/sha256" },
+            "relay_sha256": { "$ref": "#/$defs/sha256" },
+            "ledger_relative_path": {
+              "type": "string",
+              "pattern": "^_transport/[^/]+\\.jsonl$"
+            },
+            "ledger_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "oneOf": [
+        { "$ref": "#/$defs/rate_card_evidence" },
+        { "$ref": "#/$defs/invoice_evidence" }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonzero_sha256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "decimal": {
+      "oneOf": [
+        { "type": "number", "minimum": 0 },
+        { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$" }
+      ]
+    },
+    "source_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "document_class"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "document_class": {
+          "enum": ["provider_rate_card", "provider_invoice_export"]
+        }
+      }
+    },
+    "rate_card_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "pricing_authority",
+        "source_document"
+      ],
+      "properties": {
+        "mode": { "const": "rate_card" },
+        "pricing_authority": { "const": "novacode_provider" },
+        "source_document": {
+          "allOf": [
+            { "$ref": "#/$defs/source_document" },
+            {
+              "type": "object",
+              "properties": { "document_class": { "const": "provider_rate_card" } }
+            }
+          ]
+        }
+      }
+    },
+    "invoice_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "pricing_authority",
+        "source_document"
+      ],
+      "properties": {
+        "mode": { "const": "invoice_export" },
+        "pricing_authority": { "const": "novacode_provider" },
+        "source_document": {
+          "allOf": [
+            { "$ref": "#/$defs/source_document" },
+            {
+              "type": "object",
+              "properties": {
+                "document_class": { "const": "provider_invoice_export" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
