@@ -40,11 +40,15 @@ PY
     if [[ -z "${missing}" ]]; then
       break
     fi
+    selector=(--tasks "${missing}")
+    present_count="$(find "${domain_root}/run1" -maxdepth 1 -type f -name '*.json' | wc -l)"
+    if [[ "${attempt}" -eq 1 && "${present_count}" -eq 0 ]]; then
+      selector=(--split test)
+    fi
     echo "domain=${domain} attempt=${attempt} remaining=$(awk -F, '{print NF}' <<<"${missing}")"
     "${python_bin}" -m state_bench.scripts.run_batch \
       --domain "${domain}" \
-      --split test \
-      --tasks "${missing}" \
+      "${selector[@]}" \
       --output-dir "${domain_root}" \
       --num-runs 1 \
       --num-workers "${workers}" \

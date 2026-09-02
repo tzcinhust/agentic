@@ -58,7 +58,6 @@ PY
     echo "arm=${arm} attempt=${attempt} remaining=$(awk -F, '{print NF}' <<<"${missing}")"
     "${python_bin}" -m state_bench.scripts.run_batch \
       --domain shopping_assistant \
-      --split train \
       --tasks "${missing}" \
       --output-dir "${arm_root}" \
       --num-runs 1 \
